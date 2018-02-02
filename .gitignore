@@ -1,0 +1,9 @@
+/.cproject
+/.project
+*.d
+/Release/
+/libraries/
+/core/
+/.settings
+/objects/
+/secrets.h
