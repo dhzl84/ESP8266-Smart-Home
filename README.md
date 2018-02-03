@@ -13,6 +13,19 @@ Basic building blocks and technologies:
 SW Built with [Sloeber IDE 4.2](http://eclipse.baeyens.it/), lots of great [Arduino](https://www.arduino.cc) libraries and ESP8266 Arduino 2.4.0  
 Circuit and PCB made with [Target 3001](https://ibfriedrich.com/de/index.html)
 
+## General hints
+Since there is certain information in my software that I do not want everyone to know I located those in a single header file called *secrets.h* which is not part of the repository, and therefore the build will fail.
+
+My *secrets.h* contains the following information:
+```c++
+#define WIFI_SSID          "xxx"
+#define WIFI_PWD           "xxx"
+#define LOCAL_MQTT_HOST    "xxx.xxx.xxx.xxx"
+#define THERMOSTAT_BINARY  "xxx"
+#define S20_BINARY         "xxx"
+```
+
+
 ## Inwall thermostat
 I started to think about new thermostats for my floor heating system while trying to find a good setting for each room with the analog thermostats only giving the range ice cold (0) to 6, whatever temperature that should be.
 So I thought about buying them but they were either expensive as hell or just didn't have the functionalities I wanted, thus I decided to build them on my own.
