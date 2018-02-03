@@ -42,12 +42,13 @@
 /* WiFi */
 const char* ssid     = WIFI_SSID;
 const char* password = WIFI_PWD;
-/* MQTT */
+
 #if CFG_MQTT_CLIENT
 const char* mqttHost = LOCAL_MQTT_HOST;
 const int   mqttPort = 1883;
 int MQTT_RECONNECT_TIMER   = MQTT_RECONNECT_TIME;
 #endif
+
 #if CFG_HTTP_UPDATE
 #if CFG_DEVICE == cThermostat
 const String myUpdateServer = THERMOSTAT_BINARY;
@@ -56,16 +57,18 @@ const String myUpdateServer = S20_BINARY;
 #else
 #error "HTTP update not supported for this device!"
 #endif /* CFG_DEVICE */
+boolean                 FETCH_UPDATE                    = false;       /* global variable used to decide whether an update shall be fetched from server or not */
 #endif /* CFG_HTTP_UPDATE */
+
+#if CFG_OTA
+boolean                 OTA_UPDATE                      = false;       /* global variable used to change display in case OTA update is initiated */
+#endif
 
 #if CFG_ROTARY_ENCODER
 volatile unsigned long  SWITCH_DEBOUNCE_REF             = 0;           /* reference for debouncing the rotary encoder button switch, latches return of millis() to be checked in next switch interrupt */
 volatile int            LAST_ENCODED                    = 0b11;        /* initial state of the rotary encoders gray code */
 volatile int            ROTARY_ENCODER_DIRECTION_INTS   = rotInit;     /* initialize rotary encoder with no direction */
 #endif
-
-boolean                 FETCH_UPDATE                    = false;       /* global variable used to decide whether an update shall be fetched from server or not */
-boolean                 OTA_UPDATE                      = false;       /* global variable used to change display in case OTA update is initiated */
 
 #if CFG_DEVICE == cS20
 S20 myS20;
@@ -82,6 +85,7 @@ MedianFilter   myHumidityFilter;
 #if CFG_DISPLAY
 SSD1306        myDisplay(0x3c,sdaPin,sclPin);
 #endif
+
 #if CFG_HEATING_CONTROL
 HeatingControl myHeatingControl;
 #endif
