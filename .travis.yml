@@ -8,7 +8,6 @@ before_install:
   - mv arduino-1.8.5 $HOME/arduino_ide
   - sudo ln -s $HOME/arduino_ide/arduino /usr/local/bin/arduino
 install:
-  #- git clone https://github.com/eXtatic-GitHub/ESP8266.git $HOME/esp8266
   - arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json" --save-prefs
   - arduino --install-boards esp8266:esp8266
   - arduino --board esp8266:esp8266:generic --save-prefs
@@ -17,7 +16,7 @@ script:
   - "echo $PWD"
   - "echo $HOME"
   - "ls $PWD"
-  - arduino -v --verify --board esp8266:esp8266:generic $HOME/
+  - arduino --verify --board esp8266:esp8266:generic $HOME/esp8266.cpp
 notifications:
   email:
     on_success: change
