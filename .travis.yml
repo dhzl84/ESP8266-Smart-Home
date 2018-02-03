@@ -6,7 +6,7 @@ before_install:
   - wget http://downloads.arduino.cc/arduino-1.8.5-linux64.tar.xz
   - tar xf arduino-1.8.5-linux64.tar.xz
   - mv arduino-1.8.5 $HOME/arduino_ide
-  - sudo $HOME/arduino_ide/./install.sh
+  - sudo ln -s $HOME/arduino_ide/arduino /usr/local/bin/arduino
 install:
   - git clone https://github.com/eXtatic-GitHub/ESP8266.git $HOME/esp8266
   - arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json" --save-prefs
