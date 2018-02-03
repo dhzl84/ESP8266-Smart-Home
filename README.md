@@ -14,6 +14,22 @@ SW Built with [Sloeber IDE 4.2](http://eclipse.baeyens.it/), lots of great [Ardu
 Circuit and PCB made with [Target 3001](https://ibfriedrich.com/de/index.html)
 
 ## Inwall thermostat
+I started to think about new thermostats for my floor heating system while trying to find a good setting for each room with the analog thermostats only giving the range ice cold (0) to 6, whatever temperature that should be.
+So I thought about buying them but they were either expensive as hell or just didn't have the functionalities I wanted, thus I decided to build them on my own.
+
+### Features
+
+**local:**
+* sensing room temperature
+* controlling room temperature
+* display current room temperature
+* display target temperature
+* switch on/off
+
+**remote:**
+* allow control from remote devices (smartphones, computers, etc.)
+* provide a nice front end
+* stay locally operational if not connected to a network
 
 ### SW configuration
 ```c++
@@ -32,3 +48,22 @@ Circuit and PCB made with [Target 3001](https://ibfriedrich.com/de/index.html)
 
 ### Wiring
 ![image](https://user-images.githubusercontent.com/5675570/35767892-47fde138-08f4-11e8-863e-870828831ac0.png)
+
+## Sonoff S20
+While having already some 433 MHz outlets setup I decided to buy some of those nice devices to connect all the christmas lights to Home Assistant and switch them reliably.
+I had a look at some available software solutions but then decided to just stick to my base software and extend it a bit for the S20.
+
+### Features
+
+**local:**
+* switch on/off via button
+
+**remote:**
+* switch on/off from remote devices (smartphones, computers, etc.)
+* switch on/off from remote controls (433 MHz, EnOcean)
+* configurable time based automations
+
+### SW configuration
+```c++
+#define CFG_DEVICE   cS20
+```
