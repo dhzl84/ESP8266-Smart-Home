@@ -1,4 +1,4 @@
-language: c
+language: cpp
 before_install:
   - "/sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_1.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :1 -ac -screen 0 1280x1024x16"
   - sleep 3
@@ -6,7 +6,7 @@ before_install:
   - wget http://downloads.arduino.cc/arduino-1.8.5-linux64.tar.xz
   - tar xf arduino-1.8.5-linux64.tar.xz
   - mv arduino-1.8.5 $HOME/arduino_ide
-  - sudo ln -s $HOME/arduino_ide/arduino /usr/local/bin/arduino
+  - ln -s $HOME/arduino_ide/arduino /usr/local/bin/arduino
 install:
   - arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json" --save-prefs
   - arduino --install-boards esp8266:esp8266
@@ -16,7 +16,7 @@ script:
   - "echo $PWD"
   - "echo $HOME"
   - "ls $PWD"
-  - arduino --verify --board esp8266:esp8266:generic $HOME/esp8266.cpp
+  - arduino -v --verify --board esp8266:esp8266:generic $HOME/esp8266.cpp
 notifications:
   email:
     on_success: change
