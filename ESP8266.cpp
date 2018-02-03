@@ -65,6 +65,7 @@ volatile int            ROTARY_ENCODER_DIRECTION_INTS   = rotInit;     /* initia
 #endif
 
 boolean                 FETCH_UPDATE                    = false;       /* global variable used to decide whether an update shall be fetched from server or not */
+boolean                 OTA_UPDATE                      = false;       /* global variable used to change display in case OTA update is initiated */
 
 #if CFG_DEVICE == cS20
 S20 myS20;
@@ -132,6 +133,7 @@ void messageReceived(String &topic, String &payload); /* MQTT callback */
 
 #if CFG_OTA
 void OTA_INIT(void);
+void HANDLE_OTA_UPDATE(void);
 #endif
 
 #if CFG_HTTP_UPDATE
@@ -454,22 +456,39 @@ void OTA_INIT(void)
 
       delete [] mqttName;
 
-      ArduinoOTA.onStart([]() {
+      ArduinoOTA.onStart([]()
+      {
+         OTA_UPDATE = true;
+         #if CFG_DISPLAY
+         DRAW_DISPLAY_MAIN();
+         #endif
          Serial.println("Start");
       });
-      ArduinoOTA.onEnd([]() {
-        Serial.println("\nEnd");
+
+      ArduinoOTA.onEnd([]()
+      {
+         OTA_UPDATE = false;
+         Serial.println("\nEnd");
       });
-      ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-        Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+
+      ArduinoOTA.onProgress([](unsigned int progress, unsigned int total)
+      {
+         Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
       });
-      ArduinoOTA.onError([](ota_error_t error) {
-        Serial.printf("Error[%u]: ", error);
-        if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-        else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-        else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-        else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-        else if (error == OTA_END_ERROR) Serial.println("End Failed");
+
+      ArduinoOTA.onError([](ota_error_t error)
+      {
+         OTA_UPDATE = false;
+         #if CFG_DISPLAY
+         DRAW_DISPLAY_MAIN();
+         #endif
+
+         Serial.printf("Error[%u]: ", error);
+         if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+         else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+         else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+         else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+         else if (error == OTA_END_ERROR) Serial.println("End Failed");
       });
       ArduinoOTA.begin();
    }
@@ -502,7 +521,7 @@ void MQTT_CONNECT(void)
       ret = myMqttClient.connect(mqttName, "mqttuser", "mqtt");
       #ifdef CFG_DEBUG
       Serial.print("MQTT connect with name " + String(mqttName));
-      if ( ret == true ? Serial.println(": success") : Serial.println("failed"));
+      (ret == true) ? (Serial.println("success")) : (Serial.println("failed"));
       #endif
 
       #if CFG_HEATING_CONTROL
@@ -510,47 +529,47 @@ void MQTT_CONNECT(void)
       ret = myMqttClient.subscribe(myMqttConfig.getTopicTargetTempCmd());
       #ifdef CFG_DEBUG
       Serial.print("MQTT subscribe " + myMqttConfig.getTopicTargetTempCmd() + ": ");
-      if ( ret == true ? Serial.println("success") : Serial.println("failed"));
+      (ret == true) ? (Serial.println("success")) : (Serial.println("failed"));
       #endif
 
       ret = myMqttClient.subscribe(myMqttConfig.getTopicHeatingAllowedCmd());
       #ifdef CFG_DEBUG
       Serial.print("MQTT subscribe " + myMqttConfig.getTopicHeatingAllowedCmd() + ": ");
-      if ( ret == true ? Serial.println("success") : Serial.println("failed"));
+      (ret == true) ? (Serial.println("success")) : (Serial.println("failed"));
       #endif
       #endif /* CFG_HEATING_CONTROL */
 
       ret = myMqttClient.subscribe(myMqttConfig.getTopicUpdateFirmware());
       #ifdef CFG_DEBUG
       Serial.print("MQTT subscribe " + myMqttConfig.getTopicUpdateFirmware() + ": ");
-      if ( ret == true ? Serial.println("success") : Serial.println("failed"));
+      (ret == true) ? (Serial.println("success")) : (Serial.println("failed"));
       #endif
 
       ret = myMqttClient.subscribe(myMqttConfig.getTopicChangeName());
       #ifdef CFG_DEBUG
       Serial.print("MQTT subscribe " + myMqttConfig.getTopicChangeName() + ": ");
-      if ( ret == true ? Serial.println("success") : Serial.println("failed"));
+      (ret == true) ? (Serial.println("success")) : (Serial.println("failed"));
       #endif
 
       #if CFG_SENSOR
       ret = myMqttClient.subscribe(myMqttConfig.getTopicChangeSensorCalib());
       #ifdef CFG_DEBUG
       Serial.print("MQTT subscribe " + myMqttConfig.getTopicChangeSensorCalib() + ": ");
-      if ( ret == true ? Serial.println("success") : Serial.println("failed"));
+      (ret == true) ? (Serial.println("success")) : (Serial.println("failed"));
       #endif
       #endif /* CFG_SENSOR */
 
       ret = myMqttClient.subscribe(myMqttConfig.getTopicSystemRestartRequest());
       #ifdef CFG_DEBUG
       Serial.print("MQTT subscribe " + myMqttConfig.getTopicSystemRestartRequest() + ": ");
-      if ( ret == true ? Serial.println("success") : Serial.println("failed"));
+      (ret == true) ? (Serial.println("success")) : (Serial.println("failed"));
       #endif
 
       #if CFG_DEVICE == cS20
       ret = myMqttClient.subscribe(myMqttConfig.getTopicS20Command());
       #ifdef CFG_DEBUG
       Serial.print("MQTT subscribe " + myMqttConfig.getTopicS20Command() + ": ");
-      if ( ret == true ? Serial.println("success") : Serial.println("failed"));
+      (ret == true) ? (Serial.println("success")) : (Serial.println("failed"));
       #endif
       /* publish relay state on connect */
       myMqttClient.publish(myMqttConfig.getTopicS20State()  ,String(myS20.getState())    ,true , 1); /* publish S20 state */
@@ -613,6 +632,10 @@ void loop()
    HANDLE_HTTP_UPDATE(); /* pull update from server if it was requested via MQTT*/
    #endif
 
+   #if CFG_OTA
+   HANDLE_OTA_UPDATE();
+   #endif
+
    #if CFG_SPIFFS
    SPIFFS_MAIN();
    #endif
@@ -649,13 +672,7 @@ void HANDLE_SYSTEM_STATE(void)
       }
    }
 
-   if (systemState_online == mySystemState.getSystemState())
-   {
-      #if CFG_OTA
-      ArduinoOTA.handle();
-      #endif
-   }
-   else if (systemState_offline == mySystemState.getSystemState())
+   if (systemState_offline == mySystemState.getSystemState())
    {
       if (mySystemState.getConnectDebounceTimer() == 0) /* getConnectDebounceTimer decrements the timer */
       {
@@ -821,7 +838,7 @@ void DRAW_DISPLAY_MAIN(void)
       myDisplay.setTextAlignment(TEXT_ALIGN_CENTER);
       myDisplay.drawString(64,22,"Restart");
    }
-   else if (FETCH_UPDATE == true)
+   else if ( (FETCH_UPDATE == true) || (OTA_UPDATE == true) )
    {
       myDisplay.setFont(Roboto_Condensed_16);
       myDisplay.setTextAlignment(TEXT_ALIGN_CENTER);
@@ -944,6 +961,15 @@ void HANDLE_HTTP_UPDATE(void)
 }
 #endif
 
+#if CFG_OTA
+void HANDLE_OTA_UPDATE(void)
+{
+   if (systemState_online == mySystemState.getSystemState())
+   {
+      ArduinoOTA.handle();
+   }
+}
+#endif
 #if CFG_SPIFFS
 void SPIFFS_MAIN(void)
 {
