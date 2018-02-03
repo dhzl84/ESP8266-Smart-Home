@@ -1,5 +1,12 @@
 #include "MQTT.h"
 
+#ifndef MQTT_MAIN_TOPIC
+#if CFG_MQTT_CLIENT
+#warning "MQTT topic not defined"
+#endif
+#define MQTT_MAIN_TOPIC "none"
+#endif
+
 mqttConfig::mqttConfig()
 {
    mqttConfig::init();
