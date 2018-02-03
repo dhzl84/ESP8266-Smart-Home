@@ -15,12 +15,12 @@ Circuit and PCB made with [Target 3001](https://ibfriedrich.com/de/index.html)
 
 ## Inwall thermostat
 
-**SW configuration:**
+### SW configuration
 ```c++
 #define CFG_DEVICE   cThermostat
 ```
 
-**Assembly parts:**
+### Assembly parts
 * ESP8266-07
 * DHT22 temeperture and humidity sensor
 * 0,96" OLED display
