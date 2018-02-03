@@ -10,4 +10,15 @@ Basic building blocks and technologies:
 * MQTT
 * [Home Assistant](https://home-assistant.io/)
 
-Built with [Sloeber IDE 4.1](http://eclipse.baeyens.it/), lots of great [Arduino](https://www.arduino.cc) libraries and ESP8266 SDK 2.3.0
+Built with [Sloeber IDE 4.2](http://eclipse.baeyens.it/), lots of great [Arduino](https://www.arduino.cc) libraries and ESP8266 Arduino 2.4.0
+
+## Inwall thermostat
+Assembly parts:
+* ESP8266-07
+* DHT22 temeperture and humidity sensor
+* 0,96" OLED display
+* SRD-05VDC-SL-C 230V 10A relay
+* IRM-03-5 230V AC to 5V DC print module
+* 3,3 V DC voltage reulator
+* rotary encoder with push button
+* wires, resistors, capacitors, transistor, optocoupler, circuit board, etc
