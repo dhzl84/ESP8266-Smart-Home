@@ -10,13 +10,14 @@ before_install:
 install:
   - arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json" --save-prefs
   - arduino --install-boards esp8266:esp8266
+  - arduino --install-library "Adafruit_Unified_Sensor","ArduinoOTA", "DHT_sensor_library", "ESP8266_and_ESP32_Oled_Driver_for_SSD1306_display", "ESP8266HTTPClient", "ESP8266httpUpdate", "ESP8266mDNS", "ESP8266WiFi", "MQTT", "Wire"
   - arduino --board esp8266:esp8266:generic --save-prefs
   - arduino --pref "compiler.warning_level=all" --save-prefs
 script:
   - "echo $PWD"
   - "echo $HOME"
   - "ls $PWD"
-  - arduino -v --verify --board esp8266:esp8266:generic $PWD
+  - arduino -v --verify --board esp8266:esp8266:generic $PWD/ESP8266.cpp
 notifications:
   email:
     on_success: change
