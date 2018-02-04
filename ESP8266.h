@@ -1,12 +1,12 @@
 #ifndef _ESP8266_with_DHT22_H_
 #define _ESP8266_with_DHT22_H_
-#include "Arduino.h"
+#include <Arduino.h>
 
 #include "secrets.h"
 /* the secrets.h file contains your personal configuration of the parameters below:
 #define WIFI_SSID          "xxx"
 #define WIFI_PWD           "xxx"
-#define LOCAL_MQTT_HOST    "xxx.xxx.xxx.xxx"
+#define LOCAL_MQTT_HOST    "123.456.789.012"
 #define THERMOSTAT_BINARY  "xxx"
 #define S20_BINARY         "xxx"
  */
@@ -70,10 +70,6 @@
 /*===================================================================================================================*/
 /* WiFi */
 #define wifiConnectTime   30   /*  try to connect to WiFi at startup for x seconds */
-
-#if CFG_SENSOR
-#define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
-#endif
 
 /* display */
 #if CFG_DISPLAY == true

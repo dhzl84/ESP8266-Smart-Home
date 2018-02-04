@@ -3,16 +3,16 @@
 /*===================================================================================================================*/
 #include "ESP8266.h"
 
-#include "ESP8266WiFi.h"
+#include <ESP8266WiFi.h>
 #if CFG_DEVICE == cS20
 #include "S20.h"
 #endif
 #if CFG_SENSOR
-#include "DHT.h"
+#include <DHTesp.h>
 #include "SensorData.h"
 #include "MedianFilter.h"
-#include "osapi.h"   /* for sensor timer */
-#include "os_type.h" /* for sensor timer */
+#include <osapi.h>   /* for sensor timer */
+#include <os_type.h> /* for sensor timer */
 #endif
 #if CFG_HEATING_CONTROL
 #include "HeatingControl.h"
@@ -76,7 +76,7 @@ S20 myS20;
 
 #if CFG_SENSOR
 LOCAL os_timer_t SENSOR_TIMER;
-DHT myDHT(dhtPin, DHTTYPE);
+DHTesp myDHT;
 SensorData     mySensorData;
 MedianFilter   myTemperatureFilter;
 MedianFilter   myHumidityFilter;
@@ -221,7 +221,7 @@ void setup()
    #endif
 
    #if CFG_SENSOR
-   myDHT.begin();    /* init DHT sensor */
+   myDHT.setup(dhtPin);    /* init DHT sensor */
    #endif
 
    #if CFG_DISPLAY
@@ -706,8 +706,8 @@ void SENSOR_MAIN()
 
       /* Reading temperature or humidity takes about 250 milliseconds! */
       /* Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor) */
-      dhtHumid = myDHT.readHumidity();
-      dhtTemp  = myDHT.readTemperature();
+      dhtHumid = myDHT.getHumidity();
+      dhtTemp  = myDHT.getTemperature();
 
       /* Check if any reads failed */
       if (isnan(dhtHumid) || isnan(dhtTemp)) {

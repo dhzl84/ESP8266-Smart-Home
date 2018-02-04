@@ -1,31 +1,38 @@
-language: cpp
+language: c
 before_install:
+  - ARD_VER="1.8.5"
   - "/sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_1.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :1 -ac -screen 0 1280x1024x16"
-  - sleep 3
+  - sleep 5
   - export DISPLAY=:1.0
-  - wget http://downloads.arduino.cc/arduino-1.8.5-linux64.tar.xz
-  - tar xf arduino-1.8.5-linux64.tar.xz
-  - mv arduino-1.8.5 $HOME/arduino_ide
-  - sudo ln -s $HOME/arduino_ide/arduino /usr/local/bin/arduino
+  - wget http://downloads.arduino.cc/arduino-$ARD_VER-linux64.tar.xz
+  - tar xf arduino-$ARD_VER-linux64.tar.xz
+  - rm arduino-$ARD_VER-linux64.tar.xz
+  - sudo mv arduino-$ARD_VER /usr/local/share/arduino
+  - sudo ln -s /usr/local/share/arduino/arduino /usr/local/bin/arduino
 install:
   - arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json" --save-prefs
-  - arduino --install-boards esp8266:esp8266
-  - arduino --install-library "Adafruit_Unified_Sensor"
-  - arduino --install-library "ArduinoOTA"
-  - arduino --install-library "DHT_sensor_library"
-  - arduino --install-library "ESP8266_and_ESP32_Oled_Driver_for_SSD1306_display"
-  - arduino --install-library "ESP8266HTTPClient"
-  - arduino --install-library "ESP8266httpUpdate"
-  - arduino --install-library "ESP8266mDNS"
-  - arduino --install-library "ESP8266WiFi"
-  - arduino --install-library "MQTT"
-  - arduino --install-library "Wire"
+  - arduino --install-boards esp8266:esp8266:2.4.0
   - arduino --board esp8266:esp8266:generic --save-prefs
+  - arduino --install-library "Adafruit Unified Sensor,DHT sensor library for ESPx,ESP8266 and ESP32 Oled Driver for SSD1306 display,MQTT"
   - arduino --pref "compiler.warning_level=all" --save-prefs
+  - arduino --pref "custom_CpuFrequency=generic_80" --save-prefs
+  - arduino --pref "custom_CrystalFreq=generic_26" --save-prefs
+  - arduino --pref "builtin_platform_is_newer=10804" --save-prefs
+  - arduino --pref "custom_Debug=generic_Disabled" --save-prefs
+  - arduino --pref "custom_DebugLevel=generic_None____" --save-prefs
+  - arduino --pref "custom_FlashFreq=generic_40" --save-prefs
+  - arduino --pref "custom_FlashMode=generic_qio" --save-prefs
+  - arduino --pref "custom_FlashSize=generic_1M64" --save-prefs
+  - arduino --pref "custom_LwIPVariant=generic_v2mss536" --save-prefs
+  - arduino --pref "custom_ResetMethod=generic_ck" --save-prefs
+  - arduino --pref "custom_UploadSpeed=generic_115200" --save-prefs
 script:
+  - cat ~/.arduino15/preferences.txt 
+  - chmod a+x secrets.sh
+  - ./secrets.sh
   - "echo $PWD"
   - "echo $HOME"
-  - "ls $PWD"
+  - "ls -al $PWD"
   - arduino -v --verify --board esp8266:esp8266:generic $PWD/ESP8266.cpp
 notifications:
   email:
