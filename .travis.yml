@@ -15,6 +15,8 @@ install:
   - arduino --board esp8266:esp8266:generic --save-prefs
   - arduino --install-library "Adafruit Unified Sensor,DHT sensor library for ESPx,ESP8266 and ESP32 Oled Driver for SSD1306 display,MQTT"
   - arduino --pref "compiler.warning_level=all" --save-prefs
+  #- arduino --pref "generic.menu.CpuFrequency.80.build.f_cpu=80000000L" --save-prefs
+  - arduino --pref "generic.build.f_cpu=80000000L" --save-prefs
 script:
   - chmod a+x secrets.sh
   - ./secrets.sh
