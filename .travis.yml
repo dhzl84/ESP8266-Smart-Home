@@ -13,6 +13,8 @@ install:
   - arduino --board esp8266:esp8266:generic --save-prefs
   - arduino --pref "compiler.warning_level=all" --save-prefs
 script:
+  - chmod a+x secrets.sh
+  - ./secrets.sh
   - "echo $PWD"
   - "echo $HOME"
   - "ls $PWD"
