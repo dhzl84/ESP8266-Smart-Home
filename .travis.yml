@@ -27,12 +27,16 @@ install:
   - arduino --pref "custom_ResetMethod=generic_ck" --save-prefs
   - arduino --pref "custom_UploadSpeed=generic_115200" --save-prefs
 script:
-  - cat ~/.arduino15/preferences.txt 
-  - chmod a+x secrets.sh
-  - ./secrets.sh
-  - "echo $PWD"
-  - "echo $HOME"
-  - "ls -al $PWD"
+  - chmod a+x config.sh
+  - echo "configure S20"
+  - ./config.sh 1
+  - cat config.h
+  - ls -l
+  - arduino -v --verify --board esp8266:esp8266:generic $PWD/ESP8266.cpp
+  - echo "configure thermostat"
+  - ./config.sh 0
+  - cat config.h  
+  - ls -l
   - arduino -v --verify --board esp8266:esp8266:generic $PWD/ESP8266.cpp
 notifications:
   email:

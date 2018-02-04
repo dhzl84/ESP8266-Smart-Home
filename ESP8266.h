@@ -2,23 +2,19 @@
 #define _ESP8266_with_DHT22_H_
 #include <Arduino.h>
 
-#include "secrets.h"
+#include "config.h"
 /* the secrets.h file contains your personal configuration of the parameters below:
 #define WIFI_SSID          "xxx"
 #define WIFI_PWD           "xxx"
 #define LOCAL_MQTT_HOST    "123.456.789.012"
 #define THERMOSTAT_BINARY  "xxx"
 #define S20_BINARY         "xxx"
- */
-
-//#define CFG_DEBUG
-
-/*===================================================================================================================*/
-/* Select device which this SW will be built for */
-/*===================================================================================================================*/
 #define cThermostat  0
 #define cS20         1
 #define CFG_DEVICE   cThermostat
+*/
+
+//#define CFG_DEBUG
 
 /*===================================================================================================================*/
 /* Configuration */
