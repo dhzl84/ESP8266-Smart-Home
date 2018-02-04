@@ -1,15 +1,29 @@
 language: c
 before_install:
-  - source <(curl -SLs https://raw.githubusercontent.com/adafruit/travis-ci-arduino/master/install.sh)
+  - ARD_VER="1.8.5"
+  - "/sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_1.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :1 -ac -screen 0 1280x1024x16"
+  - sleep 5
+  - export DISPLAY=:1.0
+  - wget http://downloads.arduino.cc/arduino-$ARD_VER-linux64.tar.xz
+  - tar xf arduino-$ARD_VER-linux64.tar.xz
+  - rm arduino-$ARD_VER-linux64.tar.xz
+  - sudo mv arduino-$ARD_VER /usr/local/share/arduino
+  - sudo ln -s /usr/local/share/arduino/arduino /usr/local/bin/arduino
 install:
+  - arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json" --save-prefs
+  - arduino --install-boards esp8266:esp8266:2.4.0
+  - arduino --board esp8266:esp8266:generic --save-prefs
   - arduino --install-library "Adafruit Unified Sensor"
-  - arduino --install-library "DHT sensor library"
+  - arduino --install-library "DHT sensor library:1.2.3"
   - arduino --install-library "ESP8266 and ESP32 Oled Driver for SSD1306 display"
   - arduino --install-library "MQTT"
+  - arduino --pref "compiler.warning_level=all" --save-prefs
 script:
   - chmod a+x secrets.sh
   - ./secrets.sh
-  #- build_platform esp8266
+  - "echo $PWD"
+  - "echo $HOME"
+  - "ls -al $PWD"
   - arduino -v --verify --board esp8266:esp8266:generic $PWD/ESP8266.cpp
 notifications:
   email:
