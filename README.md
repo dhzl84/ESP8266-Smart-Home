@@ -14,7 +14,7 @@ SW Built with [Sloeber IDE 4.2](http://eclipse.baeyens.it/), lots of great [Ardu
 Circuit and PCB made with [Target 3001](https://ibfriedrich.com/de/index.html)
 
 ## Build Status
-* Master | Arduino IDE 1.8.5 | ESP8266 2.4.0 | latest libraries: [![Build Status](https://travis-ci.org/eXtatic-GitHub/ESP8266.svg?branch=master)](https://travis-ci.org/eXtatic-GitHub/ESP8266)
+* Master | Arduino IDE 1.8.5 | ESP8266 Arduino 2.4.0 | latest libraries: [![Build Status](https://travis-ci.org/eXtatic-GitHub/ESP8266.svg?branch=master)](https://travis-ci.org/eXtatic-GitHub/ESP8266)
 
 ## General hints
 Since there is certain information in my software that I do not want everyone to know I located those in a single header file called *secrets.h* which is not part of the repository, and therefore the build will fail.
