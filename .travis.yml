@@ -26,7 +26,7 @@ script:
   - "echo $PWD"
   - "echo $HOME"
   - "ls $PWD"
-  - arduino -v --verify --board esp8266:esp8266:generic $PWD/ESP8266.cpp
+  - arduino -v --verify --board esp8266:esp8266:generic $PWD/ESP8266.ino
 notifications:
   email:
     on_success: change
