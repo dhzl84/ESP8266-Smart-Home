@@ -8,7 +8,7 @@ install:
   - arduino --install-library "MQTT"
 script:
   - chmod a+x secrets.sh
-  - ./secrets.sh
+  #- ./secrets.sh
   - build_platform esp8266
 notifications:
   email:
