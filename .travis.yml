@@ -10,16 +10,6 @@ before_install:
 install:
   - arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json" --save-prefs
   - arduino --install-boards esp8266:esp8266
-  - arduino --install-library "Adafruit_Unified_Sensor"
-  - arduino --install-library "ArduinoOTA"
-  - arduino --install-library "DHT_sensor_library"
-  - arduino --install-library "ESP8266_and_ESP32_Oled_Driver_for_SSD1306_display"
-  - arduino --install-library "ESP8266HTTPClient"
-  - arduino --install-library "ESP8266httpUpdate"
-  - arduino --install-library "ESP8266mDNS"
-  - arduino --install-library "ESP8266WiFi"
-  - arduino --install-library "MQTT"
-  - arduino --install-library "Wire"
   - arduino --board esp8266:esp8266:generic --save-prefs
   - arduino --pref "compiler.warning_level=all" --save-prefs
 script:
