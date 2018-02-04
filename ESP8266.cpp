@@ -8,7 +8,7 @@
 #include "S20.h"
 #endif
 #if CFG_SENSOR
-#include <DHT.h>
+#include <DHTesp.h>
 #include "SensorData.h"
 #include "MedianFilter.h"
 #include <osapi.h>   /* for sensor timer */
@@ -76,7 +76,7 @@ S20 myS20;
 
 #if CFG_SENSOR
 LOCAL os_timer_t SENSOR_TIMER;
-DHT myDHT(dhtPin, DHTTYPE);
+DHTesp myDHT(dhtPin, DHTTYPE);
 SensorData     mySensorData;
 MedianFilter   myTemperatureFilter;
 MedianFilter   myHumidityFilter;
