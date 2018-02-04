@@ -28,6 +28,8 @@ My *secrets.h* contains the following information:
 #define S20_BINARY         "xxx"
 ```
 
+For Travis CI compatibility there is the *secrets.sh* script which generates the above mentioned dummy code.
+
 
 ## Inwall thermostat
 I started to think about new thermostats for my floor heating system while trying to find a good setting for each room with the analog thermostats only giving the range ice cold (0) to 6, whatever temperature that should be.
