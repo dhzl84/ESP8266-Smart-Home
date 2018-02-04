@@ -3,16 +3,16 @@
 /*===================================================================================================================*/
 #include "ESP8266.h"
 
-#include "ESP8266WiFi.h"
+#include <ESP8266WiFi.h>
 #if CFG_DEVICE == cS20
 #include "S20.h"
 #endif
 #if CFG_SENSOR
-#include "DHT.h"
+#include <DHT.h>
 #include "SensorData.h"
 #include "MedianFilter.h"
-#include "osapi.h"   /* for sensor timer */
-#include "os_type.h" /* for sensor timer */
+#include <osapi.h>   /* for sensor timer */
+#include <os_type.h> /* for sensor timer */
 #endif
 #if CFG_HEATING_CONTROL
 #include "HeatingControl.h"

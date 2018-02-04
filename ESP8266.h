@@ -1,6 +1,6 @@
 #ifndef _ESP8266_with_DHT22_H_
 #define _ESP8266_with_DHT22_H_
-#include "Arduino.h"
+#include <Arduino.h>
 
 #include "secrets.h"
 /* the secrets.h file contains your personal configuration of the parameters below:
