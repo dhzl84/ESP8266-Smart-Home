@@ -28,13 +28,13 @@ install:
   - arduino --pref "custom_UploadSpeed=generic_115200" --save-prefs
 script:
   - chmod a+x config.sh
-  - echo "configure thermostat"
-  - ./config.sh 0
+  - echo "configure S20"
+  - ./config.sh 1
   - cat config.h
   - ls -l
   - arduino -v --verify --board esp8266:esp8266:generic $PWD/ESP8266.cpp
-  - echo "configure S20"
-  - ./config.sh 1
+  - echo "configure thermostat"
+  - ./config.sh 0
   - cat config.h  
   - ls -l
   - arduino -v --verify --board esp8266:esp8266:generic $PWD/ESP8266.cpp

@@ -1,4 +1,4 @@
-#include "ESP8266.h" /* needed to switch the GPIO attached relay */
+#include "ESP8266.h" /* needed to switch the GPIO attached relay and device config */
 
 #if CFG_DEVICE == cS20
 #include "s20.h"
