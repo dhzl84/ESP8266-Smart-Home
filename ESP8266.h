@@ -71,10 +71,6 @@
 /* WiFi */
 #define wifiConnectTime   30   /*  try to connect to WiFi at startup for x seconds */
 
-#if CFG_SENSOR
-#define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
-#endif
-
 /* display */
 #if CFG_DISPLAY == true
 #define drawTempYOffset       16
