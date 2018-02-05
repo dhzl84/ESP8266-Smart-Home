@@ -1,6 +1,8 @@
 #ifndef SYSTEMSTATE_H_
 #define SYSTEMSTATE_H_
 
+#include "Arduino.h"
+
 #define debounceTime 30000
 
 typedef enum systemState_e

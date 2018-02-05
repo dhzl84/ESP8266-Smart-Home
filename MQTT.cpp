@@ -1,67 +1,82 @@
 #include "MQTT.h"
 
-#ifndef MQTT_MAIN_TOPIC
-#if CFG_MQTT_CLIENT
-#warning "MQTT topic not defined"
-#endif
-#define MQTT_MAIN_TOPIC "none"
-#endif
-
 mqttConfig::mqttConfig()
 {
    mqttConfig::init();
 }
 
-mqttConfig::~mqttConfig()
-{
-
-}
+mqttConfig::~mqttConfig() {}
 
 void mqttConfig::init()
 {
-   mqttConfig::changeName("unknown");
+   mqttMainTopic = "unknown";
+   mqttName = "unknown";
    nameChanged = false;
 }
 
-void mqttConfig::changeName(String deviceID)
+void mqttConfig::setup(String mainTopic, String deviceName)
 {
-   mqttName =                    deviceID;
-   mqttUpdateFirmware =          MQTT_MAIN_TOPIC + deviceID + "/updateFirmware";
-   mqttUpdateFirmwareAccepted =  MQTT_MAIN_TOPIC + deviceID + "/updateFirmwareAccepted";
-   mqttChangeName =              MQTT_MAIN_TOPIC + deviceID + "/changeName";
-   mqttState =                   MQTT_MAIN_TOPIC + deviceID + "/online";
-   mqttDeviceIP          =       MQTT_MAIN_TOPIC + deviceID + "/deviceIP";
-   mqttSystemRestartRequest =    MQTT_MAIN_TOPIC + deviceID + "/systemRestartRequest";
+   mqttName      = deviceName;
+   mqttMainTopic = mainTopic;
+   mqttConfig::buildTopics();
+}
+
+void mqttConfig::setup(String mainTopic)
+{
+   mqttMainTopic = mainTopic;
+   mqttConfig::buildTopics();
+}
+
+void mqttConfig::buildTopics(void)
+{
+   mqttUpdateFirmware =          mqttMainTopic + mqttName + "/updateFirmware";
+   mqttUpdateFirmwareAccepted =  mqttMainTopic + mqttName + "/updateFirmwareAccepted";
+   mqttChangeName =              mqttMainTopic + mqttName + "/changeName";
+   mqttState =                   mqttMainTopic + mqttName + "/online";
+   mqttDeviceIP          =       mqttMainTopic + mqttName + "/deviceIP";
+   mqttSystemRestartRequest =    mqttMainTopic + mqttName + "/systemRestartRequest";
 
    #if CFG_SENSOR
-   mqttTemp =                    MQTT_MAIN_TOPIC + deviceID + "/temp";
-   mqttHum =                     MQTT_MAIN_TOPIC + deviceID + "/hum";
-   mqttSensorStatus =            MQTT_MAIN_TOPIC + deviceID + "/sensorStatus";
-   mqttChangeSensorCalib =       MQTT_MAIN_TOPIC + deviceID + "/changeSensorCalib";
-   mqttSensorCalibFactor =       MQTT_MAIN_TOPIC + deviceID + "/sensorCalibFactor";
-   mqttSensorCalibOffset =       MQTT_MAIN_TOPIC + deviceID + "/sensorCalibOffset";
+   mqttTemp =                    mqttMainTopic + mqttName + "/temp";
+   mqttHum =                     mqttMainTopic + mqttName + "/hum";
+   mqttSensorStatus =            mqttMainTopic + mqttName + "/sensorStatus";
+   mqttChangeSensorCalib =       mqttMainTopic + mqttName + "/changeSensorCalib";
+   mqttSensorCalibFactor =       mqttMainTopic + mqttName + "/sensorCalibFactor";
+   mqttSensorCalibOffset =       mqttMainTopic + mqttName + "/sensorCalibOffset";
    #endif
 
    #if CFG_HEATING_CONTROL
-   mqttTargetTempCmd =           MQTT_MAIN_TOPIC + deviceID + "/targetTempCmd";
-   mqttTargetTempState =         MQTT_MAIN_TOPIC + deviceID + "/targetTempState";
-   mqttHeatingState =            MQTT_MAIN_TOPIC + deviceID + "/heatingState";
-   mqttHeatingAllowedCmd =       MQTT_MAIN_TOPIC + deviceID + "/heatingAllowedCmd";
-   mqttHeatingAllowedState =     MQTT_MAIN_TOPIC + deviceID + "/heatingAllowedState";
+   mqttTargetTempCmd =           mqttMainTopic + mqttName + "/targetTempCmd";
+   mqttTargetTempState =         mqttMainTopic + mqttName + "/targetTempState";
+   mqttHeatingState =            mqttMainTopic + mqttName + "/heatingState";
+   mqttHeatingAllowedCmd =       mqttMainTopic + mqttName + "/heatingAllowedCmd";
+   mqttHeatingAllowedState =     mqttMainTopic + mqttName + "/heatingAllowedState";
    #endif
 
    #if CFG_DEVICE == cS20
-   mqttS20State   =              MQTT_MAIN_TOPIC + deviceID + "/state";
-   mqttS20Command =              MQTT_MAIN_TOPIC + deviceID + "/command";
+   mqttS20State   =              mqttMainTopic + mqttName + "/state";
+   mqttS20Command =              mqttMainTopic + mqttName + "/command";
    #endif
 }
+
+void mqttConfig::changeName(String value)
+{
+   if(value != mqttName)
+   {
+      mqttName = value;
+      mqttConfig::buildTopics();
+      nameChanged = true;
+   }
+}
+
 
 void mqttConfig::setName(String value)
 {
    if(value != mqttName)
    {
-      mqttConfig::changeName(value);
-      nameChanged = true;
+      mqttName = value;
+      mqttConfig::buildTopics();
+      nameChanged = false;
    }
 }
 

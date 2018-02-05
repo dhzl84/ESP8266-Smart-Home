@@ -1,4 +1,3 @@
-#include "Arduino.h"
 #include "MedianFilter.h"
 
 MedianFilter::MedianFilter()

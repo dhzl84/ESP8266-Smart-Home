@@ -1,12 +1,7 @@
-/*
- * s20.h
- *
- *  Created on: 20.12.2017
- *      Author: eXtatic
- */
-
 #ifndef S20_H_
 #define S20_H_
+
+#include "Arduino.h"
 
 class S20
 {
@@ -14,6 +9,7 @@ public:
    S20(void);
    ~S20(void);
    void init(void);
+   void setup(unsigned char relayGpio, unsigned char toggleGpio, unsigned char ledPin);
    void main(void);
    void toggleState(void);
    void setState(bool newState);
@@ -26,6 +22,9 @@ private:
    bool led;
    bool newData;
    int  buttonDebounce;
+   unsigned char relayGpio;
+   unsigned char toggleGpio;
+   unsigned char ledGpio;
    void setLed(bool state);
    bool getLed(void);
 };
