@@ -919,7 +919,10 @@ void MQTT_MAIN(void)
       if(!myMqttClient.connected())
       {
          #ifdef CFG_DEBUG
-         Serial.println("MQTT_RECONNECT_TIMER: " + String(MQTT_RECONNECT_TIMER));
+         if ( MQTT_RECONNECT_TIMER % 100 == 0 )
+         {
+            Serial.println("MQTT_RECONNECT_TIMER: " + String(MQTT_RECONNECT_TIMER));
+         }
          #endif
 
          if (MQTT_RECONNECT_TIMER == 0)
