@@ -2,7 +2,7 @@ cat > config.h << EOF
 #ifndef CONFIG_H_
 #define CONFIG_H_
 
-/* the config.h file contains your personal configuration of the parameters below:
+/* the config.h file contains your personal configuration of the parameters below: */
 #define WIFI_SSID          "xxxxxxxxx"
 #define WIFI_PWD           "xxx"
 #define LOCAL_MQTT_HOST    "123.456.789.012"
