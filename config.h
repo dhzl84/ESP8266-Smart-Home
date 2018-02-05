@@ -11,5 +11,4 @@
 #define cS20         1
 #define CFG_DEVICE   cThermostat
 
-
 #endif /* CONFIG_H_ */

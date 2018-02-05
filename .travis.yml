@@ -29,12 +29,12 @@ install:
 script:
   - chmod a+x config.sh
   - echo "configure S20"
-  - ./config.sh 1
+  - ./config.sh cS20
   - cat config.h
   - ls -l
   - arduino -v --verify --board esp8266:esp8266:generic $PWD/ESP8266.cpp
   - echo "configure thermostat"
-  - ./config.sh 0
+  - ./config.sh cThermostat
   - cat config.h  
   - ls -l
   - arduino -v --verify --board esp8266:esp8266:generic $PWD/ESP8266.cpp
