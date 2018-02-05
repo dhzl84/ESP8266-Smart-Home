@@ -1,7 +1,5 @@
 #include "HeatingControl.h"
 
-#include "ESP8266.h" /* needed to switch the GPIO attached relay */
-
 HeatingControl::HeatingControl()
 {
    HeatingControl::init();
@@ -18,7 +16,24 @@ void HeatingControl::init()
    heatingEnabled       = false;
    targetTemperature    = 200;
    newData              = false;
-   digitalWrite(relayPin,HIGH); /* switch relay OFF */
+   relayGpio            = 16;
+}
+
+void HeatingControl::setup(unsigned char gpio, unsigned char tarTemp)
+{
+   /* limit target temperature range */
+   if (tarTemp < minTargetTemp) {
+      targetTemperature = minTargetTemp;
+   }
+   else if (tarTemp > maxTargetTemp) {
+      targetTemperature = maxTargetTemp;
+   }
+   else {
+      targetTemperature = tarTemp;
+   }
+   relayGpio          = gpio;    /* assign GPIO */
+   pinMode(relayGpio, OUTPUT);   /* configure GPIO */
+   digitalWrite(relayGpio,HIGH); /* switch relay OFF */
 }
 
 void HeatingControl::setHeatingEnabled(bool value)
@@ -28,11 +43,11 @@ void HeatingControl::setHeatingEnabled(bool value)
       newData = true;
       if (value == true)
       {
-         digitalWrite(relayPin,LOW); /* switch relay ON */
+         digitalWrite(relayGpio,LOW); /* switch relay ON */
       }
       else
       {
-         digitalWrite(relayPin,HIGH); /* switch relay OFF */
+         digitalWrite(relayGpio,HIGH); /* switch relay OFF */
       }
    }
    heatingEnabled  = value;
@@ -45,25 +60,19 @@ void HeatingControl::resetNewData()
 
 void HeatingControl::increaseTargetTemperature(unsigned int value)
 {
-   if (value >= 0)
+   if ((targetTemperature + value) <= maxTargetTemp)
    {
-      if ((targetTemperature + value) <= maxTargetTemp)
-      {
-         targetTemperature += value;
-         newData = true;
-      }
+      targetTemperature += value;
+      newData = true;
    }
 }
 
 void HeatingControl::decreaseTargetTemperature(unsigned int value)
 {
-   if (value >= 0)
+   if ((targetTemperature - value) >= minTargetTemp)
    {
-      if ((targetTemperature - value) >= minTargetTemp)
-      {
-         targetTemperature -= value;
-         newData = true;
-      }
+      targetTemperature -= value;
+      newData = true;
    }
 }
 

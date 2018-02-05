@@ -1,6 +1,8 @@
 #ifndef MEDIANFILTER_H_
 #define MEDIANFILTER_H_
 
+#include "Arduino.h"
+
 #define CFG_MEDIAN_QUEUE_SIZE 15 /* number of Value samples used for median calculation */
 class MedianFilter;
 

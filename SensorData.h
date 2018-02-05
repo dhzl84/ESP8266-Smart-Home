@@ -1,6 +1,8 @@
 #ifndef SENSORDATA_H_
 #define SENSORDATA_H_
 
+#include "Arduino.h"
+
 class SensorData
 {
 public:
