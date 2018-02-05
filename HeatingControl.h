@@ -1,8 +1,10 @@
 #ifndef HEATINGCONTROL_H_
 #define HEATINGCONTROL_H_
 
-#define minTargetTemp 150
-#define maxTargetTemp 250
+#include "Arduino.h"
+
+#define minTargetTemp (unsigned char) 150
+#define maxTargetTemp (unsigned char) 250
 
 class HeatingControl
 {
@@ -10,6 +12,7 @@ public:
    HeatingControl(void);
    ~HeatingControl(void);
    void init(void);
+   void setup(unsigned char gpio, unsigned char tarTemp);
    void setHeatingEnabled(bool value);
    void setTargetTemperature(int value);
    void increaseTargetTemperature(unsigned int value);
@@ -23,10 +26,11 @@ public:
    void setHeatingAllowed(bool value);
    void toggleHeatingAllowed();
 private:
-   bool heatingEnabled;
-   int  targetTemperature;
-   bool newData;
-   bool heatingAllowed;
+   bool          heatingEnabled;
+   unsigned char targetTemperature;
+   unsigned char relayGpio;
+   bool          newData;
+   bool          heatingAllowed;
 };
 
 

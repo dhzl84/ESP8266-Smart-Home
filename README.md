@@ -22,18 +22,21 @@ Circuit and PCB made with [Target 3001](https://ibfriedrich.com/de/index.html)
 * S20 config
 
 ## General hints
-Since there is certain information in my software that I do not want everyone to know I located those in a single header file called *secrets.h* which is not part of the repository, and therefore the build will fail.
+Since there is certain information in my software that I do not want everyone to know I located those in a single header file called *config.h* which is not part of the repository, and therefore the build will fail.
 
-My *secrets.h* contains the following information:
+My *config.h* for building a thermostat SW contains the following information:
 ```c++
-#define WIFI_SSID          "xxx"
+#define WIFI_SSID          "xxxxxxxxx"
 #define WIFI_PWD           "xxx"
-#define LOCAL_MQTT_HOST    "xxx.xxx.xxx.xxx"
-#define THERMOSTAT_BINARY  "xxx"
-#define S20_BINARY         "xxx"
+#define LOCAL_MQTT_HOST    "123.456.789.012"
+#define THERMOSTAT_BINARY  "http://<domain or ip>/<name>.bin"
+#define S20_BINARY         "http://<domain or ip>/<name>.bin"
+#define cThermostat  0
+#define cS20         1
+#define CFG_DEVICE   cThermostat
 ```
 
-For Travis CI compatibility there is the *secrets.sh* script which generates the above mentioned dummy code.
+For Travis CI compatibility there is the *config.sh* script which generates the above mentioned dummy code.
 
 
 ## Inwall thermostat

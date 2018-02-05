@@ -1,9 +1,7 @@
 #ifndef MQTT_H_
 #define MQTT_H_
 
-#include "Arduino.h"
-
-#include "ESP8266.h" /* needed to resolve MQTT_MAIN_TOPIC and device config */
+#include "ESP8266.h"
 
 class mqttConfig
 {
@@ -11,8 +9,11 @@ public:
    mqttConfig(void);
    ~mqttConfig(void);
    void   init(void);
-   void   setName(String value);
+   void   setup(String mainTopic, String deviceName);
+   void   setup(String mainTopic);
    void   changeName(String value);
+   void   setName(String value);
+   void   buildTopics(void);
    bool   getNameChanged();
    void   resetNameChanged();
    String getName(void);
@@ -53,6 +54,7 @@ private:
    String mqttState;
    String mqttDeviceIP;
    String mqttSystemRestartRequest;
+   String mqttMainTopic;
    bool   nameChanged;
 
    #if CFG_SENSOR

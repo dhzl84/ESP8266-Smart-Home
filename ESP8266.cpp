@@ -37,6 +37,23 @@
 #endif
 
 /*===================================================================================================================*/
+/* GPIO config */
+/*===================================================================================================================*/
+#if CFG_DEVICE == cThermostat
+#define DHT_PIN              2 /* sensor */
+#define SDA_PIN              4 /* I²C */
+#define SCL_PIN              5 /* I²C */
+#define ENCODER_PIN1        12 /* rotary left/right */
+#define ENCODER_PIN2        13 /* rotary left/right */
+#define ENCODER_SWITCH_PIN  14 /* push button switch */
+#define RELAY_PIN           16 /* relay control */
+#elif CFG_DEVICE == cS20
+#define RELAY_PIN           12 /* relay control */
+#define TOGGLE_PIN           0 /* pin connected to HW button to toggle relay */
+#define LED_PIN             13 /* drive LED */
+#endif
+
+/*===================================================================================================================*/
 /* variables, constants, types, classes, etc, definitions */
 /*===================================================================================================================*/
 /* WiFi */
@@ -65,6 +82,13 @@ boolean                 OTA_UPDATE                      = false;       /* global
 #endif
 
 #if CFG_ROTARY_ENCODER
+#define rotLeft              -1
+#define rotRight              1
+#define rotInit               0
+#define tempStep              5
+#define displayTemp           0
+#define displayHumid          1
+#define switchDebounceTime  250
 volatile unsigned long  SWITCH_DEBOUNCE_REF             = 0;           /* reference for debouncing the rotary encoder button switch, latches return of millis() to be checked in next switch interrupt */
 volatile int            LAST_ENCODED                    = 0b11;        /* initial state of the rotary encoders gray code */
 volatile int            ROTARY_ENCODER_DIRECTION_INTS   = rotInit;     /* initialize rotary encoder with no direction */
@@ -83,12 +107,25 @@ MedianFilter   myHumidityFilter;
 #endif
 
 #if CFG_DISPLAY
-SSD1306        myDisplay(0x3c,sdaPin,sclPin);
+#define drawTempYOffset       16
+#define drawTargetTempYOffset 0
+#define drawHeating drawXbm(0,drawTempYOffset,myThermo_width,myThermo_height,myThermo)
+SSD1306        myDisplay(0x3c,SDA_PIN,SCL_PIN);
 #endif
 
 #if CFG_HEATING_CONTROL
 HeatingControl myHeatingControl;
 #endif
+
+#if CFG_MQTT_CLIENT
+#if CFG_DEVICE == cThermostat
+#define MQTT_MAIN_TOPIC "/heating/"
+#elif CFG_DEVICE == cS20
+#define MQTT_MAIN_TOPIC "/sonoff/"
+#else
+#error "no mqtt main topic defined for this device"
+#endif /* CFG_DEVICE */
+#endif /* CFG_MQTT_CLIENT */
 
 WiFiClient     myWiFiClient;
 SystemState    mySystemState;
@@ -221,7 +258,7 @@ void setup()
    #endif
 
    #if CFG_SENSOR
-   myDHT.setup(dhtPin);    /* init DHT sensor */
+   myDHT.setup(DHT_PIN);    /* init DHT sensor */
    #endif
 
    #if CFG_DISPLAY
@@ -235,6 +272,7 @@ void setup()
    #endif
 
    #if CFG_MQTT_CLIENT
+   myMqttConfig.setup(MQTT_MAIN_TOPIC);
    MQTT_CONNECT();   /* connect to MQTT host and build subscriptions, must be called after SPIFFS_INIT()*/
    #endif
 
@@ -247,9 +285,9 @@ void setup()
 
    #if CFG_ROTARY_ENCODER
    /* enable interrupts on encoder pins to decode gray code and recognize switch event*/
-   attachInterrupt(encoderPin1, updateEncoder, CHANGE);
-   attachInterrupt(encoderPin2, updateEncoder, CHANGE);
-   attachInterrupt(encoderSwitchPin, encoderSwitch, FALLING);
+   attachInterrupt(ENCODER_PIN1, updateEncoder, CHANGE);
+   attachInterrupt(ENCODER_PIN2, updateEncoder, CHANGE);
+   attachInterrupt(ENCODER_SWITCH_PIN, encoderSwitch, FALLING);
    #endif
 }
 
@@ -259,16 +297,13 @@ void setup()
 void GPIO_CONFIG(void)
 {
    #if CFG_DEVICE == cThermostat
-   /* GPIO used to switch connected relay with inverted logic */
-   pinMode(relayPin, OUTPUT);
+   myHeatingControl.setup(RELAY_PIN, 210); /*GPIO to switch connected relay and initial target temperature */
    /* initialize encoder pins */
-   pinMode(encoderPin1, INPUT_PULLUP);
-   pinMode(encoderPin2, INPUT_PULLUP);
-   pinMode(encoderSwitchPin, INPUT_PULLUP);
+   pinMode(ENCODER_PIN1, INPUT_PULLUP);
+   pinMode(ENCODER_PIN2, INPUT_PULLUP);
+   pinMode(ENCODER_SWITCH_PIN, INPUT_PULLUP);
    #elif CFG_DEVICE == cS20
-   pinMode(relayPin, OUTPUT);
-   pinMode(togglePin, INPUT_PULLUP);
-   pinMode(ledPin, OUTPUT);
+   myS20.setup(RELAY_PIN, TOGGLE_PIN, LED_PIN);
    #endif
 }
 
@@ -336,7 +371,7 @@ void SPIFFS_INIT(void)
 
          if (myName != "")
          {
-            myMqttConfig.changeName(myName);
+            myMqttConfig.setName(myName); /* set name from spiffs here, thus setup only needs to set the main topic */
          }
          else
          {
@@ -524,7 +559,7 @@ void MQTT_CONNECT(void)
       /* connect to MQTT */
       ret = myMqttClient.connect(mqttName, "mqttuser", "mqtt");
       #ifdef CFG_DEBUG
-      Serial.print("MQTT connect with name " + String(mqttName));
+      Serial.print("MQTT connect with name " + String(mqttName) + ": ");
       (ret == true) ? (Serial.println("success")) : (Serial.println("failed"));
       #endif
 
@@ -619,9 +654,6 @@ void loop()
 
    #if CFG_DEVICE == cS20
    myS20.main();
-   if (digitalRead(togglePin) == LOW) {
-      myS20.toggleState();
-   }
    #endif
 
    #if CFG_MQTT_CLIENT
@@ -886,6 +918,10 @@ void MQTT_MAIN(void)
    {
       if(!myMqttClient.connected())
       {
+         #ifdef CFG_DEBUG
+         Serial.println("MQTT_RECONNECT_TIMER: " + String(MQTT_RECONNECT_TIMER));
+         #endif
+
          if (MQTT_RECONNECT_TIMER == 0)
          {
             MQTT_RECONNECT_TIMER = MQTT_RECONNECT_TIME;
@@ -1077,8 +1113,8 @@ void ICACHE_RAM_ATTR encoderSwitch (void)
 
 void ICACHE_RAM_ATTR updateEncoder(void)
 {
-   int MSB = digitalRead(encoderPin1);
-   int LSB = digitalRead(encoderPin2);
+   int MSB = digitalRead(ENCODER_PIN1);
+   int LSB = digitalRead(ENCODER_PIN2);
 
    int encoded = (MSB << 1) |LSB;  /* converting the 2 pin value to single number */
 
@@ -1121,9 +1157,6 @@ void ICACHE_RAM_ATTR updateEncoder(void)
 #if CFG_SENSOR
 LOCAL void ICACHE_FLASH_ATTR sensor_cb(void *arg) {
    mySensorData.setCheckSensor(true);     /* check sensor values next loop */
-   #ifdef CFG_DEBUG
-   Serial.println("Sensor CB");
-   #endif
 }
 #endif
 
@@ -1195,7 +1228,7 @@ void messageReceived(String &topic, String &payload)
          #ifdef CFG_DEBUG
          Serial.println("Old name was: " + myMqttConfig.getName());
          #endif
-         myMqttConfig.setName(payload);
+         myMqttConfig.changeName(payload);
       }
    }
 

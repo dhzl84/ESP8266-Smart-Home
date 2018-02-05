@@ -1,12 +1,7 @@
-/*
- * UserFonts.h
- *
- *  Created on: 10.09.2017
- *      Author: eXtatic
- */
-
 #ifndef USERFONTS_H_
 #define USERFONTS_H_
+
+#include "Arduino.h"
 
 #define myThermo_width  36
 #define myThermo_height 36
