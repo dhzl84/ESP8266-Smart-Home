@@ -557,7 +557,7 @@ void MQTT_CONNECT(void)
       myMqttClient.begin(mqttHost, mqttPort, myWiFiClient);
 
       /* connect to MQTT */
-      ret = myMqttClient.connect(mqttName, "mqttuser", "mqtt");
+      ret = myMqttClient.connect(mqttName, LOCAL_MQTT_USER, LOCAL_MQTT_PWD);
       #ifdef CFG_DEBUG
       Serial.print("MQTT connect with name " + String(mqttName) + ": ");
       (ret == true) ? (Serial.println("success")) : (Serial.println("failed"));
