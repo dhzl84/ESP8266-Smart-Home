@@ -13,7 +13,7 @@ Basic building blocks and technologies:
 SW Built with [Sloeber IDE 4.2](http://eclipse.baeyens.it/), lots of great [Arduino](https://www.arduino.cc) libraries and ESP8266 Arduino 2.4.0  
 Circuit and PCB made with [Target 3001](https://ibfriedrich.com/de/index.html)
 
-## Build Status [![Build Status](https://travis-ci.org/eXtatic-GitHub/ESP8266-Smart-Home.svg?branch=master)](https://travis-ci.org/eXtatic-GitHub/ESP8266-Smart-Home)
+## 1. Build Status [![Build Status](https://travis-ci.org/eXtatic-GitHub/ESP8266-Smart-Home.svg?branch=master)](https://travis-ci.org/eXtatic-GitHub/ESP8266-Smart-Home)
 * Master branch
 * Arduino IDE 1.8.5
 * ESP8266 Arduino 2.4.0
@@ -21,29 +21,31 @@ Circuit and PCB made with [Target 3001](https://ibfriedrich.com/de/index.html)
 * Thermostat config
 * S20 config
 
-## General hints
+## 2. General hints
 Since there is certain information in my software that I do not want everyone to know I located those in a single header file called *config.h* which is not part of the repository, and therefore the build will fail.
 
 My *config.h* for building a thermostat SW contains the following information:
 ```c++
-#define WIFI_SSID          "xxxxxxxxx"
+#define WIFI_SSID          "xxx"
 #define WIFI_PWD           "xxx"
 #define LOCAL_MQTT_HOST    "123.456.789.012"
+#define LOCAL_MQTT_USER    "xxx"
+#define LOCAL_MQTT_PWD     "xxx"
 #define THERMOSTAT_BINARY  "http://<domain or ip>/<name>.bin"
 #define S20_BINARY         "http://<domain or ip>/<name>.bin"
-#define cThermostat  0
-#define cS20         1
-#define CFG_DEVICE   cThermostat
+#define cThermostat        0
+#define cS20               1
+#define CFG_DEVICE         $1
 ```
 
 For Travis CI compatibility there is the *config.sh* script which generates the above mentioned dummy code.
 
 
-## Inwall thermostat
+## 3 Inwall thermostat
 I started to think about new thermostats for my floor heating system while trying to find a good setting for each room with the analog thermostats only giving the range ice cold (0) to 6, whatever temperature that should be.
 So I thought about buying them but they were either expensive as hell or just didn't have the functionalities I wanted, thus I decided to build them on my own.
 
-### Features
+### 3.1 Features
 
 **local:**
 * sensing room temperature
@@ -57,12 +59,12 @@ So I thought about buying them but they were either expensive as hell or just di
 * provide a nice front end
 * stay locally operational if not connected to a network
 
-### SW configuration
+### 3.2SW configuration
 ```c++
 #define CFG_DEVICE   cThermostat
 ```
 
-### Assembly parts
+### 3.3 Assembly parts
 * ESP8266-07
 * DHT22 temeperture and humidity sensor
 * 0,96" OLED display
@@ -72,14 +74,14 @@ So I thought about buying them but they were either expensive as hell or just di
 * rotary encoder with push button
 * wires, resistors, capacitors, diodes, transistor, optocoupler, circuit board, etc
 
-### Wiring
+### 3.4 Wiring
 ![image](https://user-images.githubusercontent.com/5675570/35767892-47fde138-08f4-11e8-863e-870828831ac0.png)
 
-## Sonoff S20
+## 4. Sonoff S20
 While having already some 433 MHz outlets setup I decided to buy some of those nice devices to connect all the christmas lights to Home Assistant and switch them reliably.
 I had a look at some available software solutions but then decided to just stick to my base software and extend it a bit for the S20.
 
-### Features
+### 4.1 Features
 
 **local:**
 * switch on/off via button
@@ -89,7 +91,7 @@ I had a look at some available software solutions but then decided to just stick
 * switch on/off from remote controls (433 MHz, EnOcean)
 * configurable time based automations
 
-### SW configuration
+### 4.2 SW configuration
 ```c++
 #define CFG_DEVICE   cS20
 ```
