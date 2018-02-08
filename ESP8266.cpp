@@ -61,9 +61,10 @@ const char* ssid     = WIFI_SSID;
 const char* password = WIFI_PWD;
 
 #if CFG_MQTT_CLIENT
-const char* mqttHost = LOCAL_MQTT_HOST;
-const int   mqttPort = 1883;
-int MQTT_RECONNECT_TIMER   = MQTT_RECONNECT_TIME;
+const char*    mqttHost                = LOCAL_MQTT_HOST;
+const int      mqttPort                = 1883;
+unsigned long  MQTT_RECONNECT_REFERENCE_TIME;
+boolean        MQTT_RECONNECT          = false;
 #endif
 
 #if CFG_HTTP_UPDATE
@@ -79,7 +80,7 @@ boolean                 FETCH_UPDATE                    = false;       /* global
 
 #if CFG_OTA
 boolean                 OTA_UPDATE                      = false;       /* global variable used to change display in case OTA update is initiated */
-#endif
+#endif /* CFG_OTA */
 
 #if CFG_ROTARY_ENCODER
 #define rotLeft              -1
@@ -134,6 +135,16 @@ SystemState    mySystemState;
 MQTTClient     myMqttClient;
 mqttConfig     myMqttConfig;
 #endif
+
+#if CFG_SPIFFS
+#define        SPIFFS_TARGET_TEMP_FILE    String("/targetTemp")
+#define        SPIFFS_MQTT_ID_FILE        String("/itsme")
+#define        SPIFFS_SENSOR_CALIB_FILE   String("/sensor")
+#define        SPIFFS_WRITE_DEBOUNCE      20000 /* write target temperature to spiffs if it wasn't changed for 20 s (time in ms) */
+boolean        SPIFFS_WRITTEN =           true;
+unsigned long  SPIFFS_REFERENCE_TIME;
+int            SPIFFS_LAST_TARGET_TEMPERATURE;
+#endif /* CFG_SPIFFS */
 
 /*===================================================================================================================*/
 /* function declarations */
@@ -209,6 +220,92 @@ String boolToStringOnOff(bool boolean)
       return "off";
    }
 }
+
+#if CFG_SPIFFS
+String readSpiffs(String file)
+{
+   String fileContent = "";
+
+   if (SPIFFS.exists(file))
+   {
+      File f = SPIFFS.open(file, "r");
+      if (!f) {
+         Serial.println("oh no, failed to open file: "+ file);
+         /* TODO: Error handling */
+      }
+      else
+      {
+         fileContent = f.readStringUntil('\n');
+         f.close();
+
+         if (fileContent == "")
+         {
+            Serial.println("File " + file + " is empty");
+         }
+      }
+   }
+   else
+   {
+      Serial.println("File " + file + " does not exist");
+   }
+   return fileContent;
+}
+
+boolean writeSpiffs(String file, String newFileContent)
+{
+   boolean success = false; /* return success = true if no error occured and the newFileContent equals the file content */
+   String  currentFileContent = "";
+
+   if (SPIFFS.exists(file))
+   {
+      #ifdef CFG_DEBUG
+      File f = SPIFFS.open(file, "r");
+      currentFileContent = f.readStringUntil('\n');
+      f.close();
+      #endif
+   }
+
+   if (currentFileContent == newFileContent)
+   {
+      success = true; /* nothing to do, consider write as successful */
+
+      #ifdef CFG_DEBUG
+      Serial.println("Content of '" + file + "' before writing: " + currentFileContent + " equals new content: " + newFileContent + ". Nothing to do");
+      #endif
+   }
+   else
+   {
+      #ifdef CFG_DEBUG
+      Serial.println("Content of '" + file + "' before writing: " + currentFileContent);
+      #endif
+
+      SPIFFS.remove(file);
+
+      File f = SPIFFS.open(file, "w");
+      if (!f)
+      {
+         #ifdef CFG_DEBUG
+         Serial.println("Failed to open file: " + file + " for writing");
+         #endif /* CFG_DEBUG */
+
+         /* TODO: Error handling */
+      }
+      else
+      {
+         #ifdef CFG_DEBUG
+         Serial.println("New content of '" + file + "' is: " + newFileContent);
+         #endif /* CFG_DEBUG */
+
+         f.print(newFileContent);
+         f.close();
+         success = true; /* new content written */
+         delay(1000);
+      }
+   }
+   return success;
+}
+
+#endif /* CFG_SPIFFS */
 
 #if CFG_SENSOR
 bool splitSensorDataString(String sensorCalib, int *offset, int *factor)
@@ -297,7 +394,9 @@ void setup()
 void GPIO_CONFIG(void)
 {
    #if CFG_DEVICE == cThermostat
+   #if CFG_HEATING_CONTROL
    myHeatingControl.setup(RELAY_PIN, 210); /*GPIO to switch connected relay and initial target temperature */
+   #endif
    /* initialize encoder pins */
    pinMode(ENCODER_PIN1, INPUT_PULLUP);
    pinMode(ENCODER_PIN2, INPUT_PULLUP);
@@ -310,13 +409,11 @@ void GPIO_CONFIG(void)
 #if CFG_SPIFFS
 void SPIFFS_INIT(void)
 {
-   String myName = "";
-
    SPIFFS.begin();
 
-   /* This code is only run once to format the SPIFFS before furst usage */
    if (!SPIFFS.exists("/formatted"))
    {
+      /* This code is only run once to format the SPIFFS before first usage */
       #ifdef CFG_DEBUG
       Serial.println("Formatting SPIFFS, this takes some time");
       #endif
@@ -357,86 +454,69 @@ void SPIFFS_INIT(void)
 
    #if CFG_MQTT_CLIENT
    /* check name for MQTT */
-   if (SPIFFS.exists("/itsme"))
+
+   String myName = readSpiffs(SPIFFS_MQTT_ID_FILE);
+
+   if (myName != "")
    {
-      File f = SPIFFS.open("/itsme", "r");
-      if (!f) {
-          Serial.println("oh no, failed to open file: /itsme, guess my name is 'unknown'");
-          /* TODO: Error handling */
-      }
-      else
-      {
-         myName = f.readStringUntil('\n');
-         f.close();
-
-         if (myName != "")
-         {
-            myMqttConfig.setName(myName); /* set name from spiffs here, thus setup only needs to set the main topic */
-         }
-         else
-         {
-            Serial.println("File /itsme is empty, proceed as 'unknown'");
-         }
-
-         Serial.println("My name is: " + myMqttConfig.getName());
-      }
+      myMqttConfig.setName(myName); /* set name from spiffs here, thus setup only needs to set the main topic */
    }
    else
    {
-      Serial.println("File /itsme does not exist, proceed as 'unknown' until coded via MQTT");
+      Serial.println("File " + SPIFFS_MQTT_ID_FILE + " is empty or does not exist, proceed as 'unknown'");
    }
+
+   Serial.println("My name is: " + myMqttConfig.getName());
+
+
    #endif /* CFG_MQTT_CLIENT */
 
    #if CFG_SENSOR
-   String sensorCalib = "";
+   String sensorCalib = readSpiffs(SPIFFS_SENSOR_CALIB_FILE);
 
    /* check parameters for Sensor calibration */
-   if (SPIFFS.exists("/sensor"))
+   if (sensorCalib != "")
    {
-      File f = SPIFFS.open("/sensor", "r");
-      if (!f) {
-          Serial.println("oh no, failed to open file: /sensor, proceed with uncalibrated sensor");
-          /* TODO: Error handling */
+      int offset;
+      int factor;
+
+      /* split parameter string */
+      if (splitSensorDataString(sensorCalib, &offset, &factor))
+      {
+         #ifdef CFG_DEBUG
+         Serial.println("Offset read from /sensor is: " + String(offset) + " *C");
+         Serial.println("Factor read from /sensor is: " + String(factor) + " %");
+         #endif
+
+         mySensorData.setSensorCalibData(offset, factor, false);
       }
       else
       {
-         sensorCalib = f.readStringUntil('\n');
-         #ifdef CFG_DEBUG
-         Serial.println("String read from /sensor is: " + sensorCalib);
-         #endif
-         f.close();
-
-         /* split parameter string */
-         if (sensorCalib != "")
-         {
-            int offset;
-            int factor;
-
-            if (splitSensorDataString(sensorCalib, &offset, &factor))
-            {
-               #ifdef CFG_DEBUG
-               Serial.println("Offset read from /sensor is: " + String(offset) + " *C");
-               Serial.println("Factor read from /sensor is: " + String(factor) + " %");
-               #endif
-
-               mySensorData.setSensorCalibData(offset, factor, false);
-            }
-            else
-            {
-               Serial.println("File /sensor returned malformed string, proceed with uncalibrated sensor");
-            }
-         }
-         else
-         {
-            Serial.println("File /sensor is empty, proceed with uncalibrated sensor");
-         }
+         Serial.println("File " + SPIFFS_SENSOR_CALIB_FILE + " returned malformed string, proceed with uncalibrated sensor");
       }
    }
    else
    {
-      Serial.println("File /sensor does not exist, proceed with uncalibrated sensor");
+      Serial.println("File " + SPIFFS_SENSOR_CALIB_FILE + " is empty or does not exist, proceed with uncalibrated sensor");
    }
+
    #endif /* CFG_SENSOR */
+
+   #if CFG_HEATING_CONTROL
+   String targetTemp = readSpiffs(SPIFFS_TARGET_TEMP_FILE);
+   if (targetTemp != "")
+   {
+      myHeatingControl.setTargetTemperature(targetTemp.toInt()); /* set temperature from spiffs here*/
+      Serial.println("File " + SPIFFS_TARGET_TEMP_FILE + " is available, proceed with value: " + String(myHeatingControl.getTargetTemperature()));
+   }
+   else
+   {
+      Serial.println("File " + SPIFFS_TARGET_TEMP_FILE + " is empty or does not exist, proceed with init value: " + String(myHeatingControl.getTargetTemperature()));
+   }
+
+   SPIFFS_LAST_TARGET_TEMPERATURE = myHeatingControl.getTargetTemperature(); /* store this value also here to avoid unnecessary usage of SPIFFS */
+
+   #endif /* CFG_HEATING_CONTROL */
 }
 #endif
 
@@ -684,9 +764,9 @@ void HANDLE_SYSTEM_STATE(void)
 {
    if (mySystemState.getSystemRestartRequest() == true)
    {
-      #if CFG_SENSOR
+      #if CFG_DISPLAY
       DRAW_DISPLAY_MAIN();
-      #endif /* CFG_SENSOR */
+      #endif /* CFG_DISPLAY */
 
       Serial.println("Restarting in 3 seconds");
       delay(3000);
@@ -810,7 +890,7 @@ void SENSOR_MAIN()
 #if CFG_HEATING_CONTROL
 void HEATING_CONTROL_MAIN(void)
 {
-   #if CFG_DEVICE == cThermostat
+   #if CFG_SENSOR
    if (mySensorData.getSensorError())
    {
       /* switch off heating if sensor does not provide values */
@@ -857,7 +937,7 @@ void HEATING_CONTROL_MAIN(void)
          myHeatingControl.setHeatingEnabled(false);
       }
    }
-   #endif /* CFG_DEVICE == cThermostat */
+   #endif /* CFG_SENSOR */
 }
 #endif
 
@@ -874,17 +954,28 @@ void DRAW_DISPLAY_MAIN(void)
       myDisplay.setTextAlignment(TEXT_ALIGN_CENTER);
       myDisplay.drawString(64,22,"Restart");
    }
-   else if ( (FETCH_UPDATE == true) || (OTA_UPDATE == true) )
+   #if CFG_OTA
+   else if (OTA_UPDATE == true)
    {
       myDisplay.setFont(Roboto_Condensed_16);
       myDisplay.setTextAlignment(TEXT_ALIGN_CENTER);
       myDisplay.drawString(64,22,"Update");
    }
+   #endif /* CFG_OTA */
+   #if CFG_HTTP_UPDATE
+   else if (FETCH_UPDATE == true)
+   {
+      myDisplay.setFont(Roboto_Condensed_16);
+      myDisplay.setTextAlignment(TEXT_ALIGN_CENTER);
+      myDisplay.drawString(64,22,"Update");
+   }
+   #endif /* CFG_HTTP_UPDATE */
    else
    {
       myDisplay.setTextAlignment(TEXT_ALIGN_RIGHT);
       myDisplay.setFont(Roboto_Condensed_32);
 
+      #if CFG_SENSOR
       if (mySensorData.getSensorError())
       {
          myDisplay.drawString(128, drawTempYOffset, "err");
@@ -893,7 +984,9 @@ void DRAW_DISPLAY_MAIN(void)
       {
          myDisplay.drawString(128, drawTempYOffset, String(intToFloat(mySensorData.getFilteredTemperature()),1)+"°");
       }
+      #endif /* CFG_SENSOR */
 
+      #if CFG_HEATING_CONTROL
       /* do not display target temperature if heating is not allowed */
       if (myHeatingControl.getHeatingAllowed() == true)
       {
@@ -905,6 +998,7 @@ void DRAW_DISPLAY_MAIN(void)
             myDisplay.drawHeating;
          }
       }
+      #endif /* CFG_HEATING_CONTROL */
    }
 
    myDisplay.display();
@@ -918,29 +1012,39 @@ void MQTT_MAIN(void)
    {
       if(!myMqttClient.connected())
       {
-         #ifdef CFG_DEBUG
-         if ( MQTT_RECONNECT_TIMER % 100 == 0 )
+         if (MQTT_RECONNECT == false)
          {
-            Serial.println("MQTT_RECONNECT_TIMER: " + String(MQTT_RECONNECT_TIMER));
-         }
-         #endif
-
-         if (MQTT_RECONNECT_TIMER == 0)
-         {
-            MQTT_RECONNECT_TIMER = MQTT_RECONNECT_TIME;
-            MQTT_CONNECT();
+            MQTT_RECONNECT = true;
+            MQTT_RECONNECT_REFERENCE_TIME = millis();
          }
          else
          {
-            MQTT_RECONNECT_TIMER--;
+            if (MQTT_RECONNECT_REFERENCE_TIME + MQTT_RECONNECT_TIME < millis())
+            {
+               MQTT_RECONNECT = false;
+               MQTT_CONNECT();
+            }
+            else
+            {
+               /* debounce reconnect */
+               #ifdef CFG_DEBUG
+               if ( (MQTT_RECONNECT_REFERENCE_TIME + MQTT_RECONNECT_TIME - millis()) % 100 == 0 )
+               {
+                  Serial.println("MQTT reconnect in: " + String((MQTT_RECONNECT_REFERENCE_TIME + MQTT_RECONNECT_TIME - millis())));
+               }
+               #endif
+            }
          }
+
          return;
       }
 
+      #if CFG_HTTP_UPDATE
       if (FETCH_UPDATE == true)
       {
          myMqttClient.publish(myMqttConfig.getTopicUpdateFirmwareAccepted(), String(false)); /* publish accepted update with value false to reset the switch in Home Assistant */
       }
+      #endif /* CFG_HTTP_UPDATE */
 
       /* check if there is new data to transmit */
       #if CFG_DEVICE == cThermostat
@@ -1021,29 +1125,12 @@ void SPIFFS_MAIN(void)
    {
       mySystemState.setSystemRestartRequest(true);
 
-      if (SPIFFS.exists("/itsme"))
+      if (!writeSpiffs(SPIFFS_MQTT_ID_FILE, myMqttConfig.getName()))
       {
          #ifdef CFG_DEBUG
-         File f = SPIFFS.open("/itsme", "r");
-         String myName = f.readStringUntil('\n');
-         f.close();
-         Serial.println("My current name is " + myName);
+         Serial.println("Writing to file: " + SPIFFS_MQTT_ID_FILE + " returned no success");
          #endif
-         SPIFFS.remove("/itsme");
-      }
-
-      File f = SPIFFS.open("/itsme", "w");
-      if (!f) {
-          Serial.println("Failed to open file: /itsme, can't change my name");
-          /* TODO: Error handling */
-      }
-      else
-      {
-         myMqttConfig.resetNameChanged();
-         f.print(myMqttConfig.getName());
-         f.close();
-         Serial.println("My new name is: " + myMqttConfig.getName());
-         delay(1000);
+         /* ToDo: implement retry */
       }
    }
 
@@ -1052,51 +1139,71 @@ void SPIFFS_MAIN(void)
    {
       mySystemState.setSystemRestartRequest(true);
 
-      if (SPIFFS.exists("/sensor"))
+      if (!writeSpiffs(SPIFFS_SENSOR_CALIB_FILE, String(mySensorData.getSensorCalibOffset()) + ";" + String(mySensorData.getSensorCalibFactor())))
       {
          #ifdef CFG_DEBUG
-         File f = SPIFFS.open("/sensor", "r");
-         String sensorCalib = f.readStringUntil('\n');
-         Serial.println("String read from /sensor is: " + sensorCalib);
-
-         f.close();
-
-         if (sensorCalib != "")
-         {
-            int offset;
-            int factor;
-
-            if (splitSensorDataString(sensorCalib, &offset, &factor))
-            {
-               Serial.println("Offset read from /sensor is: " + String(offset));
-               Serial.println("Factor read from /sensor is: " + String(factor));
-            }
-            else
-            {
-               Serial.println("Malformed string received from file /sensor");
-            }
-         }
-
+         Serial.println("Writing to file: " + SPIFFS_SENSOR_CALIB_FILE + " returned no success");
          #endif
-         SPIFFS.remove("/sensor");
+         /* ToDo: implement retry */
       }
 
-      File f = SPIFFS.open("/sensor", "w");
-      if (!f) {
-          Serial.println("Failed to open file: /sensor, can't change sensor calibration parameters");
-      }
-      else
-      {
-         mySensorData.resetNewCalib();
-         f.print(String(mySensorData.getSensorCalibOffset()) + ";" + String(mySensorData.getSensorCalibFactor()));
-         f.close();
-         delay(1000);
-      }
    }
    #endif /* CFG_SENSOR */
    #endif /* CFG_MQTT_CLIENT */
+
+   #if CFG_HEATING_CONTROL
+   /* avoid extensive writing to SPIFFS, therefore check if the target temperature didn't change for a certain time before writing. */
+   if (myHeatingControl.getTargetTemperature() != SPIFFS_LAST_TARGET_TEMPERATURE)
+   {
+      #ifdef CFG_DEBUG
+      Serial.println("Target temperature changed from. " + String(SPIFFS_LAST_TARGET_TEMPERATURE) + " to: " + String(myHeatingControl.getTargetTemperature()));
+      #endif
+
+      SPIFFS_REFERENCE_TIME = millis();
+      SPIFFS_LAST_TARGET_TEMPERATURE = myHeatingControl.getTargetTemperature();
+      SPIFFS_WRITTEN = false;
+   }
+   else /* target temperature not changed this loop */
+   {
+      if (SPIFFS_WRITTEN == true)
+      {
+         /* do nothing, last change was already stored in SPIFFS */
+      }
+      else /* latest change not stored in SPIFFS */
+      {
+         if (SPIFFS_REFERENCE_TIME + SPIFFS_WRITE_DEBOUNCE < millis()) /* check debounce */
+         {
+            /* debounce expired -> write */
+            if (writeSpiffs(SPIFFS_TARGET_TEMP_FILE, String(myHeatingControl.getTargetTemperature())))
+            {
+               SPIFFS_WRITTEN = true;
+            }
+            else
+            {
+               #ifdef CFG_DEBUG
+               Serial.println("Writing to file: " + SPIFFS_TARGET_TEMP_FILE + " returned no success, retry next loop");
+               #endif
+            }
+
+            #ifdef CFG_DEBUG
+            Serial.println("New target temperature: " + String(myHeatingControl.getTargetTemperature()) + " stored in SPIFFS");
+            #endif
+         }
+         else
+         {
+            /* debounce SPIFFS write */
+            #ifdef CFG_DEBUG
+            if ( (SPIFFS_REFERENCE_TIME + SPIFFS_WRITE_DEBOUNCE - millis()) % 100 == 0 ) /* modulo 100 to avoid excessive prints while debouncing */
+            {
+               Serial.println("Debouncing at: " + String((SPIFFS_REFERENCE_TIME + SPIFFS_WRITE_DEBOUNCE - millis())));
+            }
+            #endif
+         }
+      }
+   }
+   #endif /* CFG_HEATING_CONTROL */
 }
-#endif
+#endif /* CFG_SPIFFS */
 /*===================================================================================================================*/
 /* callback, interrupt, timer functions */
 /*===================================================================================================================*/
@@ -1108,8 +1215,10 @@ void ICACHE_RAM_ATTR encoderSwitch (void)
    unsigned long time = millis();
    if ((time - SWITCH_DEBOUNCE_REF) > switchDebounceTime)
    {
+      #if CFG_HEATING_CONTROL
       /* toggle heating allowed */
       myHeatingControl.toggleHeatingAllowed();
+      #endif
    }
    SWITCH_DEBOUNCE_REF = time;
 }
@@ -1140,11 +1249,15 @@ void ICACHE_RAM_ATTR updateEncoder(void)
 
       if(ROTARY_ENCODER_DIRECTION_INTS > rotRight) /* if there was a higher amount of interrupts to the right, consider the encoder was turned to the right */
       {
+         #if CFG_HEATING_CONTROL
          myHeatingControl.increaseTargetTemperature(tempStep);
+         #endif /* CFG_HEATING_CONTROL */
       }
       else if (ROTARY_ENCODER_DIRECTION_INTS < rotLeft) /* if there was a higher amount of interrupts to the left, consider the encoder was turned to the left */
       {
+         #if CFG_HEATING_CONTROL
          myHeatingControl.decreaseTargetTemperature(tempStep);
+         #endif /* CFG_HEATING_CONTROL */
       }
       else
       {
