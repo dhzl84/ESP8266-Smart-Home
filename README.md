@@ -13,7 +13,7 @@ Basic building blocks and technologies:
 SW Built with [Sloeber IDE 4.2](http://eclipse.baeyens.it/), lots of great [Arduino](https://www.arduino.cc) libraries and ESP8266 Arduino 2.4.0  
 Circuit and PCB made with [Target 3001](https://ibfriedrich.com/de/index.html)
 
-## 1. Build Status [![Build Status](https://travis-ci.org/eXtatic-GitHub/ESP8266-Smart-Home.svg?branch=master)](https://travis-ci.org/eXtatic-GitHub/ESP8266-Smart-Home)
+## 1. Build Status [![Build Status](https://travis-ci.org/dhzl84/ESP8266-Smart-Home.svg?branch=master)](https://travis-ci.org/dhzl84/ESP8266-Smart-Home)
 * Master branch
 * Arduino IDE 1.8.5
 * ESP8266 Arduino 2.4.0
@@ -22,6 +22,8 @@ Circuit and PCB made with [Target 3001](https://ibfriedrich.com/de/index.html)
 * S20 config
 
 ## 2. General hints
+See [my Home Assistant configuration](https://github.com/dhzl84/Home-Assistant-Configuration) for the usage of this devices.
+
 Since there is certain information in my software that I do not want everyone to know I located those in a single header file called *config.h* which is not part of the repository, and therefore the build will fail.
 
 My *config.h* for building a thermostat SW contains the following information:
