@@ -137,13 +137,19 @@ mqttConfig     myMqttConfig;
 #endif
 
 #if CFG_SPIFFS
-#define        SPIFFS_TARGET_TEMP_FILE    String("/targetTemp")
+#if CFG_MQTT_CLIENT
 #define        SPIFFS_MQTT_ID_FILE        String("/itsme")
+#endif
+#if CFG_SENSOR
 #define        SPIFFS_SENSOR_CALIB_FILE   String("/sensor")
+#endif
+#if CFG_HEATING_CONTROL
+#define        SPIFFS_TARGET_TEMP_FILE    String("/targetTemp")
 #define        SPIFFS_WRITE_DEBOUNCE      20000 /* write target temperature to spiffs if it wasn't changed for 20 s (time in ms) */
 boolean        SPIFFS_WRITTEN =           true;
 unsigned long  SPIFFS_REFERENCE_TIME;
 int            SPIFFS_LAST_TARGET_TEMPERATURE;
+#endif /* CFG_HEATING_CONTROL */
 #endif /* CFG_SPIFFS */
 
 /*===================================================================================================================*/
@@ -348,11 +354,11 @@ void setup()
    Serial.println("Serial connection established");
    #endif
 
-   GPIO_CONFIG();    /* configure GPIOs */
-
    #if CFG_SPIFFS
-   SPIFFS_INIT();
+   SPIFFS_INIT();   /* read stuff from SPIFFS */
    #endif
+
+   GPIO_CONFIG();    /* configure GPIOs */
 
    #if CFG_SENSOR
    myDHT.setup(DHT_PIN);    /* init DHT sensor */
@@ -391,21 +397,6 @@ void setup()
 /*===================================================================================================================*/
 /* functions called by setup() */
 /*===================================================================================================================*/
-void GPIO_CONFIG(void)
-{
-   #if CFG_DEVICE == cThermostat
-   #if CFG_HEATING_CONTROL
-   myHeatingControl.setup(RELAY_PIN, 210); /*GPIO to switch connected relay and initial target temperature */
-   #endif
-   /* initialize encoder pins */
-   pinMode(ENCODER_PIN1, INPUT_PULLUP);
-   pinMode(ENCODER_PIN2, INPUT_PULLUP);
-   pinMode(ENCODER_SWITCH_PIN, INPUT_PULLUP);
-   #elif CFG_DEVICE == cS20
-   myS20.setup(RELAY_PIN, TOGGLE_PIN, LED_PIN);
-   #endif
-}
-
 #if CFG_SPIFFS
 void SPIFFS_INIT(void)
 {
@@ -449,7 +440,17 @@ void SPIFFS_INIT(void)
       #endif
    }
    #ifdef CFG_DEBUG
-   Serial.print("Check if I remember who I am, ");
+   Serial.println("Check if I remember who I am ... ");
+   #endif
+
+
+   #ifdef CFG_DEBUG
+   Dir dir = SPIFFS.openDir("/");
+   while (dir.next()) {
+       Serial.print("SPIFFS file found: " + dir.fileName() + " - Size in byte: ");
+       File f = dir.openFile("r");
+       Serial.println(f.size());
+   }
    #endif
 
    #if CFG_MQTT_CLIENT
@@ -520,6 +521,21 @@ void SPIFFS_INIT(void)
 }
 #endif
 
+void GPIO_CONFIG(void)
+{
+   #if CFG_DEVICE == cThermostat
+   #if CFG_HEATING_CONTROL
+   myHeatingControl.setup(RELAY_PIN, myHeatingControl.getTargetTemperature()); /*GPIO to switch connected relay and initial target temperature */
+   #endif
+   /* initialize encoder pins */
+   pinMode(ENCODER_PIN1, INPUT_PULLUP);
+   pinMode(ENCODER_PIN2, INPUT_PULLUP);
+   pinMode(ENCODER_SWITCH_PIN, INPUT_PULLUP);
+   #elif CFG_DEVICE == cS20
+   myS20.setup(RELAY_PIN, TOGGLE_PIN, LED_PIN);
+   #endif
+}
+
 #if CFG_DISPLAY
 void DISPLAY_INIT(void)
 {
@@ -545,11 +561,16 @@ void WIFI_CONNECT(void)
       #ifdef CFG_DEBUG
       Serial.println("Initialize WiFi ");
       #endif
+
       WiFi.mode(WIFI_STA);
       WiFi.begin(ssid, password);
+
+      #ifdef CFG_DEBUG
+      Serial.println("WiFi Status: "+ String(WiFi.begin(ssid, password)));
+      #endif
    }
 
-   /* try to connect to WiFi for some time prior to proceed with init */
+   /* try to connect to WiFi, proceed offline if not connecting here*/
    while (WiFi.waitForConnectResult() != WL_CONNECTED) {
      Serial.println("Failed to connect to WiFi, continue offline");
      mySystemState.setSystemState(systemState_offline);
