@@ -29,6 +29,7 @@ void mqttConfig::setup(String mainTopic)
 
 void mqttConfig::buildTopics(void)
 {
+   mqttFirmwareVersion =         mqttMainTopic + mqttName + "/firmwareVersion";
    mqttUpdateFirmware =          mqttMainTopic + mqttName + "/updateFirmware";
    mqttUpdateFirmwareAccepted =  mqttMainTopic + mqttName + "/updateFirmwareAccepted";
    mqttChangeName =              mqttMainTopic + mqttName + "/changeName";
@@ -94,6 +95,11 @@ bool mqttConfig::getNameChanged(void)
 {
    return nameChanged;
 }
+String mqttConfig::getTopicFirmwareVersion(void)
+{
+   return mqttFirmwareVersion;
+}
+
 String mqttConfig::getTopicUpdateFirmware(void)
 {
    return mqttUpdateFirmware;

@@ -17,6 +17,7 @@ public:
    bool   getNameChanged();
    void   resetNameChanged();
    String getName(void);
+   String getTopicFirmwareVersion(void);
    String getTopicUpdateFirmware(void);
    String getTopicUpdateFirmwareAccepted(void);
    String getTopicChangeName(void);
@@ -48,6 +49,7 @@ public:
 
 private:
    String mqttName;
+   String mqttFirmwareVersion;
    String mqttUpdateFirmware;
    String mqttUpdateFirmwareAccepted;
    String mqttChangeName;

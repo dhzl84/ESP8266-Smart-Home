@@ -2,6 +2,7 @@
 /* includes */
 /*===================================================================================================================*/
 #include "ESP8266.h"
+#include "version.h"
 
 #include <ESP8266WiFi.h>
 #if CFG_DEVICE == cS20
@@ -728,6 +729,12 @@ void MQTT_CONNECT(void)
       myMqttClient.publish(myMqttConfig.getTopicSystemRestartRequest(),"0", true, 1);
       #ifdef CFG_DEBUG
       Serial.println("MQTT publish " + myMqttConfig.getTopicSystemRestartRequest() + ": 0");
+      #endif
+
+      /* publish firmware version on connect */
+      myMqttClient.publish(myMqttConfig.getTopicFirmwareVersion(), FIRMWARE_VERSION, true, 1);
+      #ifdef CFG_DEBUG
+      Serial.println("MQTT publish " + myMqttConfig.getTopicFirmwareVersion() + ": " + FIRMWARE_VERSION);
       #endif
 
       /* register callback */
