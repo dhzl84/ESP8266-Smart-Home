@@ -5,7 +5,7 @@
 
 #define myThermo_width  36
 #define myThermo_height 36
-const char myThermo [] PROGMEM = {
+const uint8_t myThermo [] PROGMEM = {
    /* MDI:thermometer 36x36 px
       converted with https://www.online-utility.org/image/convert/to/XBM
       inverted with GIMP */
@@ -28,7 +28,7 @@ const char myThermo [] PROGMEM = {
 
 // Created by http://oleddisplay.squix.ch/ Consider a donation
 // In case of problems make sure that you are using the font file with the correct version!
-const char Roboto_Condensed_32[] PROGMEM = {
+const uint8_t Roboto_Condensed_32[] PROGMEM = {
 	0x1A, // Width: 26
 	0x26, // Height: 38
 	0x20, // First Char: 32
@@ -488,7 +488,7 @@ const char Roboto_Condensed_32[] PROGMEM = {
 
 // Created by http://oleddisplay.squix.ch/ Consider a donation
 // In case of problems make sure that you are using the font file with the correct version!
-const char Roboto_Condensed_16[] PROGMEM = {
+const uint8_t Roboto_Condensed_16[] PROGMEM = {
 	0x0D, // Width: 13
 	0x13, // Height: 19
 	0x20, // First Char: 32
