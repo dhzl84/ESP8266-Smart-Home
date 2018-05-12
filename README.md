@@ -18,10 +18,9 @@ Circuit and PCB made with [Target 3001](https://ibfriedrich.com/de/index.html)
 * Arduino IDE 1.8.5
 * ESP8266 Arduino 2.4.1
 * custom libraries:
-  1. Adafruit Unified Sensor - 1.0.2
-  2. DHT sensor library for ESPx - 1.0.5
-  3. ESP8266 and ESP32 Oled Driver for SSD1306 display - 4.0.0
-  4. MQTT - 2.3.1
+  * DHT sensor library for ESPx - 1.0.5
+  * ESP8266 and ESP32 Oled Driver for SSD1306 display - 4.0.0
+  * MQTT - 2.3.1
 * Thermostat config
 * S20 config
 
