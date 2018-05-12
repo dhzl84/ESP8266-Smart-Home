@@ -13,7 +13,7 @@ install:
   - arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json" --save-prefs
   - arduino --install-boards esp8266:esp8266:2.4.1
   - arduino --board esp8266:esp8266:generic --save-prefs
-  - arduino --install-library "Adafruit Unified Sensor VERSION=1.0.2"
+  - arduino --install-library "Adafruit Unified Sensor:1.0.2"
   - arduino --install-library "DHT sensor library for ESPx,ESP8266 and ESP32 Oled Driver for SSD1306 display,MQTT"
   - arduino --pref "compiler.warning_level=all" --save-prefs
   - arduino --pref "custom_CpuFrequency=generic_80" --save-prefs
