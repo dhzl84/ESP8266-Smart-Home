@@ -100,3 +100,6 @@ I had a look at some available software solutions but then decided to just stick
 ```c++
 #define CFG_DEVICE   cS20
 ```
+
+### 4.3 Build specifics
+The Sonoff S20 ESP8266 devices seem to be sensible concerning the Flash Mode set in the Arduino IDE. Flash Mode "DOUT" works reliably for me.
