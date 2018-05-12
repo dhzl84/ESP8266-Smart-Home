@@ -16,8 +16,12 @@ Circuit and PCB made with [Target 3001](https://ibfriedrich.com/de/index.html)
 ## 1. Build Status [![Build Status](https://travis-ci.org/dhzl84/ESP8266-Smart-Home.svg?branch=master)](https://travis-ci.org/dhzl84/ESP8266-Smart-Home)
 * Master branch
 * Arduino IDE 1.8.5
-* ESP8266 Arduino 2.4.0
-* latest libraries
+* ESP8266 Arduino 2.4.1
+* latest libraries:
+  1. Adafruit Unified Sensor
+  2. DHT sensor library for ESPx
+  3. ESP8266 and ESP32 Oled Driver for SSD1306 display
+  4. MQTT
 * Thermostat config
 * S20 config
 
