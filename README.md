@@ -10,7 +10,7 @@ Basic building blocks and technologies:
 * MQTT
 * [Home Assistant](https://home-assistant.io/)
 
-SW Built with [Sloeber IDE 4.2](http://eclipse.baeyens.it/), lots of great [Arduino](https://www.arduino.cc) libraries and ESP8266 Arduino 2.4.0  
+SW Built with [Sloeber IDE 4.2](http://eclipse.baeyens.it/), some great [Arduino](https://www.arduino.cc) libraries and ESP8266 Arduino
 Circuit and PCB made with [Target 3001](https://ibfriedrich.com/de/index.html)
 
 ## 1. Build Status [![Build Status](https://travis-ci.org/dhzl84/ESP8266-Smart-Home.svg?branch=master)](https://travis-ci.org/dhzl84/ESP8266-Smart-Home)
