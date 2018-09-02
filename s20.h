@@ -3,30 +3,37 @@
 
 #include "Arduino.h"
 
+void S20_TOGGLE_PIN_CB(void);
+
 class S20
 {
 public:
    S20(void);
    ~S20(void);
    void init(void);
-   void setup(unsigned char relayGpio, unsigned char toggleGpio, unsigned char ledPin);
+   void setup(unsigned char relayGpio, unsigned char toggleGpio, unsigned char ledPin, unsigned int switchDebounce);
    void main(void);
    void toggleState(void);
    void setState(bool newState);
    bool getState(void);
    bool getNewData(void);
    void resetNewData(void);
+   void togglePinCB(void);
 
 private:
    bool state;
    bool led;
    bool newData;
-   int  buttonDebounce;
    unsigned char relayGpio;
    unsigned char toggleGpio;
    unsigned char ledGpio;
+   unsigned long toggleTime;
+   unsigned long toggleTimeRef;
+   unsigned int  toggleTimeThres;
    void setLed(bool state);
    bool getLed(void);
+   void toggleLed();
+
 };
 
 #define buttonDebounceTime 15

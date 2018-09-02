@@ -2,6 +2,8 @@
 #define _ESP8266_with_DHT22_H_
 #include <Arduino.h>
 
+//#define CFG_DEBUG
+
 #include "config.h"
 /* the config.h file contains your personal configuration of the parameters below:
 #define WIFI_SSID          "xxxxxxxxx"
@@ -13,8 +15,6 @@
 #define cS20         1
 #define CFG_DEVICE   cThermostat
 */
-
-#define CFG_DEBUG
 
 /*===================================================================================================================*/
 /* Configuration */

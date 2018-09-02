@@ -84,20 +84,27 @@ boolean                 OTA_UPDATE                      = false;       /* global
 #endif /* CFG_OTA */
 
 #if CFG_ROTARY_ENCODER
+#define switchDebounceTime  250
 #define rotLeft              -1
 #define rotRight              1
 #define rotInit               0
 #define tempStep              5
 #define displayTemp           0
 #define displayHumid          1
-#define switchDebounceTime  250
 volatile unsigned long  SWITCH_DEBOUNCE_REF             = 0;           /* reference for debouncing the rotary encoder button switch, latches return of millis() to be checked in next switch interrupt */
 volatile int            LAST_ENCODED                    = 0b11;        /* initial state of the rotary encoders gray code */
 volatile int            ROTARY_ENCODER_DIRECTION_INTS   = rotInit;     /* initialize rotary encoder with no direction */
 #endif
 
 #if CFG_DEVICE == cS20
+#define switchDebounceTime  500
 S20 myS20;
+
+/* Wrapper function for interrupt */
+void ICACHE_RAM_ATTR S20_TOGGLE_PIN_CB(void)
+{
+   myS20.togglePinCB();
+}
 #endif
 
 #if CFG_SENSOR
@@ -206,6 +213,26 @@ void updateEncoder(void);
 /*===================================================================================================================*/
 /* library functions */
 /*===================================================================================================================*/
+#if CFG_DEVICE == cThermostat
+boolean debounceCheck()
+{
+   boolean ret = false;
+
+   unsigned long time = millis();
+   if ((time - SWITCH_DEBOUNCE_REF) > switchDebounceTime)
+   {
+      SWITCH_DEBOUNCE_REF = time;
+      ret = true;
+   }
+   else
+   {
+      ret = false;
+   }
+
+   return ret;
+}
+#endif
+
 float intToFloat(int intValue)
 {
    return ((float)(intValue/10.0));
@@ -533,7 +560,7 @@ void GPIO_CONFIG(void)
    pinMode(ENCODER_PIN2, INPUT_PULLUP);
    pinMode(ENCODER_SWITCH_PIN, INPUT_PULLUP);
    #elif CFG_DEVICE == cS20
-   myS20.setup(RELAY_PIN, TOGGLE_PIN, LED_PIN);
+   myS20.setup(RELAY_PIN, TOGGLE_PIN, LED_PIN, switchDebounceTime);
    #endif
 }
 
@@ -1236,19 +1263,19 @@ void SPIFFS_MAIN(void)
 /* callback, interrupt, timer functions */
 /*===================================================================================================================*/
 
+
+
 #if CFG_ROTARY_ENCODER
-void ICACHE_RAM_ATTR encoderSwitch (void)
+void ICACHE_RAM_ATTR encoderSwitch(void)
 {
    /* debouncing routine for encoder switch */
-   unsigned long time = millis();
-   if ((time - SWITCH_DEBOUNCE_REF) > switchDebounceTime)
+   if (debounceCheck())
    {
       #if CFG_HEATING_CONTROL
       /* toggle heating allowed */
       myHeatingControl.toggleHeatingAllowed();
       #endif
    }
-   SWITCH_DEBOUNCE_REF = time;
 }
 
 void ICACHE_RAM_ATTR updateEncoder(void)
