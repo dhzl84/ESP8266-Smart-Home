@@ -10,17 +10,17 @@ Basic building blocks and technologies:
 * MQTT
 * [Home Assistant](https://home-assistant.io/)
 
-SW Built with [Sloeber IDE 4.2](http://eclipse.baeyens.it/), some great [Arduino](https://www.arduino.cc) libraries and ESP8266 Arduino
+SW Built with PlatformIO in Visual Studio Code, some great [Arduino](https://www.arduino.cc) libraries and ESP8266 Arduino
+
 Circuit and PCB made with [Target 3001](https://ibfriedrich.com/de/index.html)
 
 ## 1. Build Status [![Build Status](https://travis-ci.org/dhzl84/ESP8266-Smart-Home.svg?branch=master)](https://travis-ci.org/dhzl84/ESP8266-Smart-Home)
 * Master branch
-* Arduino IDE 1.8.5
-* ESP8266 Arduino 2.4.1
+* ESP8266 Arduino 2.4.2
 * custom libraries:
-  * DHT sensor library for ESPx - 1.0.5
-  * ESP8266 and ESP32 Oled Driver for SSD1306 display - 4.0.0
-  * MQTT - 2.3.1
+  * DHT sensor library for ESPx
+  * ESP8266 and ESP32 Oled Driver for SSD1306 display
+  * MQTT
 * Thermostat config
 * S20 config
 
