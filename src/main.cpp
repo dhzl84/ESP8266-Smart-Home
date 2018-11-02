@@ -6,7 +6,7 @@
 
 #include <ESP8266WiFi.h>
 #if CFG_DEVICE == cS20
-#include "s20.h"
+#include "cS20.h"
 #endif
 #if CFG_SENSOR
 #include <DHTesp.h>

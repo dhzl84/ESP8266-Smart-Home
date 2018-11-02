@@ -2,7 +2,7 @@
 
 This is my ESP8266 smart home playground for:  
 * Self made floor heating sens and control units
-* Sonoff S20 plugs
+* Sonoff S20 outlets
 
 Basic building blocks and technologies:
 * [ESP8266-07](https://www.espressif.com/)
