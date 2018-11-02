@@ -39,5 +39,21 @@ install:
     - platformio lib -g install 1
 
 script:
+    - chmod a+x config.sh
+    - echo "configure S20"
+    - ./config.sh "cS20"
+    - cat config.h
+    - ls -l
+    - mv config.h src/config.h
+    # - echo "configure thermostat"
+    # - ./config.sh "cThermostat"
+    # - cat config.h
+    # - ls -l
+    # - mv config.h src/config.h
+
     - platformio run
 
+notifications:
+  email:
+    on_success: change
+    on_failure: change
