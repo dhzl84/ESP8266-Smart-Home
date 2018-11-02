@@ -1,6 +1,4 @@
-touch config.h
-touch src/config.h
-cat > src/config.h << EOF
+cat > config.h << EOF
 #ifndef CONFIG_H_
 #define CONFIG_H_
 
