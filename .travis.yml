@@ -35,13 +35,13 @@ script:
   - cat config.h
   - ls -l
   - mv config.h src/config.h
-  - arduino -v --verify --board esp8266:esp8266:generic $PWD/ESP8266.cpp
+  - arduino -v --verify --board esp8266:esp8266:generic $PWD/src/ESP8266.cpp
   - echo "configure thermostat"
   - ./config.sh "cThermostat"
   - cat config.h
   - ls -l
   - mv config.h src/config.h
-  - arduino -v --verify --board esp8266:esp8266:generic $PWD/ESP8266.cpp
+  - arduino -v --verify --board esp8266:esp8266:generic $PWD/src/ESP8266.cpp
 notifications:
   email:
     on_success: change
