@@ -45,14 +45,14 @@ script:
     - cat config.h
     - ls -l
     - mv config.h src/config.h
-    # - echo "configure thermostat"
-    # - ./config.sh "cThermostat"
-    # - cat config.h
-    # - ls -l
-    # - mv config.h src/config.h
-
     - platformio run
-
+    - echo "configure thermostat"
+    - ./config.sh "cThermostat"
+    - cat config.h
+    - ls -l
+    - mv config.h src/config.h
+    - platformio run
+    
 notifications:
   email:
     on_success: change
