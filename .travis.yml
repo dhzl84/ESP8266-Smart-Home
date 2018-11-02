@@ -32,12 +32,12 @@ script:
   - chmod a+x config.sh
   - echo "configure S20"
   - ./config.sh "s20"
-  - cat config.h
+  - cat /src/config.h
   - ls -l
   - arduino -v --verify --board esp8266:esp8266:generic $PWD/ESP8266.cpp
   - echo "configure thermostat"
   - ./config.sh "cThermostat"
-  - cat config.h  
+  - cat /src/config.h  
   - ls -l
   - arduino -v --verify --board esp8266:esp8266:generic $PWD/ESP8266.cpp
 notifications:
