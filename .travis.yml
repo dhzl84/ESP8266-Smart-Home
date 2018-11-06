@@ -40,14 +40,8 @@ install:
 
 script:
     - chmod a+x config.sh
-    - echo "configure S20"
-    - ./config.sh "cS20"
-    - cat config.h
-    - ls -l
-    - mv config.h src/config.h
-    - platformio run
-    - echo "configure thermostat"
-    - ./config.sh "cThermostat"
+    - echo "generate config.h dummy"
+    - ./config.sh
     - cat config.h
     - ls -l
     - mv config.h src/config.h

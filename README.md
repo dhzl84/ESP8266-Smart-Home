@@ -2,7 +2,6 @@
 
 This is my ESP8266 smart home playground for:  
 * Self made floor heating sens and control units
-* Sonoff S20 outlets
 
 Basic building blocks and technologies:
 * [ESP8266-07](https://www.espressif.com/)
@@ -21,8 +20,6 @@ Circuit and PCB made with [Target 3001](https://ibfriedrich.com/de/index.html)
   * DHT sensor library for ESPx
   * ESP8266 and ESP32 Oled Driver for SSD1306 display
   * MQTT
-* Thermostat config
-* S20 config
 
 ## 2. General hints
 See [my Home Assistant configuration](https://github.com/dhzl84/Home-Assistant-Configuration) for the usage of this devices.
@@ -37,10 +34,6 @@ My *config.h* for building a thermostat SW contains the following information:
 #define LOCAL_MQTT_USER    "xxx"
 #define LOCAL_MQTT_PWD     "xxx"
 #define THERMOSTAT_BINARY  "http://<domain or ip>/<name>.bin"
-#define S20_BINARY         "http://<domain or ip>/<name>.bin"
-#define cThermostat        0
-#define cS20               1
-#define CFG_DEVICE         $1
 ```
 
 For Travis CI compatibility there is the *config.sh* script which generates the above mentioned dummy code.
@@ -57,17 +50,11 @@ So I thought about buying them but they were either expensive as hell or just di
 * controlling room temperature
 * display current room temperature
 * display target temperature
-* switch on/off
 
 **remote:**
 * allow control from remote devices (smartphones, computers, etc.)
 * provide a nice front end
 * stay locally operational if not connected to a network
-
-### 3.2SW configuration
-```c++
-#define CFG_DEVICE   cThermostat
-```
 
 ### 3.3 Assembly parts
 * ESP8266-07
@@ -81,25 +68,3 @@ So I thought about buying them but they were either expensive as hell or just di
 
 ### 3.4 Wiring
 ![image](https://user-images.githubusercontent.com/5675570/35767892-47fde138-08f4-11e8-863e-870828831ac0.png)
-
-## 4. Sonoff S20
-While having already some 433 MHz outlets setup I decided to buy some of those nice devices to connect all the christmas lights to Home Assistant and switch them reliably.
-I had a look at some available software solutions but then decided to just stick to my base software and extend it a bit for the S20.
-
-### 4.1 Features
-
-**local:**
-* switch on/off via button
-
-**remote:**
-* switch on/off from remote devices (smartphones, computers, etc.)
-* switch on/off from remote controls (433 MHz, EnOcean)
-* configurable time based automations
-
-### 4.2 SW configuration
-```c++
-#define CFG_DEVICE   cS20
-```
-
-### 4.3 Build specifics
-The Sonoff S20 ESP8266 devices seem to be sensible concerning the Flash Mode set in the Arduino IDE. Flash Mode "DOUT" works reliably for me.

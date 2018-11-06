@@ -9,10 +9,6 @@ cat > config.h << EOF
 #define LOCAL_MQTT_USER    "xxx"
 #define LOCAL_MQTT_PWD     "xxx"
 #define THERMOSTAT_BINARY  "http://<domain or ip>/<name>.bin"
-#define S20_BINARY         "http://<domain or ip>/<name>.bin"
-#define cThermostat        0
-#define cS20               1
-#define CFG_DEVICE         $1
 
 #endif /* CONFIG_H_ */
 EOF

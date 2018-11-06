@@ -5,9 +5,6 @@
 #include "version.h"
 
 #include <ESP8266WiFi.h>
-#if CFG_DEVICE == cS20
-#include "cS20.h"
-#endif
 #if CFG_SENSOR
 #include <DHTesp.h>
 #include "cSensorData.h"
@@ -40,7 +37,6 @@
 /*===================================================================================================================*/
 /* GPIO config */
 /*===================================================================================================================*/
-#if CFG_DEVICE == cThermostat
 #define DHT_PIN              2 /* sensor */
 #define SDA_PIN              4 /* I²C */
 #define SCL_PIN              5 /* I²C */
@@ -48,11 +44,6 @@
 #define ENCODER_PIN2        13 /* rotary left/right */
 #define ENCODER_SWITCH_PIN  14 /* push button switch */
 #define RELAY_PIN           16 /* relay control */
-#elif CFG_DEVICE == cS20
-#define RELAY_PIN           12 /* relay control */
-#define TOGGLE_PIN           0 /* pin connected to HW button to toggle relay */
-#define LED_PIN             13 /* drive LED */
-#endif
 
 /*===================================================================================================================*/
 /* variables, constants, types, classes, etc, definitions */
@@ -69,13 +60,7 @@ boolean        MQTT_RECONNECT          = false;
 #endif
 
 #if CFG_HTTP_UPDATE
-#if CFG_DEVICE == cThermostat
 const String myUpdateServer = THERMOSTAT_BINARY;
-#elif CFG_DEVICE == cS20
-const String myUpdateServer = S20_BINARY;
-#else
-#error "HTTP update not supported for this device!"
-#endif /* CFG_DEVICE */
 boolean                 FETCH_UPDATE                    = false;       /* global variable used to decide whether an update shall be fetched from server or not */
 #endif /* CFG_HTTP_UPDATE */
 
@@ -94,17 +79,6 @@ boolean                 OTA_UPDATE                      = false;       /* global
 volatile unsigned long  SWITCH_DEBOUNCE_REF             = 0;           /* reference for debouncing the rotary encoder button switch, latches return of millis() to be checked in next switch interrupt */
 volatile int            LAST_ENCODED                    = 0b11;        /* initial state of the rotary encoders gray code */
 volatile int            ROTARY_ENCODER_DIRECTION_INTS   = rotInit;     /* initialize rotary encoder with no direction */
-#endif
-
-#if CFG_DEVICE == cS20
-#define switchDebounceTime  500
-S20 myS20;
-
-/* Wrapper function for interrupt */
-void ICACHE_RAM_ATTR S20_TOGGLE_PIN_CB(void)
-{
-   myS20.togglePinCB();
-}
 #endif
 
 #if CFG_SENSOR
@@ -127,13 +101,7 @@ HeatingControl myHeatingControl;
 #endif
 
 #if CFG_MQTT_CLIENT
-#if CFG_DEVICE == cThermostat
 #define MQTT_MAIN_TOPIC "/heating/"
-#elif CFG_DEVICE == cS20
-#define MQTT_MAIN_TOPIC "/sonoff/"
-#else
-#error "no mqtt main topic defined for this device"
-#endif /* CFG_DEVICE */
 #endif /* CFG_MQTT_CLIENT */
 
 WiFiClient     myWiFiClient;
@@ -213,7 +181,6 @@ void updateEncoder(void);
 /*===================================================================================================================*/
 /* library functions */
 /*===================================================================================================================*/
-#if CFG_DEVICE == cThermostat
 boolean debounceCheck()
 {
    boolean ret = false;
@@ -231,7 +198,6 @@ boolean debounceCheck()
 
    return ret;
 }
-#endif
 
 float intToFloat(int intValue)
 {
@@ -563,7 +529,6 @@ void SPIFFS_INIT(void)
 
 void GPIO_CONFIG(void)
 {
-   #if CFG_DEVICE == cThermostat
    #if CFG_HEATING_CONTROL
    myHeatingControl.setup(RELAY_PIN, myHeatingControl.getTargetTemperature()); /*GPIO to switch connected relay and initial target temperature */
    #endif
@@ -571,9 +536,6 @@ void GPIO_CONFIG(void)
    pinMode(ENCODER_PIN1, INPUT_PULLUP);
    pinMode(ENCODER_PIN2, INPUT_PULLUP);
    pinMode(ENCODER_SWITCH_PIN, INPUT_PULLUP);
-   #elif CFG_DEVICE == cS20
-   myS20.setup(RELAY_PIN, TOGGLE_PIN, LED_PIN, switchDebounceTime);
-   #endif
 }
 
 #if CFG_DISPLAY
@@ -747,19 +709,6 @@ void MQTT_CONNECT(void)
       (ret == true) ? (Serial.println("success")) : (Serial.println("failed"));
       #endif
 
-      #if CFG_DEVICE == cS20
-      ret = myMqttClient.subscribe(myMqttConfig.getTopicS20Command());
-      #ifdef CFG_DEBUG
-      Serial.print("MQTT subscribe " + myMqttConfig.getTopicS20Command() + ": ");
-      (ret == true) ? (Serial.println("success")) : (Serial.println("failed"));
-      #endif
-      /* publish relay state on connect */
-      myMqttClient.publish(myMqttConfig.getTopicS20State()  ,String(myS20.getState())    ,true , 1); /* publish S20 state */
-      #ifdef CFG_DEBUG
-      Serial.println("MQTT publish " + myMqttConfig.getTopicS20State() + ": "+ String(myS20.getState()));
-      #endif
-      #endif /* CFG_DEVICE == cS20 */
-
       /* publish online on connect */
       myMqttClient.publish(myMqttConfig.getTopicState(),"online", true, 1);
       #ifdef CFG_DEBUG
@@ -796,10 +745,6 @@ void loop()
 
    #if CFG_HEATING_CONTROL
    HEATING_CONTROL_MAIN(); /* control relay for heating */
-   #endif
-
-   #if CFG_DEVICE == cS20
-   myS20.main();
    #endif
 
    #if CFG_MQTT_CLIENT
@@ -1050,7 +995,7 @@ void DRAW_DISPLAY_MAIN(void)
       }
       else
       {
-         myDisplay.drawString(128, drawTempYOffset, String(intToFloat(mySensorData.getFilteredTemperature()),1)+"�");
+         myDisplay.drawString(128, drawTempYOffset, String(intToFloat(mySensorData.getFilteredTemperature()),1));
       }
       #endif /* CFG_SENSOR */
 
@@ -1059,7 +1004,7 @@ void DRAW_DISPLAY_MAIN(void)
       if (myHeatingControl.getHeatingAllowed() == true)
       {
          myDisplay.setFont(Roboto_Condensed_16);
-         myDisplay.drawString(128, drawTargetTempYOffset, String(intToFloat(myHeatingControl.getTargetTemperature()),1)+"�");
+         myDisplay.drawString(128, drawTargetTempYOffset, String(intToFloat(myHeatingControl.getTargetTemperature()),1));
 
          if (myHeatingControl.getHeatingEnabled()) /* heating */
          {
@@ -1068,6 +1013,11 @@ void DRAW_DISPLAY_MAIN(void)
       }
       #endif /* CFG_HEATING_CONTROL */
    }
+   #ifdef CFG_DEBUG
+   myDisplay.setTextAlignment(TEXT_ALIGN_LEFT);
+   myDisplay.setFont(Roboto_Condensed_16);
+   myDisplay.drawString(0, drawTargetTempYOffset, String(VERSION));
+   #endif
 
    myDisplay.display();
 }
@@ -1119,7 +1069,6 @@ void MQTT_MAIN(void)
       #endif /* CFG_HTTP_UPDATE */
 
       /* check if there is new data to transmit */
-      #if CFG_DEVICE == cThermostat
       if ( (mySensorData.getNewData()) || (myHeatingControl.getNewData()))
       {
          mySensorData.resetNewData();
@@ -1134,14 +1083,6 @@ void MQTT_MAIN(void)
          myMqttClient.publish(myMqttConfig.getTopicSensorCalibOffset()  ,String(mySensorData.getSensorCalibOffset())                      ,true, 1); /* publish calibration offset */
          myMqttClient.publish(myMqttConfig.getTopicDeviceIP()           ,WiFi.localIP().toString()                                        ,true, 1); /* publish device IP address */
       }
-      #elif CFG_DEVICE == cS20
-      if (myS20.getNewData())
-      {
-         myS20.resetNewData();
-         myMqttClient.publish(myMqttConfig.getTopicS20State()  ,String(myS20.getState())    ,true, 1); /* publish S20 state */
-         myMqttClient.publish(myMqttConfig.getTopicDeviceIP()  ,WiFi.localIP().toString()   ,true, 1); /* publish device IP address */
-      }
-      #endif /* CFG_DEVICE */
 
       myMqttClient.loop();
       delay(20); // <- fixes some issues with WiFi stability
@@ -1439,24 +1380,7 @@ void messageReceived(String &topic, String &payload)
          mySensorData.setSensorCalibData(offset, factor, true);
       }
    }
-   #endif
-   #endif
-
-   #if CFG_DEVICE == cS20
-   if (topic == myMqttConfig.getTopicS20Command())
-   {
-      #ifdef CFG_DEBUG
-      Serial.println("S20 command received: " + payload);
-      #endif
-      if (payload.toInt() != myS20.getState())
-      {
-         myS20.toggleState();
-         #ifdef CFG_DEBUG
-         Serial.println("toggle S20");
-         #endif
-      }
-   }
-
-   #endif
+   #endif /* CFG_SENSOR */
+   #endif /* CFG_SPIFFS */
 }
 #endif

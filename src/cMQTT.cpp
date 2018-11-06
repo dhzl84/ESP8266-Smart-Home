@@ -53,11 +53,6 @@ void mqttConfig::buildTopics(void)
    mqttHeatingAllowedCmd =       mqttMainTopic + mqttName + "/heatingAllowedCmd";
    mqttHeatingAllowedState =     mqttMainTopic + mqttName + "/heatingAllowedState";
    #endif
-
-   #if CFG_DEVICE == cS20
-   mqttS20State   =              mqttMainTopic + mqttName + "/state";
-   mqttS20Command =              mqttMainTopic + mqttName + "/command";
-   #endif
 }
 
 void mqttConfig::changeName(String value)
@@ -173,14 +168,3 @@ String mqttConfig::getTopicHeatingAllowedState(void)
    return mqttHeatingAllowedState;
 }
 #endif /* CFG_HEATING_CONTROL */
-
-#if CFG_DEVICE == cS20
-String mqttConfig::getTopicS20State(void)
-{
-   return mqttS20State;
-}
-String mqttConfig::getTopicS20Command(void)
-{
-   return mqttS20Command;
-}
-#endif

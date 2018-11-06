@@ -1,10 +1,4 @@
-#if CFG_DEVICE == cThermostat
-#define VERSION "0.3.0"
-#elif CFG_DEVICE == cS20
-#define VERSION "0.1.2"
-#else
-#error "misconfigured"
-#endif
+#define VERSION "0.3.1"
 
 #if defined CFG_DEBUG
 #define FW_PREFIX "d"

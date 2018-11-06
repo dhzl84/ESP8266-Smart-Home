@@ -42,11 +42,6 @@ public:
    String getTopicHeatingAllowedState(void);
    #endif
 
-   #if CFG_DEVICE == cS20
-   String getTopicS20State(void);
-   String getTopicS20Command(void);
-   #endif
-
 private:
    String mqttName;
    String mqttFirmwareVersion;
@@ -75,12 +70,6 @@ private:
    String mqttTargetTempCmd;
    String mqttTargetTempState;
    #endif
-
-   #if CFG_DEVICE == cS20
-   String mqttS20State;
-   String mqttS20Command;
-   #endif
-
 };
 
 #endif /* cMQTT_H_ */
