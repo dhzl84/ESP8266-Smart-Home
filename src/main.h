@@ -2,8 +2,6 @@
 #define _MAIN_H_
 #include <Arduino.h>
 
-#define CFG_DEBUG
-
 #include "config.h"
 /* the config.h file contains your personal configuration of the parameters below:
 #define WIFI_SSID          "xxxxxxxxx"
