@@ -1058,7 +1058,7 @@ void MQTT_MAIN(void)
       }
       else
       {
-          MQTT_RECONNECT == false; /* reset */
+          MQTT_RECONNECT = false; /* reset */
       }
 
       #if CFG_HTTP_UPDATE
