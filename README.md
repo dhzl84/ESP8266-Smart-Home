@@ -11,7 +11,7 @@ Basic building blocks and technologies:
 
 SW Built with PlatformIO in Visual Studio Code, some great [Arduino](https://www.arduino.cc) libraries and ESP8266 Arduino
 
-Circuit and PCB made with [Target 3001](https://ibfriedrich.com/de/index.html)
+[Circuit and PCB](https://github.com/dhzl84/ESP8266_Thermostat_PCB.git) made with [Target 3001](https://ibfriedrich.com/de/index.html)
 
 ## 1. Build Status [![Build Status](https://travis-ci.org/dhzl84/ESP8266-Smart-Home.svg?branch=master)](https://travis-ci.org/dhzl84/ESP8266-Smart-Home)
 * Master branch
