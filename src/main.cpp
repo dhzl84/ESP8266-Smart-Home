@@ -1098,9 +1098,8 @@ void MQTT_MAIN(void)
       #endif /* CFG_HTTP_UPDATE */
 
       /* check if there is new data to transmit */
-      if ( (myThermostat.getNewData()) || (myThermostat.getNewData()))
+      if (myThermostat.getNewData())
       {
-         myThermostat.resetNewData();
          myThermostat.resetNewData();
          myMqttClient.publish(myMqttConfig.getTopicTemp()               ,String(intToFloat(myThermostat.getFilteredTemperature()))        ,true, 1); /* publish filtered temperature */
          myMqttClient.publish(myMqttConfig.getTopicHum()                ,String(myThermostat.getFilteredHumidity())                       ,true, 1); /* publish filtered humidity */
