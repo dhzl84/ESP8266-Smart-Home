@@ -5,21 +5,17 @@
 #include "version.h"
 
 #include <ESP8266WiFi.h>
-#if CFG_SENSOR
+
 #include <DHTesp.h>
-#include "cSensorData.h"
-#include "cMedianFilter.h"
+#include "cThermostat.h"
 #include <osapi.h>   /* for sensor timer */
 #include <os_type.h> /* for sensor timer */
-#endif
-#if CFG_HEATING_CONTROL
-#include "cHeatingControl.h"
-#endif
+
 #include "cSystemState.h"
-#if CFG_DISPLAY
+
 #include "UserFonts.h"
 #include <SSD1306.h>
-#endif
+
 #if CFG_MQTT_CLIENT
 #include "MQTTClient.h"
 #include "cMQTT.h"
@@ -81,23 +77,18 @@ volatile int            LAST_ENCODED                    = 0b11;        /* initia
 volatile int            ROTARY_ENCODER_DIRECTION_INTS   = rotInit;     /* initialize rotary encoder with no direction */
 #endif
 
-#if CFG_SENSOR
-LOCAL os_timer_t SENSOR_TIMER;
+
+unsigned long read_sensor_scheduled = 0;
+unsigned long read_sensor_schedule_time = 20000;       // 20 s in ms
 DHTesp myDHT;
-SensorData     mySensorData;
-MedianFilter   myTemperatureFilter;
-MedianFilter   myHumidityFilter;
-#endif
+
+Thermostat myThermostat;
 
 #if CFG_DISPLAY
 #define drawTempYOffset       16
 #define drawTargetTempYOffset 0
 #define drawHeating drawXbm(0,drawTempYOffset,myThermo_width,myThermo_height,myThermo)
 SSD1306        myDisplay(0x3c,SDA_PIN,SCL_PIN);
-#endif
-
-#if CFG_HEATING_CONTROL
-HeatingControl myHeatingControl;
 #endif
 
 #if CFG_MQTT_CLIENT
@@ -181,6 +172,65 @@ void updateEncoder(void);
 /*===================================================================================================================*/
 /* library functions */
 /*===================================================================================================================*/
+long TimeDifference(unsigned long prev, unsigned long next)
+{
+  // Return the time difference as a signed value, taking into account the timers may overflow.
+  // Returned timediff is between -24.9 days and +24.9 days.
+  // Returned value is positive when "next" is after "prev"
+  long signed_diff = 0;
+  // To cast a value to a signed long, the difference may not exceed half 0xffffffffUL (= 4294967294)
+  const unsigned long half_max_unsigned_long = 2147483647u;  // = 2^31 -1
+  if (next >= prev) {
+    const unsigned long diff = next - prev;
+    if (diff <= half_max_unsigned_long) {                    // Normal situation, just return the difference.
+      signed_diff = static_cast<long>(diff);                 // Difference is a positive value.
+    } else {
+      // prev has overflow, return a negative difference value
+      signed_diff = static_cast<long>((0xffffffffUL - next) + prev + 1u);
+      signed_diff = -1 * signed_diff;
+    }
+  } else {
+    // next < prev
+    const unsigned long diff = prev - next;
+    if (diff <= half_max_unsigned_long) {                    // Normal situation, return a negative difference value
+      signed_diff = static_cast<long>(diff);
+      signed_diff = -1 * signed_diff;
+    } else {
+      // next has overflow, return a positive difference value
+      signed_diff = static_cast<long>((0xffffffffUL - prev) + next + 1u);
+    }
+  }
+  return signed_diff;
+}
+
+long TimePassedSince(unsigned long timestamp)
+{
+  // Compute the number of milliSeconds passed since timestamp given.
+  // Note: value can be negative if the timestamp has not yet been reached.
+  return TimeDifference(timestamp, millis());
+}
+
+bool TimeReached(unsigned long timer)
+{
+  // Check if a certain timeout has been reached.
+  const long passed = TimePassedSince(timer);
+  return (passed >= 0);
+}
+
+void SetNextTimeInterval(unsigned long& timer, const unsigned long step)
+{
+  timer += step;
+  const long passed = TimePassedSince(timer);
+  if (passed < 0) { return; }   // Event has not yet happened, which is fine.
+  if (static_cast<unsigned long>(passed) > step) {
+    // No need to keep running behind, start again.
+    timer = millis() + step;
+    return;
+  }
+  // Try to get in sync again.
+  timer = millis() + (step - passed);
+}
+
 boolean debounceCheck()
 {
    boolean ret = false;
@@ -385,13 +435,6 @@ void setup()
    MQTT_CONNECT();   /* connect to MQTT host and build subscriptions, must be called after SPIFFS_INIT()*/
    #endif
 
-   #if CFG_SENSOR
-   /* set timer to read sensor data every xx seconds */
-   os_timer_disarm(&SENSOR_TIMER);
-   os_timer_setfn(&SENSOR_TIMER, (os_timer_func_t *)sensor_cb, (void *)0);
-   os_timer_arm(&SENSOR_TIMER, SENSOR_UPDATE_INTERVAL, 1);
-   #endif
-
    #if CFG_ROTARY_ENCODER
    /* enable interrupts on encoder pins to decode gray code and recognize switch event*/
    attachInterrupt(ENCODER_PIN1, updateEncoder, CHANGE);
@@ -495,7 +538,7 @@ void SPIFFS_INIT(void)
          Serial.println("Factor read from /sensor is: " + String(factor) + " %");
          #endif
 
-         mySensorData.setSensorCalibData(offset, factor, false);
+         myThermostat.setSensorCalibData(offset, factor, false);
       }
       else
       {
@@ -513,15 +556,15 @@ void SPIFFS_INIT(void)
    String targetTemp = readSpiffs(SPIFFS_TARGET_TEMP_FILE);
    if (targetTemp != "")
    {
-      myHeatingControl.setTargetTemperature(targetTemp.toInt()); /* set temperature from spiffs here*/
-      Serial.println("File " + SPIFFS_TARGET_TEMP_FILE + " is available, proceed with value: " + String(myHeatingControl.getTargetTemperature()));
+      myThermostat.setTargetTemperature(targetTemp.toInt()); /* set temperature from spiffs here*/
+      Serial.println("File " + SPIFFS_TARGET_TEMP_FILE + " is available, proceed with value: " + String(myThermostat.getTargetTemperature()));
    }
    else
    {
-      Serial.println("File " + SPIFFS_TARGET_TEMP_FILE + " is empty or does not exist, proceed with init value: " + String(myHeatingControl.getTargetTemperature()));
+      Serial.println("File " + SPIFFS_TARGET_TEMP_FILE + " is empty or does not exist, proceed with init value: " + String(myThermostat.getTargetTemperature()));
    }
 
-   SPIFFS_LAST_TARGET_TEMPERATURE = myHeatingControl.getTargetTemperature(); /* store this value also here to avoid unnecessary usage of SPIFFS */
+   SPIFFS_LAST_TARGET_TEMPERATURE = myThermostat.getTargetTemperature(); /* store this value also here to avoid unnecessary usage of SPIFFS */
 
    #endif /* CFG_HEATING_CONTROL */
 }
@@ -530,7 +573,7 @@ void SPIFFS_INIT(void)
 void GPIO_CONFIG(void)
 {
    #if CFG_HEATING_CONTROL
-   myHeatingControl.setup(RELAY_PIN, myHeatingControl.getTargetTemperature()); /*GPIO to switch connected relay and initial target temperature */
+   myThermostat.setup(RELAY_PIN, myThermostat.getTargetTemperature()); /*GPIO to switch connected relay and initial target temperature */
    #endif
    /* initialize encoder pins */
    pinMode(ENCODER_PIN1, INPUT_PULLUP);
@@ -825,9 +868,10 @@ void SENSOR_MAIN()
    float dhtTemp;
    float dhtHumid;
 
-   if (mySensorData.getCheckSensor() == true) /* check sensor values this loop, set to true by sensor_cb(), else do nothing here */
+   /* dschedule routine for sensor read */
+   if (TimeReached(read_sensor_scheduled))
    {
-      mySensorData.setCheckSensor(false);    /* reset flag */
+      SetNextTimeInterval(read_sensor_scheduled, read_sensor_schedule_time);
 
       /* Reading temperature or humidity takes about 250 milliseconds! */
       /* Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor) */
@@ -836,46 +880,31 @@ void SENSOR_MAIN()
 
       /* Check if any reads failed */
       if (isnan(dhtHumid) || isnan(dhtTemp)) {
-         mySensorData.setLastSensorReadFailed(true);   /* set failure flag and exit SENSOR_MAIN() */
+         myThermostat.setLastSensorReadFailed(true);   /* set failure flag and exit SENSOR_MAIN() */
          #ifdef CFG_DEBUG
-         Serial.println("Failed to read from DHT sensor! Failure counter: " + String(mySensorData.getSensorFailureCounter()));
+         Serial.println("Failed to read from DHT sensor! Failure counter: " + String(myThermostat.getSensorFailureCounter()));
          #endif
       }
       else
       {
-         mySensorData.setLastSensorReadFailed(false);   /* set no failure during read sensor */
+         myThermostat.setLastSensorReadFailed(false);   /* set no failure during read sensor */
 
-         mySensorData.setCurrentHumidity((int)(10* dhtHumid));     /* read value and convert to one decimal precision integer */
-         mySensorData.setCurrentTemperature((int)(10* dhtTemp));   /* read value and convert to one decimal precision integer */
-
-         myHumidityFilter.pushValue(mySensorData.getCurrentHumidity());                /* push current sensor value to filter */
-         myTemperatureFilter.pushValue(mySensorData.getCurrentTemperature());          /* push current sensor value to filter */
-
-         /* humidity: check if new filtered value is different to old one */
-         if (mySensorData.getFilteredHumidity() != myHumidityFilter.getFilteredValue())
-         {
-            mySensorData.setFilteredHumidity(myHumidityFilter.getFilteredValue());     /* read back latest filtered value if different */
-         }
-
-         /* temperature: check if new filtered value is different to old one */
-         if (mySensorData.getFilteredTemperature() != myTemperatureFilter.getFilteredValue())
-         {
-            mySensorData.setFilteredTemperature(myTemperatureFilter.getFilteredValue());     /* read back latest filtered value if different */
-         }
+         myThermostat.setCurrentHumidity((int)(10* dhtHumid));     /* read value and convert to one decimal precision integer */
+         myThermostat.setCurrentTemperature((int)(10* dhtTemp));   /* read value and convert to one decimal precision integer */
 
          #ifdef CFG_DEBUG
          Serial.print("Temperature: ");
-         Serial.print(intToFloat(mySensorData.getCurrentTemperature()),1);
+         Serial.print(intToFloat(myThermostat.getCurrentTemperature()),1);
          Serial.println(" *C ");
          Serial.print("Filtered temperature: ");
-         Serial.print(intToFloat(mySensorData.getFilteredTemperature()),1);
+         Serial.print(intToFloat(myThermostat.getFilteredTemperature()),1);
          Serial.println(" *C ");
 
          Serial.print("Humidity: ");
-         Serial.print(intToFloat(mySensorData.getCurrentHumidity()),1);
+         Serial.print(intToFloat(myThermostat.getCurrentHumidity()),1);
          Serial.println(" %");
          Serial.print("Filtered humidity: ");
-         Serial.print(intToFloat(mySensorData.getFilteredHumidity()),1);
+         Serial.print(intToFloat(myThermostat.getFilteredHumidity()),1);
          Serial.println(" %");
          #endif
 
@@ -904,39 +933,39 @@ void SENSOR_MAIN()
 void HEATING_CONTROL_MAIN(void)
 {
    #if CFG_SENSOR
-   if (mySensorData.getSensorError())
+   if (myThermostat.getSensorError())
    {
       /* switch off heating if sensor does not provide values */
       #ifdef CFG_DEBUG
       Serial.println("not heating, sensor data invalid");
       #endif
-      if (myHeatingControl.getHeatingEnabled() == true)
+      if (myThermostat.getHeatingEnabled() == true)
       {
-         myHeatingControl.setHeatingEnabled(false);
+         myThermostat.setHeatingEnabled(false);
       }
    }
    else /* sensor is healthy */
    {
-      if (myHeatingControl.getHeatingAllowed() == true) /* check if heating is allowed by user */
+      if (myThermostat.getHeatingAllowed() == true) /* check if heating is allowed by user */
       {
-         if (mySensorData.getFilteredTemperature() < myHeatingControl.getTargetTemperature()) /* check if measured temperature is lower than heating target */
+         if (myThermostat.getFilteredTemperature() < myThermostat.getTargetTemperature()) /* check if measured temperature is lower than heating target */
          {
-            if (myHeatingControl.getHeatingEnabled() == false) /* switch on heating if target temperature is higher than measured temperature */
+            if (myThermostat.getHeatingEnabled() == false) /* switch on heating if target temperature is higher than measured temperature */
             {
                #ifdef CFG_DEBUG
                Serial.println("heating");
                #endif
-               myHeatingControl.setHeatingEnabled(true);
+               myThermostat.setHeatingEnabled(true);
             }
          }
-         else if (mySensorData.getFilteredTemperature() > myHeatingControl.getTargetTemperature()) /* check if measured temperature is higher than heating target */
+         else if (myThermostat.getFilteredTemperature() > myThermostat.getTargetTemperature()) /* check if measured temperature is higher than heating target */
          {
-            if (myHeatingControl.getHeatingEnabled() == true) /* switch off heating if target temperature is lower than measured temperature */
+            if (myThermostat.getHeatingEnabled() == true) /* switch off heating if target temperature is lower than measured temperature */
             {
                #ifdef CFG_DEBUG
                Serial.println("not heating");
                #endif
-               myHeatingControl.setHeatingEnabled(false);
+               myThermostat.setHeatingEnabled(false);
             }
          }
          else
@@ -947,7 +976,7 @@ void HEATING_CONTROL_MAIN(void)
       else
       {
          /* disable heating if heating is set to not allowed by user */
-         myHeatingControl.setHeatingEnabled(false);
+         myThermostat.setHeatingEnabled(false);
       }
    }
    #endif /* CFG_SENSOR */
@@ -989,24 +1018,24 @@ void DRAW_DISPLAY_MAIN(void)
       myDisplay.setFont(Roboto_Condensed_32);
 
       #if CFG_SENSOR
-      if (mySensorData.getSensorError())
+      if (myThermostat.getSensorError())
       {
          myDisplay.drawString(128, drawTempYOffset, "err");
       }
       else
       {
-         myDisplay.drawString(128, drawTempYOffset, String(intToFloat(mySensorData.getFilteredTemperature()),1));
+         myDisplay.drawString(128, drawTempYOffset, String(intToFloat(myThermostat.getFilteredTemperature()),1));
       }
       #endif /* CFG_SENSOR */
 
       #if CFG_HEATING_CONTROL
       /* do not display target temperature if heating is not allowed */
-      if (myHeatingControl.getHeatingAllowed() == true)
+      if (myThermostat.getHeatingAllowed() == true)
       {
          myDisplay.setFont(Roboto_Condensed_16);
-         myDisplay.drawString(128, drawTargetTempYOffset, String(intToFloat(myHeatingControl.getTargetTemperature()),1));
+         myDisplay.drawString(128, drawTargetTempYOffset, String(intToFloat(myThermostat.getTargetTemperature()),1));
 
-         if (myHeatingControl.getHeatingEnabled()) /* heating */
+         if (myThermostat.getHeatingEnabled()) /* heating */
          {
             myDisplay.drawHeating;
          }
@@ -1069,18 +1098,18 @@ void MQTT_MAIN(void)
       #endif /* CFG_HTTP_UPDATE */
 
       /* check if there is new data to transmit */
-      if ( (mySensorData.getNewData()) || (myHeatingControl.getNewData()))
+      if ( (myThermostat.getNewData()) || (myThermostat.getNewData()))
       {
-         mySensorData.resetNewData();
-         myHeatingControl.resetNewData();
-         myMqttClient.publish(myMqttConfig.getTopicTemp()               ,String(intToFloat(mySensorData.getFilteredTemperature()))        ,true, 1); /* publish filtered temperature */
-         myMqttClient.publish(myMqttConfig.getTopicHum()                ,String(mySensorData.getFilteredHumidity())                       ,true, 1); /* publish filtered humidity */
-         myMqttClient.publish(myMqttConfig.getTopicHeatingState()       ,String(boolToStringOnOff(myHeatingControl.getHeatingEnabled()))  ,true, 1); /* publish heating state: 0 -> heating off, 1 -> heating on */
-         myMqttClient.publish(myMqttConfig.getTopicTargetTempState()    ,String(intToFloat(myHeatingControl.getTargetTemperature()))      ,true, 1); /* publish target temperature as float */
-         myMqttClient.publish(myMqttConfig.getTopicSensorStatus()       ,String(mySensorData.getSensorError())                            ,true, 1); /* publish sensor status: 0 -> good, 1 -> error */
-         myMqttClient.publish(myMqttConfig.getTopicHeatingAllowedState(),String(boolToStringHeatOff(myHeatingControl.getHeatingAllowed()))  ,true, 1); /* publish if heating is allowed */
-         myMqttClient.publish(myMqttConfig.getTopicSensorCalibFactor()  ,String(mySensorData.getSensorCalibFactor())                      ,true, 1); /* publish calibration factor */
-         myMqttClient.publish(myMqttConfig.getTopicSensorCalibOffset()  ,String(mySensorData.getSensorCalibOffset())                      ,true, 1); /* publish calibration offset */
+         myThermostat.resetNewData();
+         myThermostat.resetNewData();
+         myMqttClient.publish(myMqttConfig.getTopicTemp()               ,String(intToFloat(myThermostat.getFilteredTemperature()))        ,true, 1); /* publish filtered temperature */
+         myMqttClient.publish(myMqttConfig.getTopicHum()                ,String(myThermostat.getFilteredHumidity())                       ,true, 1); /* publish filtered humidity */
+         myMqttClient.publish(myMqttConfig.getTopicHeatingState()       ,String(boolToStringOnOff(myThermostat.getHeatingEnabled()))  ,true, 1); /* publish heating state: 0 -> heating off, 1 -> heating on */
+         myMqttClient.publish(myMqttConfig.getTopicTargetTempState()    ,String(intToFloat(myThermostat.getTargetTemperature()))      ,true, 1); /* publish target temperature as float */
+         myMqttClient.publish(myMqttConfig.getTopicSensorStatus()       ,String(myThermostat.getSensorError())                            ,true, 1); /* publish sensor status: 0 -> good, 1 -> error */
+         myMqttClient.publish(myMqttConfig.getTopicHeatingAllowedState(),String(boolToStringHeatOff(myThermostat.getHeatingAllowed()))  ,true, 1); /* publish if heating is allowed */
+         myMqttClient.publish(myMqttConfig.getTopicSensorCalibFactor()  ,String(myThermostat.getSensorCalibFactor())                      ,true, 1); /* publish calibration factor */
+         myMqttClient.publish(myMqttConfig.getTopicSensorCalibOffset()  ,String(myThermostat.getSensorCalibOffset())                      ,true, 1); /* publish calibration offset */
          myMqttClient.publish(myMqttConfig.getTopicDeviceIP()           ,WiFi.localIP().toString()                                        ,true, 1); /* publish device IP address */
       }
 
@@ -1148,11 +1177,11 @@ void SPIFFS_MAIN(void)
    }
 
    #if CFG_SENSOR
-   if(mySensorData.getNewCalib())
+   if(myThermostat.getNewCalib())
    {
       mySystemState.setSystemRestartRequest(true);
 
-      if (!writeSpiffs(SPIFFS_SENSOR_CALIB_FILE, String(mySensorData.getSensorCalibOffset()) + ";" + String(mySensorData.getSensorCalibFactor())))
+      if (!writeSpiffs(SPIFFS_SENSOR_CALIB_FILE, String(myThermostat.getSensorCalibOffset()) + ";" + String(myThermostat.getSensorCalibFactor())))
       {
          #ifdef CFG_DEBUG
          Serial.println("Writing to file: " + SPIFFS_SENSOR_CALIB_FILE + " returned no success");
@@ -1166,14 +1195,14 @@ void SPIFFS_MAIN(void)
 
    #if CFG_HEATING_CONTROL
    /* avoid extensive writing to SPIFFS, therefore check if the target temperature didn't change for a certain time before writing. */
-   if (myHeatingControl.getTargetTemperature() != SPIFFS_LAST_TARGET_TEMPERATURE)
+   if (myThermostat.getTargetTemperature() != SPIFFS_LAST_TARGET_TEMPERATURE)
    {
       #ifdef CFG_DEBUG
-      Serial.println("Target temperature changed from. " + String(SPIFFS_LAST_TARGET_TEMPERATURE) + " to: " + String(myHeatingControl.getTargetTemperature()));
+      Serial.println("Target temperature changed from. " + String(SPIFFS_LAST_TARGET_TEMPERATURE) + " to: " + String(myThermostat.getTargetTemperature()));
       #endif
 
       SPIFFS_REFERENCE_TIME = millis();
-      SPIFFS_LAST_TARGET_TEMPERATURE = myHeatingControl.getTargetTemperature();
+      SPIFFS_LAST_TARGET_TEMPERATURE = myThermostat.getTargetTemperature();
       SPIFFS_WRITTEN = false;
    }
    else /* target temperature not changed this loop */
@@ -1187,7 +1216,7 @@ void SPIFFS_MAIN(void)
          if (SPIFFS_REFERENCE_TIME + SPIFFS_WRITE_DEBOUNCE < millis()) /* check debounce */
          {
             /* debounce expired -> write */
-            if (writeSpiffs(SPIFFS_TARGET_TEMP_FILE, String(myHeatingControl.getTargetTemperature())))
+            if (writeSpiffs(SPIFFS_TARGET_TEMP_FILE, String(myThermostat.getTargetTemperature())))
             {
                SPIFFS_WRITTEN = true;
             }
@@ -1199,7 +1228,7 @@ void SPIFFS_MAIN(void)
             }
 
             #ifdef CFG_DEBUG
-            Serial.println("New target temperature: " + String(myHeatingControl.getTargetTemperature()) + " stored in SPIFFS");
+            Serial.println("New target temperature: " + String(myThermostat.getTargetTemperature()) + " stored in SPIFFS");
             #endif
          }
          else
@@ -1231,7 +1260,7 @@ void ICACHE_RAM_ATTR encoderSwitch(void)
    {
       #if CFG_HEATING_CONTROL
       /* toggle heating allowed */
-      myHeatingControl.toggleHeatingAllowed();
+      myThermostat.toggleHeatingAllowed();
       #endif
    }
 }
@@ -1263,13 +1292,13 @@ void ICACHE_RAM_ATTR updateEncoder(void)
       if(ROTARY_ENCODER_DIRECTION_INTS > rotRight) /* if there was a higher amount of interrupts to the right, consider the encoder was turned to the right */
       {
          #if CFG_HEATING_CONTROL
-         myHeatingControl.increaseTargetTemperature(tempStep);
+         myThermostat.increaseTargetTemperature(tempStep);
          #endif /* CFG_HEATING_CONTROL */
       }
       else if (ROTARY_ENCODER_DIRECTION_INTS < rotLeft) /* if there was a higher amount of interrupts to the left, consider the encoder was turned to the left */
       {
          #if CFG_HEATING_CONTROL
-         myHeatingControl.decreaseTargetTemperature(tempStep);
+         myThermostat.decreaseTargetTemperature(tempStep);
          #endif /* CFG_HEATING_CONTROL */
       }
       else
@@ -1280,12 +1309,6 @@ void ICACHE_RAM_ATTR updateEncoder(void)
    }
 
    LAST_ENCODED = encoded; /* store this value for next time */
-}
-#endif
-
-#if CFG_SENSOR
-LOCAL void ICACHE_FLASH_ATTR sensor_cb(void *arg) {
-   mySensorData.setCheckSensor(true);     /* check sensor values next loop */
 }
 #endif
 
@@ -1327,21 +1350,21 @@ void messageReceived(String &topic, String &payload)
    /* check incoming target temperature, don't set same target temperature as new*/
    if (topic == myMqttConfig.getTopicTargetTempCmd())
    {
-      if (myHeatingControl.getTargetTemperature() != payload.toFloat())
+      if (myThermostat.getTargetTemperature() != payload.toFloat())
       {
          /* set new target temperature for heating control, min/max limitation inside (string to float to int) */
-         myHeatingControl.setTargetTemperature(floatToInt(payload.toFloat()));
+         myThermostat.setTargetTemperature(floatToInt(payload.toFloat()));
       }
    }
    if (topic == myMqttConfig.getTopicHeatingAllowedCmd())
    {
       if (String("heat") == payload)
       {
-         myHeatingControl.setHeatingAllowed(true);
+         myThermostat.setHeatingAllowed(true);
       }
       else if (String("off") == payload)
       {
-         myHeatingControl.setHeatingAllowed(false);
+         myThermostat.setHeatingAllowed(false);
       }
       else
       {
@@ -1377,7 +1400,7 @@ void messageReceived(String &topic, String &payload)
 
       if (splitSensorDataString(payload, &offset, &factor))
       {
-         mySensorData.setSensorCalibData(offset, factor, true);
+         myThermostat.setSensorCalibData(offset, factor, true);
       }
    }
    #endif /* CFG_SENSOR */
