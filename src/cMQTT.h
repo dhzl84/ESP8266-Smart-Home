@@ -11,11 +11,11 @@
   #define MQTT_RECONNECT_TIME 10000   /* 10s in milliseconds */
 #endif
 
-class mqttConfig
+class mqttHelper
 {
 public:
-   mqttConfig(void);
-   ~mqttConfig(void);
+   mqttHelper(void);
+   ~mqttHelper(void);
    void   init(void);
    void   setup(String mainTopic, String deviceName);
    void   setup(String mainTopic);
@@ -25,47 +25,33 @@ public:
    bool   getNameChanged();
    void   resetNameChanged();
    String getName(void);
-   String getTopicFirmwareVersion(void);
    String getTopicUpdateFirmware(void);
    String getTopicUpdateFirmwareAccepted(void);
    String getTopicChangeName(void);
    String getTopicState(void);
-   String getTopicDeviceIP(void);
    String getTopicSystemRestartRequest(void);
-   String getTopicTemp(void);
-   String getTopicHum(void);
-   String getTopicSensorStatus(void);
    String getTopicChangeSensorCalib(void);
-   String getTopicSensorCalibFactor(void);
-   String getTopicSensorCalibOffset(void);
    String getTopicTargetTempCmd(void);
-   String getTopicTargetTempState(void);
-   String getTopicActualState(void);
    String getTopicThermostatModeCmd(void);
-   String getTopicThermostatModeState(void);
+   String getTopicHassDiscovery(void);
+   String buildJSON(String Temp, String humid, String actState, String tarTemp, String sensError, String thermoMode, String calibF, String calibO, String ip, String firmware);
+   String buildHassDiscovery(void);
+   String getTopicData(void);
 
 private:
    String mqttName;
-   String mqttFirmwareVersion;
+   String mqttData;
    String mqttUpdateFirmware;
    String mqttUpdateFirmwareAccepted;
    String mqttChangeName;
-   String mqttState;
-   String mqttDeviceIP;
+   String mqttWill;
    String mqttSystemRestartRequest;
    String mqttMainTopic;
+   String mqttHassDiscoveryTopic;
    bool   nameChanged;
-   String mqttTemp;
-   String mqttHum;
-   String mqttSensorStatus;
    String mqttChangeSensorCalib;
-   String mqttSensorCalibFactor;
-   String mqttSensorCalibOffset;
-   String mqttActualState;
    String mqttThermostatModeCmd;
-   String mqttThermostatModeState;
    String mqttTargetTempCmd;
-   String mqttTargetTempState;
 };
 
 #endif /* cMQTT_H_ */

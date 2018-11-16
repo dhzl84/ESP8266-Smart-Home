@@ -3,8 +3,13 @@
 
 #include "Arduino.h"
 
-#define minTargetTemp (unsigned char)150
-#define maxTargetTemp (unsigned char)250
+#ifndef minTargetTemp
+  #define minTargetTemp (unsigned char)150
+#endif
+
+#ifndef maxTargetTemp
+  #define maxTargetTemp (unsigned char)250
+#endif
 
 #ifndef CFG_MEDIAN_QUEUE_SIZE
   #define CFG_MEDIAN_QUEUE_SIZE 10

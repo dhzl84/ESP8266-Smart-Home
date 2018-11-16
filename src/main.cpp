@@ -46,8 +46,8 @@ const char*    password = WIFI_PWD;
 /* MQTT */
 const char*    mqttHost                = LOCAL_MQTT_HOST;
 const int      mqttPort                = LOCAL_MQTT_PORT;
-unsigned long  mqttReconnectTime = 0;
-unsigned long  mqttReconnectInterval        = MQTT_RECONNECT_TIME;
+unsigned long  mqttReconnectTime       = 0;
+unsigned long  mqttReconnectInterval   = MQTT_RECONNECT_TIME;
 /* HTTP Update */
 const    String myUpdateServer = THERMOSTAT_BINARY;
 boolean  FETCH_UPDATE          = false;       /* global variable used to decide whether an update shall be fetched from server or not */
@@ -55,14 +55,14 @@ boolean  FETCH_UPDATE          = false;       /* global variable used to decide 
 typedef enum { TH_OTA_IDLE, TH_OTA_ACTIVE, TH_OTA_FINISHED, TH_OTA_ERROR } OtaUpdate_t;       /* global variable used to change display in case OTA update is initiated */
 OtaUpdate_t OTA_UPDATE = TH_OTA_IDLE;
 /* rotary encoder */
-#define switchDebounceTime  250
+unsigned long  switchDebounceTime       = 0;
+unsigned long  switchDebounceInterval   = 250;
 #define rotLeft              -1
 #define rotRight              1
 #define rotInit               0
 #define tempStep              5
 #define displayTemp           0
 #define displayHumid          1
-volatile unsigned long  SWITCH_DEBOUNCE_REF             = 0;           /* reference for debouncing the rotary encoder button switch, latches return of millis() to be checked in next switch interrupt */
 volatile int            LAST_ENCODED                    = 0b11;        /* initial state of the rotary encoders gray code */
 volatile int            ROTARY_ENCODER_DIRECTION_INTS   = rotInit;     /* initialize rotary encoder with no direction */
 /* senspr */
@@ -78,8 +78,8 @@ SSD1306        myDisplay(0x3c,SDA_PIN,SCL_PIN);
 WiFiClient     myWiFiClient;
 Thermostat     myThermostat;
 SystemState    mySystemState;
-MQTTClient     myMqttClient;
-mqttConfig     myMqttConfig;
+MQTTClient     myMqttClient(1000);
+mqttHelper     myMqttConfig;
 
 #define        SPIFFS_MQTT_ID_FILE        String("/itsme")
 #define        SPIFFS_SENSOR_CALIB_FILE   String("/sensor")
@@ -177,24 +177,6 @@ void SetNextTimeInterval(unsigned long& timer, const unsigned long step)
   }
   // Try to get in sync again.
   timer = millis() + (step - passed);
-}
-
-boolean debounceCheck()
-{
-   boolean ret = false;
-
-   unsigned long time = millis();
-   if ((time - SWITCH_DEBOUNCE_REF) > switchDebounceTime)
-   {
-      SWITCH_DEBOUNCE_REF = time;
-      ret = true;
-   }
-   else
-   {
-      ret = false;
-   }
-
-   return ret;
 }
 
 String readSpiffs(String file)
@@ -568,12 +550,8 @@ void MQTT_CONNECT(void)
 
       /* broker shall publish 'offline' on ungraceful disconnect >> Last Will */
       myMqttClient.setWill(mqttWillTopic ,"offline", true, 1);
-
       myMqttClient.begin(mqttHost, mqttPort, myWiFiClient);
-      /* register callback */
-      myMqttClient.onMessage(messageReceived);
-
-      /* connect to MQTT */
+      myMqttClient.onMessage(messageReceived);       /* register callback */
       ret = myMqttClient.connect(mqttName, LOCAL_MQTT_USER, LOCAL_MQTT_PWD);
 
       /* subscribe some topics */
@@ -584,14 +562,11 @@ void MQTT_CONNECT(void)
       ret = myMqttClient.subscribe(myMqttConfig.getTopicChangeSensorCalib());
       ret = myMqttClient.subscribe(myMqttConfig.getTopicSystemRestartRequest());
 
-      /* publish online on connect */
-      myMqttClient.publish(myMqttConfig.getTopicState(),"online", true, 1);
-
       /* publish restart = false on connect */
       myMqttClient.publish(myMqttConfig.getTopicSystemRestartRequest(),"0", true, 1);
 
-      /* publish firmware version on connect */
-      myMqttClient.publish(myMqttConfig.getTopicFirmwareVersion(), FIRMWARE_VERSION, true, 1);
+      /* publish dicovery message to home assistant */
+      myMqttClient.publish(myMqttConfig.getTopicHassDiscovery(),myMqttConfig.buildHassDiscovery(),false, 1);
 
       delete [] mqttWillTopic;
       delete [] mqttName;
@@ -874,15 +849,7 @@ void MQTT_MAIN(void)
       if (myThermostat.getNewData())
       {
          myThermostat.resetNewData();
-         myMqttClient.publish(myMqttConfig.getTopicTemp()               ,String(intToFloat(myThermostat.getFilteredTemperature()))        ,true, 1); /* publish filtered temperature */
-         myMqttClient.publish(myMqttConfig.getTopicHum()                ,String(myThermostat.getFilteredHumidity())                       ,true, 1); /* publish filtered humidity */
-         myMqttClient.publish(myMqttConfig.getTopicActualState()        ,String(boolToStringOnOff(myThermostat.getActualState()))         ,true, 1); /* publish heating state: 0 -> not heating, 1 -> heating */
-         myMqttClient.publish(myMqttConfig.getTopicTargetTempState()    ,String(intToFloat(myThermostat.getTargetTemperature()))          ,true, 1); /* publish target temperature as float */
-         myMqttClient.publish(myMqttConfig.getTopicSensorStatus()       ,String(myThermostat.getSensorError())                            ,true, 1); /* publish sensor status: 0 -> good, 1 -> error */
-         myMqttClient.publish(myMqttConfig.getTopicThermostatModeState(),String(boolToStringHeatOff(myThermostat.getThermostatMode()))    ,true, 1); /* publish if heating is allowed */
-         myMqttClient.publish(myMqttConfig.getTopicSensorCalibFactor()  ,String(myThermostat.getSensorCalibFactor())                      ,true, 1); /* publish calibration factor */
-         myMqttClient.publish(myMqttConfig.getTopicSensorCalibOffset()  ,String(myThermostat.getSensorCalibOffset())                      ,true, 1); /* publish calibration offset */
-         myMqttClient.publish(myMqttConfig.getTopicDeviceIP()           ,WiFi.localIP().toString()                                        ,true, 1); /* publish device IP address */
+         myMqttClient.publish(myMqttConfig.getTopicData(), myMqttConfig.buildJSON(String(intToFloat(myThermostat.getFilteredTemperature())), String(myThermostat.getFilteredHumidity()), String(boolToStringOnOff(myThermostat.getActualState())), String(intToFloat(myThermostat.getTargetTemperature())), String(myThermostat.getSensorError()), String(boolToStringHeatOff(myThermostat.getThermostatMode())), String(myThermostat.getSensorCalibFactor()), String(myThermostat.getSensorCalibOffset()), WiFi.localIP().toString(), FIRMWARE_VERSION), true, 1);
       }
 
       myMqttClient.loop();
@@ -1010,8 +977,9 @@ void SPIFFS_MAIN(void)
 void ICACHE_RAM_ATTR encoderSwitch(void)
 {
    /* debouncing routine for encoder switch */
-   if (debounceCheck())
+   if (TimeReached(switchDebounceTime))
    {
+      SetNextTimeInterval(switchDebounceTime, switchDebounceInterval);
       myThermostat.toggleThermostatMode();
    }
 }

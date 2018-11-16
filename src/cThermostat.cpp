@@ -147,7 +147,7 @@ void Thermostat::setThermostatMode(bool value)
 
 void Thermostat::toggleThermostatMode()
 {
-   if (thermostatMode == true)
+   if (thermostatMode == TH_OFF)
    {
       thermostatMode  = TH_HEAT;
    }
