@@ -1,34 +1,30 @@
 /*===================================================================================================================*/
 /* includes */
 /*===================================================================================================================*/
-#include "main.h"
+#include <Arduino.h>
+
+#include "config.h"
+/* the config.h file contains your personal configuration of the parameters below: 
+  #define WIFI_SSID                   "xxxxxxxxx"
+  #define WIFI_PWD                    "xxx"
+  #define LOCAL_MQTT_HOST             "123.456.789.012"
+  #define THERMOSTAT_BINARY           "http://<domain or ip>/<name>.bin"
+*/
+
 #include "version.h"
-
 #include <ESP8266WiFi.h>
-
 #include <DHTesp.h>
 #include "cThermostat.h"
 #include <osapi.h>   /* for sensor timer */
 #include <os_type.h> /* for sensor timer */
-
 #include "cSystemState.h"
-
 #include "UserFonts.h"
 #include <SSD1306.h>
-
-#if CFG_MQTT_CLIENT
 #include "MQTTClient.h"
 #include "cMQTT.h"
-#endif /* CFG_MQTT_CLIENT */
-#if CFG_HTTP_UPDATE
 #include <ESP8266httpUpdate.h>
-#endif
-#if CFG_OTA
 #include <ArduinoOTA.h>
-#endif
-#if CFG_SPIFFS
-#include <FS.h>
-#endif
+#include <FS.h> // SPIFFS
 
 /*===================================================================================================================*/
 /* GPIO config */
@@ -45,26 +41,20 @@
 /* variables, constants, types, classes, etc, definitions */
 /*===================================================================================================================*/
 /* WiFi */
-const char* ssid     = WIFI_SSID;
-const char* password = WIFI_PWD;
-
-#if CFG_MQTT_CLIENT
+const char*    ssid     = WIFI_SSID;
+const char*    password = WIFI_PWD;
+/* MQTT */
 const char*    mqttHost                = LOCAL_MQTT_HOST;
-const int      mqttPort                = 1883;
-unsigned long  MQTT_RECONNECT_REFERENCE_TIME;
-boolean        MQTT_RECONNECT          = false;
-#endif
-
-#if CFG_HTTP_UPDATE
-const String myUpdateServer = THERMOSTAT_BINARY;
-boolean                 FETCH_UPDATE                    = false;       /* global variable used to decide whether an update shall be fetched from server or not */
-#endif /* CFG_HTTP_UPDATE */
-
-#if CFG_OTA
-boolean                 OTA_UPDATE                      = false;       /* global variable used to change display in case OTA update is initiated */
-#endif /* CFG_OTA */
-
-#if CFG_ROTARY_ENCODER
+const int      mqttPort                = LOCAL_MQTT_PORT;
+unsigned long  mqttReconnectTime = 0;
+unsigned long  mqttReconnectInterval        = MQTT_RECONNECT_TIME;
+/* HTTP Update */
+const    String myUpdateServer = THERMOSTAT_BINARY;
+boolean  FETCH_UPDATE          = false;       /* global variable used to decide whether an update shall be fetched from server or not */
+/* OTA */
+typedef enum { TH_OTA_IDLE, TH_OTA_ACTIVE, TH_OTA_FINISHED, TH_OTA_ERROR } OtaUpdate_t;       /* global variable used to change display in case OTA update is initiated */
+OtaUpdate_t OTA_UPDATE = TH_OTA_IDLE;
+/* rotary encoder */
 #define switchDebounceTime  250
 #define rotLeft              -1
 #define rotRight              1
@@ -75,103 +65,61 @@ boolean                 OTA_UPDATE                      = false;       /* global
 volatile unsigned long  SWITCH_DEBOUNCE_REF             = 0;           /* reference for debouncing the rotary encoder button switch, latches return of millis() to be checked in next switch interrupt */
 volatile int            LAST_ENCODED                    = 0b11;        /* initial state of the rotary encoders gray code */
 volatile int            ROTARY_ENCODER_DIRECTION_INTS   = rotInit;     /* initialize rotary encoder with no direction */
-#endif
-
-
-unsigned long read_sensor_scheduled = 0;
-unsigned long read_sensor_schedule_time = 20000;       // 20 s in ms
-DHTesp myDHT;
-
-Thermostat myThermostat;
-
-#if CFG_DISPLAY
+/* senspr */
+unsigned long readSensorScheduled = 0;
+unsigned long readSensorScheduleTime = SENSOR_UPDATE_INTERVAL;       // 20 s in ms
+/* Display */
 #define drawTempYOffset       16
 #define drawTargetTempYOffset 0
 #define drawHeating drawXbm(0,drawTempYOffset,myThermo_width,myThermo_height,myThermo)
+/* classes */
+DHTesp         myDHT;
 SSD1306        myDisplay(0x3c,SDA_PIN,SCL_PIN);
-#endif
-
-#if CFG_MQTT_CLIENT
-#define MQTT_MAIN_TOPIC "/heating/"
-#endif /* CFG_MQTT_CLIENT */
-
 WiFiClient     myWiFiClient;
+Thermostat     myThermostat;
 SystemState    mySystemState;
-
-#if CFG_MQTT_CLIENT
 MQTTClient     myMqttClient;
 mqttConfig     myMqttConfig;
-#endif
 
-#if CFG_SPIFFS
-#if CFG_MQTT_CLIENT
 #define        SPIFFS_MQTT_ID_FILE        String("/itsme")
-#endif
-#if CFG_SENSOR
 #define        SPIFFS_SENSOR_CALIB_FILE   String("/sensor")
-#endif
-#if CFG_HEATING_CONTROL
 #define        SPIFFS_TARGET_TEMP_FILE    String("/targetTemp")
 #define        SPIFFS_WRITE_DEBOUNCE      20000 /* write target temperature to spiffs if it wasn't changed for 20 s (time in ms) */
 boolean        SPIFFS_WRITTEN =           true;
 unsigned long  SPIFFS_REFERENCE_TIME;
 int            SPIFFS_LAST_TARGET_TEMPERATURE;
-#endif /* CFG_HEATING_CONTROL */
-#endif /* CFG_SPIFFS */
 
 /*===================================================================================================================*/
 /* function declarations */
 /*===================================================================================================================*/
 void GPIO_CONFIG(void);
-
-#if CFG_SPIFFS
 void SPIFFS_INIT(void);
 void SPIFFS_MAIN(void);
-#endif
-
-#if CFG_DISPLAY
 void DISPLAY_INIT(void);
-#endif
-
 void WIFI_CONNECT(void);
-
 void HANDLE_SYSTEM_STATE(void);
-
-#if CFG_SENSOR
 void SENSOR_MAIN(void);
 LOCAL void sensor_cb(void *arg); /* sensor timer callback */
-#endif
-
-#if CFG_HEATING_CONTROL
 void HEATING_CONTROL_MAIN(void);
-#endif
-
-#if CFG_DISPLAY
 void DRAW_DISPLAY_MAIN(void);
-#endif
-
-#if CFG_MQTT_CLIENT
 void MQTT_CONNECT(void);
 void MQTT_MAIN(void);
 void messageReceived(String &topic, String &payload); /* MQTT callback */
-#endif
-
-#if CFG_OTA
 void OTA_INIT(void);
 void HANDLE_OTA_UPDATE(void);
-#endif
-
-#if CFG_HTTP_UPDATE
 void HANDLE_HTTP_UPDATE(void);
-#endif
-#if CFG_ROTARY_ENCODER
 void encoderSwitch (void);
 void updateEncoder(void);
-#endif
 
 /*===================================================================================================================*/
 /* library functions */
 /*===================================================================================================================*/
+float  intToFloat(int intValue)           { return ((float)(intValue/10.0)); }
+int    floatToInt(float floatValue)       { return ((int)(floatValue * 10)); }
+String boolToStringOnOff(bool boolean)    { return (boolean == true ? "on" : "off"); }
+String boolToStringHeatOff(bool boolean)  { return (boolean == true ? "heat" : "off"); }
+
+/* Thanks to Tasmota  for timer functions */
 long TimeDifference(unsigned long prev, unsigned long next)
 {
   // Return the time difference as a signed value, taking into account the timers may overflow.
@@ -249,41 +197,6 @@ boolean debounceCheck()
    return ret;
 }
 
-float intToFloat(int intValue)
-{
-   return ((float)(intValue/10.0));
-}
-
-int floatToInt(float floatValue)
-{
-   return ((int)(floatValue * 10));
-}
-
-String boolToStringOnOff(bool boolean)
-{
-   if (boolean == true)
-   {
-      return "on";
-   }
-   else
-   {
-      return "off";
-   }
-}
-
-String boolToStringHeatOff(bool boolean)
-{
-   if (boolean == true)
-   {
-      return "heat";
-   }
-   else
-   {
-      return "off";
-   }
-}
-
-#if CFG_SPIFFS
 String readSpiffs(String file)
 {
    String fileContent = "";
@@ -367,9 +280,6 @@ boolean writeSpiffs(String file, String newFileContent)
    return success;
 }
 
-#endif /* CFG_SPIFFS */
-
-#if CFG_SENSOR
 bool splitSensorDataString(String sensorCalib, int *offset, int *factor)
 {
    bool ret = false;
@@ -398,7 +308,7 @@ bool splitSensorDataString(String sensorCalib, int *offset, int *factor)
    #endif
    return ret;
 }
-#endif
+
 /*===================================================================================================================*/
 /* The setup function is called once at startup of the sketch */
 /*===================================================================================================================*/
@@ -410,43 +320,25 @@ void setup()
    Serial.println("Serial connection established");
    #endif
 
-   #if CFG_SPIFFS
    SPIFFS_INIT();   /* read stuff from SPIFFS */
-   #endif
-
    GPIO_CONFIG();    /* configure GPIOs */
-
-   #if CFG_SENSOR
    myDHT.setup(DHT_PIN, DHTesp::DHT22);    /* init DHT sensor */
-   #endif
-
-   #if CFG_DISPLAY
    DISPLAY_INIT();   /* init Display */
-   #endif
-
    WIFI_CONNECT();   /* connect to WiFi */
-
-   #if CFG_OTA
    OTA_INIT();
-   #endif
-
-   #if CFG_MQTT_CLIENT
    myMqttConfig.setup(MQTT_MAIN_TOPIC);
    MQTT_CONNECT();   /* connect to MQTT host and build subscriptions, must be called after SPIFFS_INIT()*/
-   #endif
 
-   #if CFG_ROTARY_ENCODER
    /* enable interrupts on encoder pins to decode gray code and recognize switch event*/
    attachInterrupt(ENCODER_PIN1, updateEncoder, CHANGE);
    attachInterrupt(ENCODER_PIN2, updateEncoder, CHANGE);
    attachInterrupt(ENCODER_SWITCH_PIN, encoderSwitch, FALLING);
-   #endif
+
 }
 
 /*===================================================================================================================*/
 /* functions called by setup() */
 /*===================================================================================================================*/
-#if CFG_SPIFFS
 void SPIFFS_INIT(void)
 {
    SPIFFS.begin();
@@ -502,9 +394,7 @@ void SPIFFS_INIT(void)
    }
    #endif
 
-   #if CFG_MQTT_CLIENT
    /* check name for MQTT */
-
    String myName = readSpiffs(SPIFFS_MQTT_ID_FILE);
 
    if (myName != "")
@@ -515,13 +405,8 @@ void SPIFFS_INIT(void)
    {
       Serial.println("File " + SPIFFS_MQTT_ID_FILE + " is empty or does not exist, proceed as 'unknown'");
    }
-
    Serial.println("My name is: " + myMqttConfig.getName());
 
-
-   #endif /* CFG_MQTT_CLIENT */
-
-   #if CFG_SENSOR
    String sensorCalib = readSpiffs(SPIFFS_SENSOR_CALIB_FILE);
 
    /* check parameters for Sensor calibration */
@@ -550,9 +435,6 @@ void SPIFFS_INIT(void)
       Serial.println("File " + SPIFFS_SENSOR_CALIB_FILE + " is empty or does not exist, proceed with uncalibrated sensor");
    }
 
-   #endif /* CFG_SENSOR */
-
-   #if CFG_HEATING_CONTROL
    String targetTemp = readSpiffs(SPIFFS_TARGET_TEMP_FILE);
    if (targetTemp != "")
    {
@@ -565,23 +447,19 @@ void SPIFFS_INIT(void)
    }
 
    SPIFFS_LAST_TARGET_TEMPERATURE = myThermostat.getTargetTemperature(); /* store this value also here to avoid unnecessary usage of SPIFFS */
-
-   #endif /* CFG_HEATING_CONTROL */
 }
-#endif
 
 void GPIO_CONFIG(void)
 {
-   #if CFG_HEATING_CONTROL
    myThermostat.setup(RELAY_PIN, myThermostat.getTargetTemperature()); /*GPIO to switch connected relay and initial target temperature */
-   #endif
+
    /* initialize encoder pins */
    pinMode(ENCODER_PIN1, INPUT_PULLUP);
    pinMode(ENCODER_PIN2, INPUT_PULLUP);
    pinMode(ENCODER_SWITCH_PIN, INPUT_PULLUP);
 }
 
-#if CFG_DISPLAY
+/* Display */
 void DISPLAY_INIT(void)
 {
    #ifdef CFG_DEBUG
@@ -596,7 +474,6 @@ void DISPLAY_INIT(void)
    myDisplay.drawString(64,22,"Initialization");
    myDisplay.display();
 }
-#endif
 
 void WIFI_CONNECT(void)
 {
@@ -628,7 +505,7 @@ void WIFI_CONNECT(void)
 
 }
 
-#if CFG_OTA
+/* OTA */
 void OTA_INIT(void)
 {
    if (systemState_online == mySystemState.getSystemState())
@@ -643,16 +520,15 @@ void OTA_INIT(void)
 
       ArduinoOTA.onStart([]()
       {
-         OTA_UPDATE = true;
-         #if CFG_DISPLAY
+         OTA_UPDATE = TH_OTA_ACTIVE;
          DRAW_DISPLAY_MAIN();
-         #endif
          Serial.println("Start");
       });
 
       ArduinoOTA.onEnd([]()
       {
-         OTA_UPDATE = false;
+         OTA_UPDATE = TH_OTA_FINISHED;
+         DRAW_DISPLAY_MAIN();
          Serial.println("\nEnd");
       });
 
@@ -663,10 +539,8 @@ void OTA_INIT(void)
 
       ArduinoOTA.onError([](ota_error_t error)
       {
-         OTA_UPDATE = false;
-         #if CFG_DISPLAY
+         OTA_UPDATE = TH_OTA_ERROR;
          DRAW_DISPLAY_MAIN();
-         #endif
 
          Serial.printf("Error[%u]: ", error);
          if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
@@ -678,9 +552,7 @@ void OTA_INIT(void)
       ArduinoOTA.begin();
    }
 }
-#endif
 
-#if CFG_MQTT_CLIENT
 void MQTT_CONNECT(void)
 {
    if (systemState_online == mySystemState.getSystemState())
@@ -696,9 +568,6 @@ void MQTT_CONNECT(void)
 
       /* broker shall publish 'offline' on ungraceful disconnect >> Last Will */
       myMqttClient.setWill(mqttWillTopic ,"offline", true, 1);
-      #ifdef CFG_DEBUG
-      Serial.println("MQTT set will " + String(mqttWillTopic) + ": offline");
-      #endif
 
       myMqttClient.begin(mqttHost, mqttPort, myWiFiClient);
       /* register callback */
@@ -706,109 +575,42 @@ void MQTT_CONNECT(void)
 
       /* connect to MQTT */
       ret = myMqttClient.connect(mqttName, LOCAL_MQTT_USER, LOCAL_MQTT_PWD);
-      #ifdef CFG_DEBUG
-      Serial.print("MQTT connect with name " + String(mqttName) + ": ");
-      (ret == true) ? (Serial.println("success")) : (Serial.println("failed"));
-      #endif
 
-      #if CFG_HEATING_CONTROL
       /* subscribe some topics */
       ret = myMqttClient.subscribe(myMqttConfig.getTopicTargetTempCmd());
-      #ifdef CFG_DEBUG
-      Serial.print("MQTT subscribe " + myMqttConfig.getTopicTargetTempCmd() + ": ");
-      (ret == true) ? (Serial.println("success")) : (Serial.println("failed"));
-      #endif
-
-      ret = myMqttClient.subscribe(myMqttConfig.getTopicHeatingAllowedCmd());
-      #ifdef CFG_DEBUG
-      Serial.print("MQTT subscribe " + myMqttConfig.getTopicHeatingAllowedCmd() + ": ");
-      (ret == true) ? (Serial.println("success")) : (Serial.println("failed"));
-      #endif
-      #endif /* CFG_HEATING_CONTROL */
-
+      ret = myMqttClient.subscribe(myMqttConfig.getTopicThermostatModeCmd());
       ret = myMqttClient.subscribe(myMqttConfig.getTopicUpdateFirmware());
-      #ifdef CFG_DEBUG
-      Serial.print("MQTT subscribe " + myMqttConfig.getTopicUpdateFirmware() + ": ");
-      (ret == true) ? (Serial.println("success")) : (Serial.println("failed"));
-      #endif
-
       ret = myMqttClient.subscribe(myMqttConfig.getTopicChangeName());
-      #ifdef CFG_DEBUG
-      Serial.print("MQTT subscribe " + myMqttConfig.getTopicChangeName() + ": ");
-      (ret == true) ? (Serial.println("success")) : (Serial.println("failed"));
-      #endif
-
-      #if CFG_SENSOR
       ret = myMqttClient.subscribe(myMqttConfig.getTopicChangeSensorCalib());
-      #ifdef CFG_DEBUG
-      Serial.print("MQTT subscribe " + myMqttConfig.getTopicChangeSensorCalib() + ": ");
-      (ret == true) ? (Serial.println("success")) : (Serial.println("failed"));
-      #endif
-      #endif /* CFG_SENSOR */
-
       ret = myMqttClient.subscribe(myMqttConfig.getTopicSystemRestartRequest());
-      #ifdef CFG_DEBUG
-      Serial.print("MQTT subscribe " + myMqttConfig.getTopicSystemRestartRequest() + ": ");
-      (ret == true) ? (Serial.println("success")) : (Serial.println("failed"));
-      #endif
 
       /* publish online on connect */
       myMqttClient.publish(myMqttConfig.getTopicState(),"online", true, 1);
-      #ifdef CFG_DEBUG
-      Serial.println("MQTT publish " + myMqttConfig.getTopicState() + ": online");
-      #endif
 
       /* publish restart = false on connect */
       myMqttClient.publish(myMqttConfig.getTopicSystemRestartRequest(),"0", true, 1);
-      #ifdef CFG_DEBUG
-      Serial.println("MQTT publish " + myMqttConfig.getTopicSystemRestartRequest() + ": 0");
-      #endif
 
       /* publish firmware version on connect */
       myMqttClient.publish(myMqttConfig.getTopicFirmwareVersion(), FIRMWARE_VERSION, true, 1);
-      #ifdef CFG_DEBUG
-      Serial.println("MQTT publish " + myMqttConfig.getTopicFirmwareVersion() + ": " + FIRMWARE_VERSION);
-      #endif
 
       delete [] mqttWillTopic;
       delete [] mqttName;
    }
 }
-#endif
+
 /*===================================================================================================================*/
 /* The loop function is called in an endless loop */
 /*===================================================================================================================*/
 void loop()
 {
    HANDLE_SYSTEM_STATE(); /*handle system state class and trigger reconnects */
-
-   #if CFG_SENSOR
    SENSOR_MAIN();   /* get sensor data */
-   #endif
-
-   #if CFG_HEATING_CONTROL
    HEATING_CONTROL_MAIN(); /* control relay for heating */
-   #endif
-
-   #if CFG_MQTT_CLIENT
    MQTT_MAIN(); /* handle MQTT each loop */
-   #endif
-
-   #if CFG_DISPLAY
    DRAW_DISPLAY_MAIN(); /* draw display each loop */
-   #endif
-
-   #if CFG_HTTP_UPDATE
    HANDLE_HTTP_UPDATE(); /* pull update from server if it was requested via MQTT*/
-   #endif
-
-   #if CFG_OTA
    HANDLE_OTA_UPDATE();
-   #endif
-
-   #if CFG_SPIFFS
    SPIFFS_MAIN();
-   #endif
 
    yield();
 }
@@ -820,9 +622,7 @@ void HANDLE_SYSTEM_STATE(void)
 {
    if (mySystemState.getSystemRestartRequest() == true)
    {
-      #if CFG_DISPLAY
       DRAW_DISPLAY_MAIN();
-      #endif /* CFG_DISPLAY */
 
       Serial.println("Restarting in 3 seconds");
       delay(3000);
@@ -850,28 +650,21 @@ void HANDLE_SYSTEM_STATE(void)
       {
          /* try to come online, debounced to avoid reconnect each loop*/
          WIFI_CONNECT();
-
-         #if CFG_MQTT_CLIENT
          MQTT_CONNECT();
-         #endif
-
-         #if CFG_OTA
          OTA_INIT();
-         #endif
       }
    }
 }
 
-#if CFG_SENSOR
 void SENSOR_MAIN()
 {
    float dhtTemp;
    float dhtHumid;
 
-   /* dschedule routine for sensor read */
-   if (TimeReached(read_sensor_scheduled))
+   /* schedule routine for sensor read */
+   if (TimeReached(readSensorScheduled))
    {
-      SetNextTimeInterval(read_sensor_scheduled, read_sensor_schedule_time);
+      SetNextTimeInterval(readSensorScheduled, readSensorScheduleTime);
 
       /* Reading temperature or humidity takes about 250 milliseconds! */
       /* Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor) */
@@ -927,45 +720,42 @@ void SENSOR_MAIN()
       }
    }
 }
-#endif
 
-#if CFG_HEATING_CONTROL
 void HEATING_CONTROL_MAIN(void)
 {
-   #if CFG_SENSOR
    if (myThermostat.getSensorError())
    {
       /* switch off heating if sensor does not provide values */
       #ifdef CFG_DEBUG
       Serial.println("not heating, sensor data invalid");
       #endif
-      if (myThermostat.getHeatingEnabled() == true)
+      if (myThermostat.getActualState() == TH_HEAT)
       {
-         myThermostat.setHeatingEnabled(false);
+         myThermostat.setActualState(TH_OFF);
       }
    }
    else /* sensor is healthy */
    {
-      if (myThermostat.getHeatingAllowed() == true) /* check if heating is allowed by user */
+      if (myThermostat.getThermostatMode() == TH_HEAT) /* check if heating is allowed by user */
       {
          if (myThermostat.getFilteredTemperature() < myThermostat.getTargetTemperature()) /* check if measured temperature is lower than heating target */
          {
-            if (myThermostat.getHeatingEnabled() == false) /* switch on heating if target temperature is higher than measured temperature */
+            if (myThermostat.getActualState() == TH_OFF) /* switch on heating if target temperature is higher than measured temperature */
             {
                #ifdef CFG_DEBUG
                Serial.println("heating");
                #endif
-               myThermostat.setHeatingEnabled(true);
+               myThermostat.setActualState(TH_HEAT);
             }
          }
          else if (myThermostat.getFilteredTemperature() > myThermostat.getTargetTemperature()) /* check if measured temperature is higher than heating target */
          {
-            if (myThermostat.getHeatingEnabled() == true) /* switch off heating if target temperature is lower than measured temperature */
+            if (myThermostat.getActualState() == TH_HEAT) /* switch off heating if target temperature is lower than measured temperature */
             {
                #ifdef CFG_DEBUG
                Serial.println("not heating");
                #endif
-               myThermostat.setHeatingEnabled(false);
+               myThermostat.setActualState(TH_OFF);
             }
          }
          else
@@ -976,14 +766,11 @@ void HEATING_CONTROL_MAIN(void)
       else
       {
          /* disable heating if heating is set to not allowed by user */
-         myThermostat.setHeatingEnabled(false);
+         myThermostat.setActualState(TH_OFF);
       }
    }
-   #endif /* CFG_SENSOR */
 }
-#endif
 
-#if CFG_DISPLAY
 void DRAW_DISPLAY_MAIN(void)
 {
    myDisplay.clear();
@@ -996,28 +783,35 @@ void DRAW_DISPLAY_MAIN(void)
       myDisplay.setTextAlignment(TEXT_ALIGN_CENTER);
       myDisplay.drawString(64,22,"Restart");
    }
-   #if CFG_OTA
-   else if (OTA_UPDATE == true)
+   /* OTA */
+   else if (OTA_UPDATE != TH_OTA_IDLE)
    {
       myDisplay.setFont(Roboto_Condensed_16);
       myDisplay.setTextAlignment(TEXT_ALIGN_CENTER);
-      myDisplay.drawString(64,22,"Update");
+      switch (OTA_UPDATE) {
+         case TH_OTA_ACTIVE:
+            myDisplay.drawString(64,22,"Update");
+            break;
+         case TH_OTA_FINISHED:
+            myDisplay.drawString(64,22,"Finished");
+            break;
+         case TH_OTA_ERROR:
+            myDisplay.drawString(64,22,"Error");
+            break;
+      }
    }
-   #endif /* CFG_OTA */
-   #if CFG_HTTP_UPDATE
+   /* HTTP Update */
    else if (FETCH_UPDATE == true)
    {
       myDisplay.setFont(Roboto_Condensed_16);
       myDisplay.setTextAlignment(TEXT_ALIGN_CENTER);
       myDisplay.drawString(64,22,"Update");
    }
-   #endif /* CFG_HTTP_UPDATE */
    else
    {
       myDisplay.setTextAlignment(TEXT_ALIGN_RIGHT);
       myDisplay.setFont(Roboto_Condensed_32);
 
-      #if CFG_SENSOR
       if (myThermostat.getSensorError())
       {
          myDisplay.drawString(128, drawTempYOffset, "err");
@@ -1026,21 +820,18 @@ void DRAW_DISPLAY_MAIN(void)
       {
          myDisplay.drawString(128, drawTempYOffset, String(intToFloat(myThermostat.getFilteredTemperature()),1));
       }
-      #endif /* CFG_SENSOR */
 
-      #if CFG_HEATING_CONTROL
       /* do not display target temperature if heating is not allowed */
-      if (myThermostat.getHeatingAllowed() == true)
+      if (myThermostat.getThermostatMode() == TH_HEAT)
       {
          myDisplay.setFont(Roboto_Condensed_16);
          myDisplay.drawString(128, drawTargetTempYOffset, String(intToFloat(myThermostat.getTargetTemperature()),1));
 
-         if (myThermostat.getHeatingEnabled()) /* heating */
+         if (myThermostat.getActualState()) /* heating */
          {
             myDisplay.drawHeating;
          }
       }
-      #endif /* CFG_HEATING_CONTROL */
    }
    #ifdef CFG_DEBUG
    myDisplay.setTextAlignment(TEXT_ALIGN_LEFT);
@@ -1050,52 +841,34 @@ void DRAW_DISPLAY_MAIN(void)
 
    myDisplay.display();
 }
-#endif
 
-#if CFG_MQTT_CLIENT
 void MQTT_MAIN(void)
 {
    if (systemState_online == mySystemState.getSystemState())
    {
       if(!myMqttClient.connected())
       {
-         if (MQTT_RECONNECT == false)
+         if (TimeReached(mqttReconnectTime))
          {
-            MQTT_RECONNECT = true;
-            MQTT_RECONNECT_REFERENCE_TIME = millis();
+            MQTT_CONNECT();
+            SetNextTimeInterval(mqttReconnectTime, mqttReconnectInterval); /* reset interval if MQTT_CONNECT was called*/
          }
-         else  /* try reconnect to MQTT broker after MQTT_RECONNECT_TIME expired */
+         else  /* try reconnect to MQTT broker after mqttReconnectTime expired */
          {
-            if (MQTT_RECONNECT_REFERENCE_TIME + MQTT_RECONNECT_TIME < millis())
-            {
-               MQTT_RECONNECT = false;
-               MQTT_CONNECT();
-            }
-            else
-            {
-               /* debounce reconnect */
-               #ifdef CFG_DEBUG
-               if ( (MQTT_RECONNECT_REFERENCE_TIME + MQTT_RECONNECT_TIME - millis()) % 100 == 0 )
-               {
-                  Serial.println("MQTT reconnect in: " + String((MQTT_RECONNECT_REFERENCE_TIME + MQTT_RECONNECT_TIME - millis())));
-               }
-               #endif
-            }
+           /* just wait */
          }
-
          return; /* no MQTT connection */
       }
       else
       {
-          MQTT_RECONNECT = false; /* reset */
+         SetNextTimeInterval(mqttReconnectTime, mqttReconnectInterval); /* reset interval  if everything is fine */
       }
 
-      #if CFG_HTTP_UPDATE
+      /* HTTP Update */
       if (FETCH_UPDATE == true)
       {
          myMqttClient.publish(myMqttConfig.getTopicUpdateFirmwareAccepted(), String(false)); /* publish accepted update with value false to reset the switch in Home Assistant */
       }
-      #endif /* CFG_HTTP_UPDATE */
 
       /* check if there is new data to transmit */
       if (myThermostat.getNewData())
@@ -1103,10 +876,10 @@ void MQTT_MAIN(void)
          myThermostat.resetNewData();
          myMqttClient.publish(myMqttConfig.getTopicTemp()               ,String(intToFloat(myThermostat.getFilteredTemperature()))        ,true, 1); /* publish filtered temperature */
          myMqttClient.publish(myMqttConfig.getTopicHum()                ,String(myThermostat.getFilteredHumidity())                       ,true, 1); /* publish filtered humidity */
-         myMqttClient.publish(myMqttConfig.getTopicHeatingState()       ,String(boolToStringOnOff(myThermostat.getHeatingEnabled()))  ,true, 1); /* publish heating state: 0 -> heating off, 1 -> heating on */
-         myMqttClient.publish(myMqttConfig.getTopicTargetTempState()    ,String(intToFloat(myThermostat.getTargetTemperature()))      ,true, 1); /* publish target temperature as float */
+         myMqttClient.publish(myMqttConfig.getTopicActualState()        ,String(boolToStringOnOff(myThermostat.getActualState()))         ,true, 1); /* publish heating state: 0 -> not heating, 1 -> heating */
+         myMqttClient.publish(myMqttConfig.getTopicTargetTempState()    ,String(intToFloat(myThermostat.getTargetTemperature()))          ,true, 1); /* publish target temperature as float */
          myMqttClient.publish(myMqttConfig.getTopicSensorStatus()       ,String(myThermostat.getSensorError())                            ,true, 1); /* publish sensor status: 0 -> good, 1 -> error */
-         myMqttClient.publish(myMqttConfig.getTopicHeatingAllowedState(),String(boolToStringHeatOff(myThermostat.getHeatingAllowed()))  ,true, 1); /* publish if heating is allowed */
+         myMqttClient.publish(myMqttConfig.getTopicThermostatModeState(),String(boolToStringHeatOff(myThermostat.getThermostatMode()))    ,true, 1); /* publish if heating is allowed */
          myMqttClient.publish(myMqttConfig.getTopicSensorCalibFactor()  ,String(myThermostat.getSensorCalibFactor())                      ,true, 1); /* publish calibration factor */
          myMqttClient.publish(myMqttConfig.getTopicSensorCalibOffset()  ,String(myThermostat.getSensorCalibOffset())                      ,true, 1); /* publish calibration offset */
          myMqttClient.publish(myMqttConfig.getTopicDeviceIP()           ,WiFi.localIP().toString()                                        ,true, 1); /* publish device IP address */
@@ -1116,17 +889,12 @@ void MQTT_MAIN(void)
       delay(20); // <- fixes some issues with WiFi stability
    }
 }
-#endif
 
-#if CFG_HTTP_UPDATE
 void HANDLE_HTTP_UPDATE(void)
 {
    if (FETCH_UPDATE == true)
    {
-      #if CFG_DISPLAY
       DRAW_DISPLAY_MAIN();
-      #endif
-
       FETCH_UPDATE = false;
       Serial.printf("Remote update started");
 
@@ -1147,9 +915,7 @@ void HANDLE_HTTP_UPDATE(void)
       }
    }
 }
-#endif
 
-#if CFG_OTA
 void HANDLE_OTA_UPDATE(void)
 {
    if (systemState_online == mySystemState.getSystemState())
@@ -1157,11 +923,9 @@ void HANDLE_OTA_UPDATE(void)
       ArduinoOTA.handle();
    }
 }
-#endif
-#if CFG_SPIFFS
+
 void SPIFFS_MAIN(void)
 {
-   #if CFG_MQTT_CLIENT
    if (myMqttConfig.getNameChanged())
    {
       mySystemState.setSystemRestartRequest(true);
@@ -1175,7 +939,6 @@ void SPIFFS_MAIN(void)
       }
    }
 
-   #if CFG_SENSOR
    if(myThermostat.getNewCalib())
    {
       mySystemState.setSystemRestartRequest(true);
@@ -1189,10 +952,7 @@ void SPIFFS_MAIN(void)
       }
 
    }
-   #endif /* CFG_SENSOR */
-   #endif /* CFG_MQTT_CLIENT */
 
-   #if CFG_HEATING_CONTROL
    /* avoid extensive writing to SPIFFS, therefore check if the target temperature didn't change for a certain time before writing. */
    if (myThermostat.getTargetTemperature() != SPIFFS_LAST_TARGET_TEMPERATURE)
    {
@@ -1242,25 +1002,17 @@ void SPIFFS_MAIN(void)
          }
       }
    }
-   #endif /* CFG_HEATING_CONTROL */
 }
-#endif /* CFG_SPIFFS */
 /*===================================================================================================================*/
 /* callback, interrupt, timer functions */
 /*===================================================================================================================*/
 
-
-
-#if CFG_ROTARY_ENCODER
 void ICACHE_RAM_ATTR encoderSwitch(void)
 {
    /* debouncing routine for encoder switch */
    if (debounceCheck())
    {
-      #if CFG_HEATING_CONTROL
-      /* toggle heating allowed */
-      myThermostat.toggleHeatingAllowed();
-      #endif
+      myThermostat.toggleThermostatMode();
    }
 }
 
@@ -1290,16 +1042,12 @@ void ICACHE_RAM_ATTR updateEncoder(void)
 
       if(ROTARY_ENCODER_DIRECTION_INTS > rotRight) /* if there was a higher amount of interrupts to the right, consider the encoder was turned to the right */
       {
-         #if CFG_HEATING_CONTROL
-         myThermostat.increaseTargetTemperature(tempStep);
-         #endif /* CFG_HEATING_CONTROL */
-      }
+          myThermostat.increaseTargetTemperature(tempStep);
+       }
       else if (ROTARY_ENCODER_DIRECTION_INTS < rotLeft) /* if there was a higher amount of interrupts to the left, consider the encoder was turned to the left */
       {
-         #if CFG_HEATING_CONTROL
-         myThermostat.decreaseTargetTemperature(tempStep);
-         #endif /* CFG_HEATING_CONTROL */
-      }
+          myThermostat.decreaseTargetTemperature(tempStep);
+       }
       else
       {
          /* do nothing here, left/right interrupts have occurred with same amount -> should never happen */
@@ -1309,9 +1057,7 @@ void ICACHE_RAM_ATTR updateEncoder(void)
 
    LAST_ENCODED = encoded; /* store this value for next time */
 }
-#endif
 
-#if CFG_MQTT_CLIENT
 void messageReceived(String &topic, String &payload)
 {
    #ifdef CFG_DEBUG
@@ -1328,7 +1074,7 @@ void messageReceived(String &topic, String &payload)
       mySystemState.setSystemRestartRequest((bool)(payload.toInt() & 1)); /* extract boolean from payload string */
    }
 
-   #if CFG_HTTP_UPDATE
+   /* HTTP Update */
    if (topic == myMqttConfig.getTopicUpdateFirmware())
    {
       if (payload == "true")
@@ -1343,9 +1089,7 @@ void messageReceived(String &topic, String &payload)
          FETCH_UPDATE = false;
       }
    }
-   #endif /* CFG_HTTP_UPDATE */
-
-   #if CFG_HEATING_CONTROL
+   
    /* check incoming target temperature, don't set same target temperature as new*/
    if (topic == myMqttConfig.getTopicTargetTempCmd())
    {
@@ -1355,24 +1099,22 @@ void messageReceived(String &topic, String &payload)
          myThermostat.setTargetTemperature(floatToInt(payload.toFloat()));
       }
    }
-   if (topic == myMqttConfig.getTopicHeatingAllowedCmd())
+   if (topic == myMqttConfig.getTopicThermostatModeCmd())
    {
       if (String("heat") == payload)
       {
-         myThermostat.setHeatingAllowed(true);
+         myThermostat.setThermostatMode(TH_HEAT);
       }
       else if (String("off") == payload)
       {
-         myThermostat.setHeatingAllowed(false);
+         myThermostat.setThermostatMode(TH_OFF);
       }
       else
       {
           /* do nothing */
       }
    }
-   #endif
 
-   #if CFG_SPIFFS
    if (topic == myMqttConfig.getTopicChangeName())
    {
       #ifdef CFG_DEBUG
@@ -1387,7 +1129,6 @@ void messageReceived(String &topic, String &payload)
       }
    }
 
-   #if CFG_SENSOR
    if(topic == myMqttConfig.getTopicChangeSensorCalib())
    {
       #ifdef CFG_DEBUG
@@ -1402,7 +1143,5 @@ void messageReceived(String &topic, String &payload)
          myThermostat.setSensorCalibData(offset, factor, true);
       }
    }
-   #endif /* CFG_SENSOR */
-   #endif /* CFG_SPIFFS */
 }
-#endif
+

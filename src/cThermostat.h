@@ -5,10 +5,13 @@
 
 #define minTargetTemp (unsigned char)150
 #define maxTargetTemp (unsigned char)250
+
 #ifndef CFG_MEDIAN_QUEUE_SIZE
   #define CFG_MEDIAN_QUEUE_SIZE 10
 #endif
 
+#define TH_HEAT true
+#define TH_OFF  false
 
 class Thermostat
 {
@@ -19,18 +22,18 @@ class Thermostat
     void setup(unsigned char gpio, unsigned char tarTemp);
 
     // heating
-    void setHeatingEnabled(bool value);
+    void setActualState(bool value);
     void setTargetTemperature(int value);
     void increaseTargetTemperature(unsigned int value);
     void decreaseTargetTemperature(unsigned int value);
     void resetTransmitRequest();
     void resetNewData();
-    bool getHeatingEnabled(void);
+    bool getActualState(void);
     int  getTargetTemperature(void);
     bool getNewData();
-    bool getHeatingAllowed();
-    void setHeatingAllowed(bool value);
-    void toggleHeatingAllowed();
+    bool getThermostatMode();
+    void setThermostatMode(bool value);
+    void toggleThermostatMode();
 
     //sensor
     void setCurrentTemperature(int temperature);
@@ -50,11 +53,11 @@ class Thermostat
 
   private:
     // heating
-    bool      heatingEnabled;
+    bool      thermostatMode;
+    bool      actualState;
     uint8     targetTemperature;
     uint8     relayGpio;
     bool      newData;
-    bool      heatingAllowed;
     // sensor
     int       currentTemperature;
     int       currentHumidity;

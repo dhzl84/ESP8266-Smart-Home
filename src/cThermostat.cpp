@@ -13,8 +13,8 @@ Thermostat::~Thermostat()
 void Thermostat::init()
 {
    //heating
-   heatingAllowed             = true;
-   heatingEnabled             = false;
+   thermostatMode             = TH_HEAT;
+   actualState                = TH_OFF;
    targetTemperature          = 200;      // initial value if setup() is not called; resolution is 0.1 °C
    newData                    = false;    // flag to indicate new data to be displayed and transmitted vai MQTT
    relayGpio                  = 16;       // relay GPIO if setup() is not called
@@ -64,12 +64,27 @@ void Thermostat::setup(unsigned char gpio, unsigned char tarTemp)
    digitalWrite(relayGpio,HIGH); /* switch relay OFF */
 }
 
-void Thermostat::setHeatingEnabled(bool value)
+bool Thermostat::getActualState(void)              { return actualState; }
+int  Thermostat::getTargetTemperature(void)        { return targetTemperature; }
+bool Thermostat::getNewData()                      { return newData; }
+bool Thermostat::getThermostatMode()               { return thermostatMode; }
+void Thermostat::resetNewCalib()                   { newCalib  = false; }
+int  Thermostat::getSensorFailureCounter(void)     { return sensorFailureCounter; }
+int  Thermostat::getCurrentTemperature(void)       { return currentTemperature; }
+int  Thermostat::getCurrentHumidity(void)          { return currentHumidity; }
+int  Thermostat::getFilteredTemperature(void)      { return filteredTemperature; }
+int  Thermostat::getFilteredHumidity(void)         { return filteredHumidity; }
+bool Thermostat::getSensorError(void)              { return sensorError; }
+bool Thermostat::getNewCalib(void)                 { return newCalib; }
+int  Thermostat::getSensorCalibOffset(void)        { return tempOffset; }
+int  Thermostat::getSensorCalibFactor(void)        { return tempFactor; }
+
+void Thermostat::setActualState(bool value)
 {
-   if (value != heatingEnabled)
+   if (value != actualState)
    {
       newData = true;
-      if (value == true)
+      if (value == TH_HEAT)
       {
          digitalWrite(relayGpio,LOW); /* switch relay ON */
       }
@@ -78,7 +93,7 @@ void Thermostat::setHeatingEnabled(bool value)
          digitalWrite(relayGpio,HIGH); /* switch relay OFF */
       }
    }
-   heatingEnabled  = value;
+   actualState  = value;
 }
 
 void Thermostat::resetNewData()
@@ -121,44 +136,24 @@ void Thermostat::setTargetTemperature(int value)
    }
 }
 
-bool Thermostat::getHeatingEnabled(void)
+void Thermostat::setThermostatMode(bool value)
 {
-   return heatingEnabled;
-}
-
-int Thermostat::getTargetTemperature(void)
-{
-   return targetTemperature;
-}
-
-bool Thermostat::getNewData()
-{
-   return newData;
-}
-
-bool Thermostat::getHeatingAllowed()
-{
-   return heatingAllowed;
-}
-
-void Thermostat::setHeatingAllowed(bool value)
-{
-   if (value != heatingAllowed)
+   if (value != thermostatMode)
    {
       newData = true;
    }
-   heatingAllowed = value;
+   thermostatMode = value;
 }
 
-void Thermostat::toggleHeatingAllowed()
+void Thermostat::toggleThermostatMode()
 {
-   if (heatingAllowed == true)
+   if (thermostatMode == true)
    {
-      heatingAllowed = false;
+      thermostatMode  = TH_HEAT;
    }
    else
    {
-      heatingAllowed = true;
+      thermostatMode = TH_OFF;
    }
    newData = true;
 }
@@ -247,11 +242,6 @@ void Thermostat::setCurrentHumidity(int value)
    filteredHumidity = humidValue;
 }
 
-void Thermostat::resetNewCalib()
-{
-   newCalib  = false;
-}
-
 void Thermostat::setLastSensorReadFailed(bool value)
 {
    /* filter sensor read failure here to avoid switching back and forth for single failure events */
@@ -301,49 +291,4 @@ void Thermostat::setSensorCalibData(int offset, int factor, bool calib)
       }
    }
 
-}
-
-int Thermostat::getSensorFailureCounter(void)
-{
-   return sensorFailureCounter;
-}
-
-int Thermostat::getCurrentTemperature(void)
-{
-   return currentTemperature;
-}
-
-int Thermostat::getCurrentHumidity(void)
-{
-   return currentHumidity;
-}
-
-int Thermostat::getFilteredTemperature(void)
-{
-   return filteredTemperature;
-}
-
-int Thermostat::getFilteredHumidity(void)
-{
-   return filteredHumidity;
-}
-
-bool Thermostat::getSensorError(void)
-{
-   return sensorError;
-}
-
-bool Thermostat::getNewCalib(void)
-{
-   return newCalib;
-}
-
-int Thermostat::getSensorCalibOffset(void)
-{
-   return tempOffset;
-}
-
-int Thermostat::getSensorCalibFactor(void)
-{
-   return tempFactor;
 }

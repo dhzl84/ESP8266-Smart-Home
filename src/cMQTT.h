@@ -1,7 +1,15 @@
 #ifndef cMQTT_H_
 #define cMQTT_H_
 
-#include "main.h"
+#include "Arduino.h"
+
+#ifndef MQTT_MAIN_TOPIC
+  #define MQTT_MAIN_TOPIC             "/heating/"
+#endif
+
+#ifndef MQTT_RECONNECT_TIME
+  #define MQTT_RECONNECT_TIME 10000   /* 10s in milliseconds */
+#endif
 
 class mqttConfig
 {
@@ -24,23 +32,17 @@ public:
    String getTopicState(void);
    String getTopicDeviceIP(void);
    String getTopicSystemRestartRequest(void);
-
-   #if CFG_SENSOR
    String getTopicTemp(void);
    String getTopicHum(void);
    String getTopicSensorStatus(void);
    String getTopicChangeSensorCalib(void);
    String getTopicSensorCalibFactor(void);
    String getTopicSensorCalibOffset(void);
-   #endif
-
-   #if CFG_HEATING_CONTROL
    String getTopicTargetTempCmd(void);
    String getTopicTargetTempState(void);
-   String getTopicHeatingState(void);
-   String getTopicHeatingAllowedCmd(void);
-   String getTopicHeatingAllowedState(void);
-   #endif
+   String getTopicActualState(void);
+   String getTopicThermostatModeCmd(void);
+   String getTopicThermostatModeState(void);
 
 private:
    String mqttName;
@@ -53,23 +55,17 @@ private:
    String mqttSystemRestartRequest;
    String mqttMainTopic;
    bool   nameChanged;
-
-   #if CFG_SENSOR
    String mqttTemp;
    String mqttHum;
    String mqttSensorStatus;
    String mqttChangeSensorCalib;
    String mqttSensorCalibFactor;
    String mqttSensorCalibOffset;
-   #endif
-
-   #if CFG_HEATING_CONTROL
-   String mqttHeatingState;
-   String mqttHeatingAllowedCmd;
-   String mqttHeatingAllowedState;
+   String mqttActualState;
+   String mqttThermostatModeCmd;
+   String mqttThermostatModeState;
    String mqttTargetTempCmd;
    String mqttTargetTempState;
-   #endif
 };
 
 #endif /* cMQTT_H_ */
