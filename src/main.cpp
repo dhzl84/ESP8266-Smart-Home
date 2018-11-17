@@ -308,7 +308,7 @@ void setup()
    DISPLAY_INIT();   /* init Display */
    WIFI_CONNECT();   /* connect to WiFi */
    OTA_INIT();
-   myMqttHelper.setup(MQTT_MAIN_TOPIC);
+   myMqttHelper.setup();
    MQTT_CONNECT();   /* connect to MQTT host and build subscriptions, must be called after SPIFFS_INIT()*/
 
    /* enable interrupts on encoder pins to decode gray code and recognize switch event*/
@@ -453,8 +453,8 @@ void DISPLAY_INIT(void)
    myDisplay.clear();
    myDisplay.setFont(Roboto_Condensed_16);
    myDisplay.setTextAlignment(TEXT_ALIGN_CENTER);
-   myDisplay.drawString(64, 22, "Initialize");
-   myDisplay.drawString(64, 44, myMqttHelper.getName());
+   myDisplay.drawString(64, 11, "Initialize");
+   myDisplay.drawString(64, 33, myMqttHelper.getName());
    myDisplay.display();
 }
 
@@ -562,19 +562,33 @@ void MQTT_CONNECT(void)
       ret = myMqttClient.subscribe(myMqttHelper.getTopicChangeName());
       ret = myMqttClient.subscribe(myMqttHelper.getTopicChangeSensorCalib());
       ret = myMqttClient.subscribe(myMqttHelper.getTopicSystemRestartRequest());
-
-      /* publish restart = false on connect */
-      myMqttClient.publish(myMqttHelper.getTopicSystemRestartRequest(),"0", false, 1);
-      /* publish online in will topic */
-      myMqttClient.publish(myMqttHelper.getTopicLastWill(),"online", false, 1);
-
-      /* publish discovery messages to home assistant */
-      // myMqttClient.publish(myMqttHelper.getTopicHassDiscovery(),"",false, 1); // remove previous device
-
       myMqttClient.loop();
-      delay(20); // <- fixes some issues with WiFi stability
 
-      myMqttClient.publish(myMqttHelper.getTopicHassDiscovery(),myMqttHelper.buildHassDiscovery(),false, 1); // add new device
+      /* Home Assistant discovery on connect */
+      myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryClimate(),       myMqttHelper.buildHassDiscoveryClimate(),       false, 1);    // make HA discover the climate component
+      myMqttClient.loop();
+      myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(),  myMqttHelper.buildHassDiscoveryBinarySensor(),  false, 1);    // make HA discover the binary_sensor for sensor failure
+      myMqttClient.loop();
+      myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sTemp),   myMqttHelper.buildHassDiscoverySensor(sTemp),   false, 1);    // make HA discover the temperature sensor
+      myMqttClient.loop();
+      myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sHum),    myMqttHelper.buildHassDiscoverySensor(sHum),    false, 1);    // make HA discover the humidity sensor
+      myMqttClient.loop();
+      myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sIP),     myMqttHelper.buildHassDiscoverySensor(sIP),     false, 1);    // make HA discover the IP sensor
+      myMqttClient.loop();
+      myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sCalibF), myMqttHelper.buildHassDiscoverySensor(sCalibF), false, 1);    // make HA discover the sensor scaling sensor
+      myMqttClient.loop();
+      myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sCalibO), myMqttHelper.buildHassDiscoverySensor(sCalibO), false, 1);    // make HA discover the sensor offset sensor
+      myMqttClient.loop();
+      myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sFW),     myMqttHelper.buildHassDiscoverySensor(sFW),     false, 1);    // make HA discover the firmware version sensor
+      myMqttClient.loop();
+      myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swReset), myMqttHelper.buildHassDiscoverySwitch(swReset), false, 1);    // make HA discover the reset switch
+      myMqttClient.loop();
+      myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swUpdate),myMqttHelper.buildHassDiscoverySwitch(swUpdate),false, 1);  // make HA discover the update switch
+      myMqttClient.loop();
+      /* publish restart = false on connect */
+      myMqttClient.publish(myMqttHelper.getTopicSystemRestartRequest(),       "0",                                            false, 1);
+      /* publish online in will topic */
+      myMqttClient.publish(myMqttHelper.getTopicLastWill(),                   "online",                                       false, 1);
 
       delete [] mqttWillTopic;
       delete [] mqttClientName;
@@ -857,7 +871,7 @@ void MQTT_MAIN(void)
       if (myThermostat.getNewData())
       {
          myThermostat.resetNewData();
-         myMqttClient.publish(myMqttHelper.getTopicData(), myMqttHelper.buildStateJSON(String(intToFloat(myThermostat.getFilteredTemperature())), String(myThermostat.getFilteredHumidity()), String(boolToStringOnOff(myThermostat.getActualState())), String(intToFloat(myThermostat.getTargetTemperature())), String(myThermostat.getSensorError()), String(boolToStringHeatOff(myThermostat.getThermostatMode())), String(myThermostat.getSensorCalibFactor()), String(myThermostat.getSensorCalibOffset()), WiFi.localIP().toString(), FIRMWARE_VERSION), false, 1);
+         myMqttClient.publish(myMqttHelper.getTopicData(), myMqttHelper.buildStateJSON(String(intToFloat(myThermostat.getFilteredTemperature())), String(intToFloat(myThermostat.getFilteredHumidity())), String(boolToStringOnOff(myThermostat.getActualState())), String(intToFloat(myThermostat.getTargetTemperature())), String(myThermostat.getSensorError()), String(boolToStringHeatOff(myThermostat.getThermostatMode())), String(myThermostat.getSensorCalibFactor()), String(intToFloat(myThermostat.getSensorCalibOffset())), WiFi.localIP().toString(), String(FIRMWARE_VERSION)), false, 1);
          myMqttClient.publish(myMqttHelper.getTopicLastWill(),"online", false, 1);
       }
 
@@ -1017,16 +1031,23 @@ void messageReceived(String &topic, String &payload)
    {
       #ifdef CFG_DEBUG
       Serial.println("Restart request received with value: " + payload);
-      Serial.println("Parameter passed to Restart class: " + String((bool)(payload.toInt() & 1)));
       #endif
+      if (payload == "1")
+      {
+         mySystemState.setSystemRestartRequest(true);
+      }
+      else
+      {
+         mySystemState.setSystemRestartRequest(false);
+      }
 
-      mySystemState.setSystemRestartRequest((bool)(payload.toInt() & 1)); /* extract boolean from payload string */
+      
    }
 
    /* HTTP Update */
    if (topic == myMqttHelper.getTopicUpdateFirmware())
    {
-      if (payload == "true")
+      if (payload == "1")
       {
          #ifdef CFG_DEBUG
          Serial.println("Firmware updated triggered via MQTT");
