@@ -47,6 +47,7 @@ public:
    String getTopicHassDiscoveryBinarySensor(void);
    String getTopicHassDiscoverySensor(sensor_t sensor);
    String getTopicHassDiscoverySwitch(switch_t switches);
+   String getTopicMqttDiscoveryTrigger(void);
    String buildStateJSON(String Temp, String humid, String actState, String tarTemp, String sensError, String thermoMode, String calibF, String calibO, String ip, String firmware);
    String buildHassDiscoveryClimate(void);
    String buildHassDiscoveryBinarySensor(void);
@@ -72,6 +73,7 @@ private:
    String mqttObjectId;
    String mqttGeneralBaseTopic;
    String mqttHassDiscoveryTopic;
+   String mqttDiscoveryTrigger;
    bool   nameChanged;
    String mqttChangeSensorCalib;
    String mqttThermostatModeCmd;

@@ -50,7 +50,8 @@ unsigned long  mqttReconnectTime       = 0;
 unsigned long  mqttReconnectInterval   = MQTT_RECONNECT_TIME;
 /* HTTP Update */
 const    String myUpdateServer = THERMOSTAT_BINARY;
-boolean  FETCH_UPDATE          = false;       /* global variable used to decide whether an update shall be fetched from server or not */
+bool     FETCH_UPDATE          = false;       /* global variable used to decide whether an update shall be fetched from server or not */
+bool     HA_DISCOVER           = false;
 /* OTA */
 typedef enum { TH_OTA_IDLE, TH_OTA_ACTIVE, TH_OTA_FINISHED, TH_OTA_ERROR } OtaUpdate_t;       /* global variable used to change display in case OTA update is initiated */
 OtaUpdate_t OTA_UPDATE = TH_OTA_IDLE;
@@ -110,6 +111,7 @@ void HANDLE_OTA_UPDATE(void);
 void HANDLE_HTTP_UPDATE(void);
 void encoderSwitch (void);
 void updateEncoder(void);
+void homeAssistantDiscovery(void);
 
 /*===================================================================================================================*/
 /* library functions */
@@ -564,27 +566,8 @@ void MQTT_CONNECT(void)
       ret = myMqttClient.subscribe(myMqttHelper.getTopicSystemRestartRequest());
       myMqttClient.loop();
 
-      /* Home Assistant discovery on connect */
-      myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryClimate(),       myMqttHelper.buildHassDiscoveryClimate(),       false, 1);    // make HA discover the climate component
-      myMqttClient.loop();
-      myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(),  myMqttHelper.buildHassDiscoveryBinarySensor(),  false, 1);    // make HA discover the binary_sensor for sensor failure
-      myMqttClient.loop();
-      myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sTemp),   myMqttHelper.buildHassDiscoverySensor(sTemp),   false, 1);    // make HA discover the temperature sensor
-      myMqttClient.loop();
-      myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sHum),    myMqttHelper.buildHassDiscoverySensor(sHum),    false, 1);    // make HA discover the humidity sensor
-      myMqttClient.loop();
-      myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sIP),     myMqttHelper.buildHassDiscoverySensor(sIP),     false, 1);    // make HA discover the IP sensor
-      myMqttClient.loop();
-      myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sCalibF), myMqttHelper.buildHassDiscoverySensor(sCalibF), false, 1);    // make HA discover the sensor scaling sensor
-      myMqttClient.loop();
-      myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sCalibO), myMqttHelper.buildHassDiscoverySensor(sCalibO), false, 1);    // make HA discover the sensor offset sensor
-      myMqttClient.loop();
-      myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sFW),     myMqttHelper.buildHassDiscoverySensor(sFW),     false, 1);    // make HA discover the firmware version sensor
-      myMqttClient.loop();
-      myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swReset), myMqttHelper.buildHassDiscoverySwitch(swReset), false, 1);    // make HA discover the reset switch
-      myMqttClient.loop();
-      myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swUpdate),myMqttHelper.buildHassDiscoverySwitch(swUpdate),false, 1);  // make HA discover the update switch
-      myMqttClient.loop();
+      homeAssistantDiscovery();
+
       /* publish restart = false on connect */
       myMqttClient.publish(myMqttHelper.getTopicSystemRestartRequest(),       "0",                                            false, 1);
       /* publish online in will topic */
@@ -867,6 +850,12 @@ void MQTT_MAIN(void)
          myMqttClient.publish(myMqttHelper.getTopicUpdateFirmwareAccepted(), String(false), false, 1); /* publish accepted update with value false to reset the switch in Home Assistant */
       }
 
+      if (HA_DISCOVER == true)
+      {
+         homeAssistantDiscovery();
+         HA_DISCOVER = false;
+      }
+
       /* check if there is new data to transmit */
       if (myThermostat.getNewData())
       {
@@ -966,7 +955,7 @@ void SPIFFS_MAIN(void)
    }
 }
 /*===================================================================================================================*/
-/* callback, interrupt, timer functions */
+/* callback, interrupt, timer, other functions */
 /*===================================================================================================================*/
 
 void ICACHE_RAM_ATTR encoderSwitch(void)
@@ -1021,6 +1010,31 @@ void ICACHE_RAM_ATTR updateEncoder(void)
    LAST_ENCODED = encoded; /* store this value for next time */
 }
 
+void homeAssistantDiscovery(void)
+{
+   /* Home Assistant discovery on connect */
+   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryClimate(),       myMqttHelper.buildHassDiscoveryClimate(),       false, 1);    // make HA discover the climate component
+   myMqttClient.loop();
+   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(),  myMqttHelper.buildHassDiscoveryBinarySensor(),  false, 1);    // make HA discover the binary_sensor for sensor failure
+   myMqttClient.loop();
+   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sTemp),   myMqttHelper.buildHassDiscoverySensor(sTemp),   false, 1);    // make HA discover the temperature sensor
+   myMqttClient.loop();
+   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sHum),    myMqttHelper.buildHassDiscoverySensor(sHum),    false, 1);    // make HA discover the humidity sensor
+   myMqttClient.loop();
+   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sIP),     myMqttHelper.buildHassDiscoverySensor(sIP),     false, 1);    // make HA discover the IP sensor
+   myMqttClient.loop();
+   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sCalibF), myMqttHelper.buildHassDiscoverySensor(sCalibF), false, 1);    // make HA discover the sensor scaling sensor
+   myMqttClient.loop();
+   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sCalibO), myMqttHelper.buildHassDiscoverySensor(sCalibO), false, 1);    // make HA discover the sensor offset sensor
+   myMqttClient.loop();
+   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sFW),     myMqttHelper.buildHassDiscoverySensor(sFW),     false, 1);    // make HA discover the firmware version sensor
+   myMqttClient.loop();
+   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swReset), myMqttHelper.buildHassDiscoverySwitch(swReset), false, 1);    // make HA discover the reset switch
+   myMqttClient.loop();
+   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swUpdate),myMqttHelper.buildHassDiscoverySwitch(swUpdate),false, 1);    // make HA discover the update switch
+   myMqttClient.loop();
+}
+
 void messageReceived(String &topic, String &payload)
 {
    #ifdef CFG_DEBUG
@@ -1045,7 +1059,7 @@ void messageReceived(String &topic, String &payload)
    }
 
    /* HTTP Update */
-   if (topic == myMqttHelper.getTopicUpdateFirmware())
+   else if (topic == myMqttHelper.getTopicUpdateFirmware())
    {
       if (payload == "1")
       {
@@ -1059,9 +1073,9 @@ void messageReceived(String &topic, String &payload)
          FETCH_UPDATE = false;
       }
    }
-   
+
    /* check incoming target temperature, don't set same target temperature as new*/
-   if (topic == myMqttHelper.getTopicTargetTempCmd())
+   else if (topic == myMqttHelper.getTopicTargetTempCmd())
    {
       if (myThermostat.getTargetTemperature() != payload.toFloat())
       {
@@ -1069,7 +1083,9 @@ void messageReceived(String &topic, String &payload)
          myThermostat.setTargetTemperature(floatToInt(payload.toFloat()));
       }
    }
-   if (topic == myMqttHelper.getTopicThermostatModeCmd())
+
+
+   else if (topic == myMqttHelper.getTopicThermostatModeCmd())
    {
       if (String("heat") == payload)
       {
@@ -1085,7 +1101,8 @@ void messageReceived(String &topic, String &payload)
       }
    }
 
-   if (topic == myMqttHelper.getTopicChangeName())
+
+   else if (topic == myMqttHelper.getTopicChangeName())
    {
       #ifdef CFG_DEBUG
       Serial.println("New name received: " + payload);
@@ -1099,7 +1116,7 @@ void messageReceived(String &topic, String &payload)
       }
    }
 
-   if(topic == myMqttHelper.getTopicChangeSensorCalib())
+   else if(topic == myMqttHelper.getTopicChangeSensorCalib())
    {
       #ifdef CFG_DEBUG
       Serial.println("New sensor calibration parameters received: " + payload);
@@ -1111,6 +1128,13 @@ void messageReceived(String &topic, String &payload)
       if (splitSensorDataString(payload, &offset, &factor))
       {
          myThermostat.setSensorCalibData(offset, factor, true);
+      }
+   }
+   else if (topic == myMqttHelper.getTopicMqttDiscoveryTrigger())
+   {
+      if (payload == "1")
+      {
+         HA_DISCOVER = true;  // start discovery in next MQTT_MAIN()
       }
    }
 }

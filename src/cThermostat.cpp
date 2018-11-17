@@ -16,7 +16,7 @@ void Thermostat::init()
    thermostatMode             = TH_HEAT;
    actualState                = TH_OFF;
    targetTemperature          = 200;      // initial value if setup() is not called; resolution is 0.1 °C
-   newData                    = false;    // flag to indicate new data to be displayed and transmitted vai MQTT
+   newData                    = true;    // flag to indicate new data to be displayed and transmitted vai MQTT
    relayGpio                  = 16;       // relay GPIO if setup() is not called
    //sensor
    sensorError                = false;    // filtered sensor error
