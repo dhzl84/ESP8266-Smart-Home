@@ -4,7 +4,7 @@
 #include "Arduino.h"
 
 #ifndef MQTT_MAIN_TOPIC
-  #define MQTT_MAIN_TOPIC             "/heating/"
+  #define MQTT_MAIN_TOPIC "homeassistant/climate/"
 #endif
 
 #ifndef MQTT_RECONNECT_TIME
@@ -25,21 +25,23 @@ public:
    bool   getNameChanged();
    void   resetNameChanged();
    String getName(void);
+   String getLoweredName(void);
    String getTopicUpdateFirmware(void);
    String getTopicUpdateFirmwareAccepted(void);
    String getTopicChangeName(void);
-   String getTopicState(void);
+   String getTopicLastWill(void);
    String getTopicSystemRestartRequest(void);
    String getTopicChangeSensorCalib(void);
    String getTopicTargetTempCmd(void);
    String getTopicThermostatModeCmd(void);
    String getTopicHassDiscovery(void);
-   String buildJSON(String Temp, String humid, String actState, String tarTemp, String sensError, String thermoMode, String calibF, String calibO, String ip, String firmware);
+   String buildStateJSON(String Temp, String humid, String actState, String tarTemp, String sensError, String thermoMode, String calibF, String calibO, String ip, String firmware);
    String buildHassDiscovery(void);
    String getTopicData(void);
 
 private:
    String mqttName;
+   String loweredMqttName;
    String mqttData;
    String mqttUpdateFirmware;
    String mqttUpdateFirmwareAccepted;

@@ -12,8 +12,10 @@ void mqttHelper::init()
 
 void mqttHelper::setup(String mainTopic, String deviceName)
 {
-   mqttName      = deviceName;
-   mqttMainTopic = mainTopic;
+   mqttMainTopic   = mainTopic;
+   mqttName        = deviceName;
+   loweredMqttName = deviceName;
+   loweredMqttName.toLowerCase();
    mqttHelper::buildTopics();
 }
 
@@ -25,37 +27,36 @@ void mqttHelper::setup(String mainTopic)
 
 void mqttHelper::buildTopics(void)
 {
-   mqttHassDiscoveryTopic =      "homeassistant/climate/" + mqttName + "/config";
-   mqttData =                    mqttMainTopic + mqttName + "/data";
+   mqttHassDiscoveryTopic =      mqttMainTopic + loweredMqttName + "/config";
+   mqttData =                    mqttMainTopic + loweredMqttName + "/state";
 // sub
-   mqttUpdateFirmware =          mqttMainTopic + mqttName + "/updateFirmware";
-   mqttChangeName =              mqttMainTopic + mqttName + "/changeName";
-   mqttSystemRestartRequest =    mqttMainTopic + mqttName + "/systemRestartRequest";
-   mqttChangeSensorCalib =       mqttMainTopic + mqttName + "/changeSensorCalib";
-   mqttTargetTempCmd =           mqttMainTopic + mqttName + "/targetTempCmd";
-   mqttThermostatModeCmd =       mqttMainTopic + mqttName + "/thermostatModeCmd";
-
+   mqttUpdateFirmware =          mqttMainTopic + loweredMqttName + "/updateFirmware";
+   mqttChangeName =              mqttMainTopic + loweredMqttName + "/changeName";
+   mqttSystemRestartRequest =    mqttMainTopic + loweredMqttName + "/systemRestartRequest";
+   mqttChangeSensorCalib =       mqttMainTopic + loweredMqttName + "/changeSensorCalib";
+   mqttTargetTempCmd =           mqttMainTopic + loweredMqttName + "/targetTempCmd";
+   mqttThermostatModeCmd =       mqttMainTopic + loweredMqttName + "/thermostatModeCmd";
 //pub
-   mqttUpdateFirmwareAccepted =  mqttMainTopic + mqttName + "/updateFirmwareAccepted";
-   mqttWill =                    mqttMainTopic + mqttName + "/online";
+   mqttUpdateFirmwareAccepted =  mqttMainTopic + loweredMqttName + "/updateFirmwareAccepted";
+   mqttWill =                    mqttMainTopic + loweredMqttName + "/LWT";
 
 }
 
-String mqttHelper::buildJSON(String temp, String humid, String actState, String tarTemp, String sensError, String thermoMode, String calibF, String calibO, String ip, String firmware)
+String mqttHelper::buildStateJSON(String temp, String humid, String actState, String tarTemp, String sensError, String thermoMode, String calibF, String calibO, String ip, String firmware)
 {
    String JSON = \
    "{\n" \
    "  \"name\":\"" + mqttName + "\",\n" \
-   "  \"device_class\":\"climate\",\n" \
+   "  \"dev_cla\":\"climate\",\n" \
    "  \"mode\":\"" + thermoMode + "\",\n" \
    "  \"state\":\"" + actState + "\",\n" \
-   "  \"target_temperature\":\"" + tarTemp + "\",\n" \
-   "  \"current_temperature\":\"" + temp + "\",\n" \
-   "  \"current_humidity\":\"" + humid + "\",\n" \
-   "  \"sensor_status\":\"" + sensError + "\",\n" \
-   "  \"sensor_scaling\":\"" + calibF + "\",\n" \
-   "  \"sensor_offset\":\"" + calibO + "\",\n" \
-   "  \"firmware_version\":\"" + firmware + "\",\n" \
+   "  \"target_temp\":\"" + tarTemp + "\",\n" \
+   "  \"current_temp\":\"" + temp + "\",\n" \
+   "  \"humidity\":\"" + humid + "\",\n" \
+   "  \"sens_status\":\"" + sensError + "\",\n" \
+   "  \"sens_scale\":\"" + calibF + "\",\n" \
+   "  \"sens_offs\":\"" + calibO + "\",\n" \
+   "  \"fw\":\"" + firmware + "\",\n" \
    "  \"ip\":\"" + ip + "\"\n "\
    "}";
 
@@ -67,18 +68,18 @@ String mqttHelper::buildHassDiscovery(void)
    String JSON = \
    "{\n" \
    "  \"name\":\"" + mqttName + "\",\n" \
-   "  \"device_class\":\"climate\",\n" \
-   "  \"mode_command_topic\":\"" + mqttThermostatModeCmd + "\",\n" \
-   "  \"mode_state_topic\":\"" + mqttData + "\",\n" \
-   "  \"mode_state_template\":\"{{value_json.mode}}\",\n" \
-   "  \"availability_topic\":\"" + mqttWill + "\",\n" \
-   "  \"payload_available\":\"online\",\n" \
-   "  \"payload_not_available\":\"offline\",\n" \
-   "  \"temperature_command_topic\":\"" + mqttTargetTempCmd + "\",\n" \
-   "  \"temperature_state_topic\":\"" + mqttData + "\",\n" \
-   "  \"temperature_state_template\":\"{{value_json.target_temperature}}\",\n" \
-   "  \"current_temperature_topic\":\"" + mqttData + "\",\n" \
-   "  \"current_temperature_template\":\"{{value_json.current_temperature}}\",\n" \
+   "  \"dev_cla\":\"climate\",\n" \
+   "  \"mode_cmd_t\":\"" + mqttThermostatModeCmd + "\",\n" \
+   "  \"mode_stat_t\":\"" + mqttData + "\",\n" \
+   "  \"mode_stat_tpl\":\"{{value_json.mode}}\",\n" \
+   "  \"avty_t\":\"" + mqttWill + "\",\n" \
+   "  \"pl_avail\":\"online\",\n" \
+   "  \"pl_not_avail\":\"offline\",\n" \
+   "  \"temp_cmd_t\":\"" + mqttTargetTempCmd + "\",\n" \
+   "  \"temp_stat_t\":\"" + mqttData + "\",\n" \
+   "  \"temp_stat_tpl\":\"{{value_json.target_temp}}\",\n" \
+   "  \"curr_temp_t\":\"" + mqttData + "\",\n" \
+   "  \"current_temperature_template\":\"{{value_json.current_temp}}\",\n" \
    "  \"min_temp\":\"15\",\n" \
    "  \"max_temp\":\"25\",\n" \
    "  \"temp_step\":\"0.5\",\n" \
@@ -93,29 +94,33 @@ void mqttHelper::changeName(String value)
    if(value != mqttName)
    {
       mqttName = value;
+      loweredMqttName = value;
+      loweredMqttName.toLowerCase();
       mqttHelper::buildTopics();
       nameChanged = true;
    }
 }
-
 
 void mqttHelper::setName(String value)
 {
    if(value != mqttName)
    {
       mqttName = value;
+      loweredMqttName = value;
+      loweredMqttName.toLowerCase();
       mqttHelper::buildTopics();
       nameChanged = false;
    }
 }
 
-void mqttHelper::resetNameChanged(void)                  { nameChanged = false; }
-bool mqttHelper::getNameChanged(void)                    { return nameChanged; }
+void   mqttHelper::resetNameChanged(void)                { nameChanged = false; }
+bool   mqttHelper::getNameChanged(void)                  { return nameChanged; }
 String mqttHelper::getName(void)                         { return mqttName; }
+String mqttHelper::getLoweredName(void)                  { return loweredMqttName; }
 String mqttHelper::getTopicUpdateFirmware(void)          { return mqttUpdateFirmware;  }
 String mqttHelper::getTopicUpdateFirmwareAccepted(void)  { return mqttUpdateFirmwareAccepted; }
 String mqttHelper::getTopicChangeName(void)              { return mqttChangeName; }
-String mqttHelper::getTopicState(void)                   { return mqttWill; }
+String mqttHelper::getTopicLastWill(void)                { return mqttWill; }
 String mqttHelper::getTopicSystemRestartRequest(void)    { return mqttSystemRestartRequest; }
 String mqttHelper::getTopicChangeSensorCalib(void)       { return mqttChangeSensorCalib; }
 String mqttHelper::getTopicTargetTempCmd(void)           { return mqttTargetTempCmd; }

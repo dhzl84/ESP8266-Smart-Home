@@ -79,7 +79,7 @@ WiFiClient     myWiFiClient;
 Thermostat     myThermostat;
 SystemState    mySystemState;
 MQTTClient     myMqttClient(1000);
-mqttHelper     myMqttConfig;
+mqttHelper     myMqttHelper;
 
 #define        SPIFFS_MQTT_ID_FILE        String("/itsme")
 #define        SPIFFS_SENSOR_CALIB_FILE   String("/sensor")
@@ -308,7 +308,7 @@ void setup()
    DISPLAY_INIT();   /* init Display */
    WIFI_CONNECT();   /* connect to WiFi */
    OTA_INIT();
-   myMqttConfig.setup(MQTT_MAIN_TOPIC);
+   myMqttHelper.setup(MQTT_MAIN_TOPIC);
    MQTT_CONNECT();   /* connect to MQTT host and build subscriptions, must be called after SPIFFS_INIT()*/
 
    /* enable interrupts on encoder pins to decode gray code and recognize switch event*/
@@ -381,13 +381,13 @@ void SPIFFS_INIT(void)
 
    if (myName != "")
    {
-      myMqttConfig.setName(myName); /* set name from spiffs here, thus setup only needs to set the main topic */
+      myMqttHelper.setName(myName); /* set name from spiffs here, thus setup only needs to set the main topic */
    }
    else
    {
       Serial.println("File " + SPIFFS_MQTT_ID_FILE + " is empty or does not exist, proceed as 'unknown'");
    }
-   Serial.println("My name is: " + myMqttConfig.getName());
+   Serial.println("My name is: " + myMqttHelper.getName());
 
    String sensorCalib = readSpiffs(SPIFFS_SENSOR_CALIB_FILE);
 
@@ -447,13 +447,14 @@ void DISPLAY_INIT(void)
    #ifdef CFG_DEBUG
    Serial.println("Initialize display");
    #endif
-   Wire.begin();   /* needed for I�C communication with display */
+   Wire.begin();   /* needed for I²C communication with display */
    myDisplay.init();
    myDisplay.flipScreenVertically();
    myDisplay.clear();
    myDisplay.setFont(Roboto_Condensed_16);
    myDisplay.setTextAlignment(TEXT_ALIGN_CENTER);
-   myDisplay.drawString(64,22,"Initialization");
+   myDisplay.drawString(64, 22, "Initialize");
+   myDisplay.drawString(64, 44, myMqttHelper.getName());
    myDisplay.display();
 }
 
@@ -493,12 +494,12 @@ void OTA_INIT(void)
    if (systemState_online == mySystemState.getSystemState())
    {
       /* convert string to char* */
-      char *mqttName = new char[myMqttConfig.getName().length() + 1];
-      strcpy(mqttName,myMqttConfig.getName().c_str());
+      char *hostname = new char[myMqttHelper.getLoweredName().length() + 1];
+      strcpy(hostname,myMqttHelper.getLoweredName().c_str());
 
-      ArduinoOTA.setHostname(mqttName);
+      ArduinoOTA.setHostname(hostname);
 
-      delete [] mqttName;
+      delete [] hostname;
 
       ArduinoOTA.onStart([]()
       {
@@ -541,35 +542,42 @@ void MQTT_CONNECT(void)
    {
       boolean ret;
       /* convert name string to char for connect API */
-      char *mqttName = new char[myMqttConfig.getName().length() + 1];
-      strcpy(mqttName,myMqttConfig.getName().c_str());
+      char *mqttClientName = new char[myMqttHelper.getLoweredName().length() + 1];
+      strcpy(mqttClientName,myMqttHelper.getLoweredName().c_str());
 
       /* convert name string to char for setWill API */
-      char *mqttWillTopic = new char[myMqttConfig.getTopicState().length() + 1];
-      strcpy(mqttWillTopic, myMqttConfig.getTopicState().c_str());
+      char *mqttWillTopic = new char[myMqttHelper.getTopicLastWill().length() + 1];
+      strcpy(mqttWillTopic, myMqttHelper.getTopicLastWill().c_str());
 
       /* broker shall publish 'offline' on ungraceful disconnect >> Last Will */
-      myMqttClient.setWill(mqttWillTopic ,"offline", true, 1);
+      myMqttClient.setWill(mqttWillTopic ,"offline", false, 1);
       myMqttClient.begin(mqttHost, mqttPort, myWiFiClient);
       myMqttClient.onMessage(messageReceived);       /* register callback */
-      ret = myMqttClient.connect(mqttName, LOCAL_MQTT_USER, LOCAL_MQTT_PWD);
+      ret = myMqttClient.connect(mqttClientName, LOCAL_MQTT_USER, LOCAL_MQTT_PWD);
 
       /* subscribe some topics */
-      ret = myMqttClient.subscribe(myMqttConfig.getTopicTargetTempCmd());
-      ret = myMqttClient.subscribe(myMqttConfig.getTopicThermostatModeCmd());
-      ret = myMqttClient.subscribe(myMqttConfig.getTopicUpdateFirmware());
-      ret = myMqttClient.subscribe(myMqttConfig.getTopicChangeName());
-      ret = myMqttClient.subscribe(myMqttConfig.getTopicChangeSensorCalib());
-      ret = myMqttClient.subscribe(myMqttConfig.getTopicSystemRestartRequest());
+      ret = myMqttClient.subscribe(myMqttHelper.getTopicTargetTempCmd());
+      ret = myMqttClient.subscribe(myMqttHelper.getTopicThermostatModeCmd());
+      ret = myMqttClient.subscribe(myMqttHelper.getTopicUpdateFirmware());
+      ret = myMqttClient.subscribe(myMqttHelper.getTopicChangeName());
+      ret = myMqttClient.subscribe(myMqttHelper.getTopicChangeSensorCalib());
+      ret = myMqttClient.subscribe(myMqttHelper.getTopicSystemRestartRequest());
 
       /* publish restart = false on connect */
-      myMqttClient.publish(myMqttConfig.getTopicSystemRestartRequest(),"0", true, 1);
+      myMqttClient.publish(myMqttHelper.getTopicSystemRestartRequest(),"0", false, 1);
+      /* publish online in will topic */
+      myMqttClient.publish(myMqttHelper.getTopicLastWill(),"online", false, 1);
 
-      /* publish dicovery message to home assistant */
-      myMqttClient.publish(myMqttConfig.getTopicHassDiscovery(),myMqttConfig.buildHassDiscovery(),false, 1);
+      /* publish discovery messages to home assistant */
+      // myMqttClient.publish(myMqttHelper.getTopicHassDiscovery(),"",false, 1); // remove previous device
+
+      myMqttClient.loop();
+      delay(20); // <- fixes some issues with WiFi stability
+
+      myMqttClient.publish(myMqttHelper.getTopicHassDiscovery(),myMqttHelper.buildHassDiscovery(),false, 1); // add new device
 
       delete [] mqttWillTopic;
-      delete [] mqttName;
+      delete [] mqttClientName;
    }
 }
 
@@ -842,14 +850,15 @@ void MQTT_MAIN(void)
       /* HTTP Update */
       if (FETCH_UPDATE == true)
       {
-         myMqttClient.publish(myMqttConfig.getTopicUpdateFirmwareAccepted(), String(false)); /* publish accepted update with value false to reset the switch in Home Assistant */
+         myMqttClient.publish(myMqttHelper.getTopicUpdateFirmwareAccepted(), String(false), false, 1); /* publish accepted update with value false to reset the switch in Home Assistant */
       }
 
       /* check if there is new data to transmit */
       if (myThermostat.getNewData())
       {
          myThermostat.resetNewData();
-         myMqttClient.publish(myMqttConfig.getTopicData(), myMqttConfig.buildJSON(String(intToFloat(myThermostat.getFilteredTemperature())), String(myThermostat.getFilteredHumidity()), String(boolToStringOnOff(myThermostat.getActualState())), String(intToFloat(myThermostat.getTargetTemperature())), String(myThermostat.getSensorError()), String(boolToStringHeatOff(myThermostat.getThermostatMode())), String(myThermostat.getSensorCalibFactor()), String(myThermostat.getSensorCalibOffset()), WiFi.localIP().toString(), FIRMWARE_VERSION), true, 1);
+         myMqttClient.publish(myMqttHelper.getTopicData(), myMqttHelper.buildStateJSON(String(intToFloat(myThermostat.getFilteredTemperature())), String(myThermostat.getFilteredHumidity()), String(boolToStringOnOff(myThermostat.getActualState())), String(intToFloat(myThermostat.getTargetTemperature())), String(myThermostat.getSensorError()), String(boolToStringHeatOff(myThermostat.getThermostatMode())), String(myThermostat.getSensorCalibFactor()), String(myThermostat.getSensorCalibOffset()), WiFi.localIP().toString(), FIRMWARE_VERSION), false, 1);
+         myMqttClient.publish(myMqttHelper.getTopicLastWill(),"online", false, 1);
       }
 
       myMqttClient.loop();
@@ -893,15 +902,12 @@ void HANDLE_OTA_UPDATE(void)
 
 void SPIFFS_MAIN(void)
 {
-   if (myMqttConfig.getNameChanged())
+   if (myMqttHelper.getNameChanged())
    {
       mySystemState.setSystemRestartRequest(true);
 
-      if (!writeSpiffs(SPIFFS_MQTT_ID_FILE, myMqttConfig.getName()))
+      if (!writeSpiffs(SPIFFS_MQTT_ID_FILE, myMqttHelper.getName()))
       {
-         #ifdef CFG_DEBUG
-         Serial.println("Writing to file: " + SPIFFS_MQTT_ID_FILE + " returned no success");
-         #endif
          /* ToDo: implement retry */
       }
    }
@@ -909,24 +915,11 @@ void SPIFFS_MAIN(void)
    if(myThermostat.getNewCalib())
    {
       mySystemState.setSystemRestartRequest(true);
-
-      if (!writeSpiffs(SPIFFS_SENSOR_CALIB_FILE, String(myThermostat.getSensorCalibOffset()) + ";" + String(myThermostat.getSensorCalibFactor())))
-      {
-         #ifdef CFG_DEBUG
-         Serial.println("Writing to file: " + SPIFFS_SENSOR_CALIB_FILE + " returned no success");
-         #endif
-         /* ToDo: implement retry */
-      }
-
    }
 
    /* avoid extensive writing to SPIFFS, therefore check if the target temperature didn't change for a certain time before writing. */
    if (myThermostat.getTargetTemperature() != SPIFFS_LAST_TARGET_TEMPERATURE)
    {
-      #ifdef CFG_DEBUG
-      Serial.println("Target temperature changed from. " + String(SPIFFS_LAST_TARGET_TEMPERATURE) + " to: " + String(myThermostat.getTargetTemperature()));
-      #endif
-
       SPIFFS_REFERENCE_TIME = millis();
       SPIFFS_LAST_TARGET_TEMPERATURE = myThermostat.getTargetTemperature();
       SPIFFS_WRITTEN = false;
@@ -948,24 +941,12 @@ void SPIFFS_MAIN(void)
             }
             else
             {
-               #ifdef CFG_DEBUG
-               Serial.println("Writing to file: " + SPIFFS_TARGET_TEMP_FILE + " returned no success, retry next loop");
-               #endif
+               /* SPIFFS not written, retry next loop */
             }
-
-            #ifdef CFG_DEBUG
-            Serial.println("New target temperature: " + String(myThermostat.getTargetTemperature()) + " stored in SPIFFS");
-            #endif
          }
          else
          {
             /* debounce SPIFFS write */
-            #ifdef CFG_DEBUG
-            if ( (SPIFFS_REFERENCE_TIME + SPIFFS_WRITE_DEBOUNCE - millis()) % 100 == 0 ) /* modulo 100 to avoid excessive prints while debouncing */
-            {
-               Serial.println("Debouncing at: " + String((SPIFFS_REFERENCE_TIME + SPIFFS_WRITE_DEBOUNCE - millis())));
-            }
-            #endif
          }
       }
    }
@@ -1032,7 +1013,7 @@ void messageReceived(String &topic, String &payload)
    Serial.println("received: " + topic + " : " + payload);
    #endif
 
-   if (topic == myMqttConfig.getTopicSystemRestartRequest())
+   if (topic == myMqttHelper.getTopicSystemRestartRequest())
    {
       #ifdef CFG_DEBUG
       Serial.println("Restart request received with value: " + payload);
@@ -1043,7 +1024,7 @@ void messageReceived(String &topic, String &payload)
    }
 
    /* HTTP Update */
-   if (topic == myMqttConfig.getTopicUpdateFirmware())
+   if (topic == myMqttHelper.getTopicUpdateFirmware())
    {
       if (payload == "true")
       {
@@ -1059,7 +1040,7 @@ void messageReceived(String &topic, String &payload)
    }
    
    /* check incoming target temperature, don't set same target temperature as new*/
-   if (topic == myMqttConfig.getTopicTargetTempCmd())
+   if (topic == myMqttHelper.getTopicTargetTempCmd())
    {
       if (myThermostat.getTargetTemperature() != payload.toFloat())
       {
@@ -1067,7 +1048,7 @@ void messageReceived(String &topic, String &payload)
          myThermostat.setTargetTemperature(floatToInt(payload.toFloat()));
       }
    }
-   if (topic == myMqttConfig.getTopicThermostatModeCmd())
+   if (topic == myMqttHelper.getTopicThermostatModeCmd())
    {
       if (String("heat") == payload)
       {
@@ -1083,21 +1064,21 @@ void messageReceived(String &topic, String &payload)
       }
    }
 
-   if (topic == myMqttConfig.getTopicChangeName())
+   if (topic == myMqttHelper.getTopicChangeName())
    {
       #ifdef CFG_DEBUG
       Serial.println("New name received: " + payload);
       #endif
-      if (payload != myMqttConfig.getName())
+      if (payload != myMqttHelper.getName())
       {
          #ifdef CFG_DEBUG
-         Serial.println("Old name was: " + myMqttConfig.getName());
+         Serial.println("Old name was: " + myMqttHelper.getName());
          #endif
-         myMqttConfig.changeName(payload);
+         myMqttHelper.changeName(payload);
       }
    }
 
-   if(topic == myMqttConfig.getTopicChangeSensorCalib())
+   if(topic == myMqttHelper.getTopicChangeSensorCalib())
    {
       #ifdef CFG_DEBUG
       Serial.println("New sensor calibration parameters received: " + payload);
