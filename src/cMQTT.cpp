@@ -22,7 +22,6 @@ void mqttHelper::init()
    mqttCompBinarySensor    = "binary_sensor/";
    mqttCompSensor          = "sensor/";
    mqttCompSwitch          = "switch/";
-   mqttDiscoveryTrigger    = "homeassistant/discover";
    mqttGeneralBaseTopic    = "";                            // built in buildTopics
 
    nameChanged = false;
@@ -308,7 +307,6 @@ String mqttHelper::getTopicThermostatModeCmd(void)                { return mqttG
 String mqttHelper::getTopicHassDiscoveryClimate(void)             { return mqttGeneralBaseTopic + mqttHassDiscoveryTopic; }
 String mqttHelper::getTopicHassDiscoveryBinarySensor(void)        { return mqttPrefix + mqttCompBinarySensor + loweredMqttNodeId + mqttObjectId + mqttHassDiscoveryTopic; }
 String mqttHelper::getTopicData(void)                             { return mqttGeneralBaseTopic + mqttData; }
-String mqttHelper::getTopicMqttDiscoveryTrigger(void)             { return mqttDiscoveryTrigger; }
 
 String mqttHelper::getTopicHassDiscoverySensor(sensor_t sensor)
 {
