@@ -48,6 +48,9 @@ const char*    mqttHost                = LOCAL_MQTT_HOST;
 const int      mqttPort                = LOCAL_MQTT_PORT;
 unsigned long  mqttReconnectTime       = 0;
 unsigned long  mqttReconnectInterval   = MQTT_RECONNECT_TIME;
+unsigned long  mqttDiscoverTime        = 0;
+unsigned long  mqttDiscoverInterval    = 300000; // 5 mins
+
 /* HTTP Update */
 const    String myUpdateServer = THERMOSTAT_BINARY;
 bool     FETCH_UPDATE          = false;       /* global variable used to decide whether an update shall be fetched from server or not */
@@ -850,8 +853,9 @@ void MQTT_MAIN(void)
          myMqttClient.publish(myMqttHelper.getTopicUpdateFirmwareAccepted(), String(false), false, 1); /* publish accepted update with value false to reset the switch in Home Assistant */
       }
 
-      if (HA_DISCOVER == true)
+      if ( TimeReached(mqttDiscoverTime) || (HA_DISCOVER == true) )
       {
+         SetNextTimeInterval(mqttDiscoverTime, mqttDiscoverInterval);
          homeAssistantDiscovery();
          HA_DISCOVER = false;
       }
