@@ -1041,7 +1041,7 @@ void messageReceived(String &topic, String &payload)
       #ifdef CFG_DEBUG
       Serial.println("Restart request received with value: " + payload);
       #endif
-      if (payload == "1")
+      if ( (payload == "true") || (payload == "1") )
       {
          mySystemState.setSystemRestartRequest(true);
       }
@@ -1056,7 +1056,7 @@ void messageReceived(String &topic, String &payload)
    /* HTTP Update */
    else if (topic == myMqttHelper.getTopicUpdateFirmware())
    {
-      if (payload == "1")
+      if ( (payload == "true") || (payload == "1") )
       {
          #ifdef CFG_DEBUG
          Serial.println("Firmware updated triggered via MQTT");
