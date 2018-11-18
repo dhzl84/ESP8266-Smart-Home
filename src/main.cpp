@@ -542,7 +542,6 @@ void MQTT_CONNECT(void)
 {
    if (systemState_online == mySystemState.getSystemState())
    {
-      boolean ret;
       /* convert name string to char for connect API */
       char *mqttClientName = new char[myMqttHelper.getLoweredName().length() + 1];
       strcpy(mqttClientName,myMqttHelper.getLoweredName().c_str());
@@ -555,15 +554,16 @@ void MQTT_CONNECT(void)
       myMqttClient.setWill(mqttWillTopic ,"offline", false, 1);
       myMqttClient.begin(mqttHost, mqttPort, myWiFiClient);
       myMqttClient.onMessage(messageReceived);       /* register callback */
-      ret = myMqttClient.connect(mqttClientName, LOCAL_MQTT_USER, LOCAL_MQTT_PWD);
+      (void)myMqttClient.connect(mqttClientName, LOCAL_MQTT_USER, LOCAL_MQTT_PWD);
 
       /* subscribe some topics */
-      ret = myMqttClient.subscribe(myMqttHelper.getTopicTargetTempCmd());
-      ret = myMqttClient.subscribe(myMqttHelper.getTopicThermostatModeCmd());
-      ret = myMqttClient.subscribe(myMqttHelper.getTopicUpdateFirmware());
-      ret = myMqttClient.subscribe(myMqttHelper.getTopicChangeName());
-      ret = myMqttClient.subscribe(myMqttHelper.getTopicChangeSensorCalib());
-      ret = myMqttClient.subscribe(myMqttHelper.getTopicSystemRestartRequest());
+      (void)myMqttClient.subscribe(myMqttHelper.getTopicTargetTempCmd());
+      (void)myMqttClient.subscribe(myMqttHelper.getTopicThermostatModeCmd());
+      (void)myMqttClient.subscribe(myMqttHelper.getTopicUpdateFirmware());
+      (void)myMqttClient.subscribe(myMqttHelper.getTopicChangeName());
+      (void)myMqttClient.subscribe(myMqttHelper.getTopicChangeSensorCalib());
+      (void)myMqttClient.subscribe(myMqttHelper.getTopicSystemRestartRequest());
+      (void)myMqttClient.subscribe(myMqttHelper.getTopicMqttDiscoveryTrigger());
       myMqttClient.loop();
 
       homeAssistantDiscovery();
