@@ -34,7 +34,7 @@
 #define SCL_PIN              5 /* I²C */
 #define ENCODER_PIN1        12 /* rotary left/right */
 #define ENCODER_PIN2        13 /* rotary left/right */
-#define ENCODER_SWITCH_PIN  14 /* push button switch */
+#define ENCODER_BUTTON_PIN  14 /* push button switch */
 #define RELAY_PIN           16 /* relay control */
 
 /*===================================================================================================================*/
@@ -50,7 +50,15 @@ unsigned long  mqttReconnectTime       = 0;
 unsigned long  mqttReconnectInterval   = MQTT_RECONNECT_TIME;
 unsigned long  mqttPubCycleTime        = 0;
 unsigned long  mqttPubCycleInterval    = 300000; // call publish at least every 5 minutes
-
+/* loop handler */
+#define loop50ms        50
+#define loop100ms      100
+#define loop500ms      500
+#define loop1000ms    1000
+unsigned long loop50msMillis      = 0;
+unsigned long loop100msMillis     = 22; /* start loops with some offset to avoid calling all loops every second */
+unsigned long loop500msMillis     = 44; /* start loops with some offset to avoid calling all loops every second */
+unsigned long loop1000msMillis    = 66; /* start loops with some offset to avoid calling all loops every second */
 /* HTTP Update */
 const    String myUpdateServer = THERMOSTAT_BINARY;
 bool     FETCH_UPDATE          = false;       /* global variable used to decide whether an update shall be fetched from server or not */
@@ -58,8 +66,10 @@ bool     FETCH_UPDATE          = false;       /* global variable used to decide 
 typedef enum { TH_OTA_IDLE, TH_OTA_ACTIVE, TH_OTA_FINISHED, TH_OTA_ERROR } OtaUpdate_t;       /* global variable used to change display in case OTA update is initiated */
 OtaUpdate_t OTA_UPDATE = TH_OTA_IDLE;
 /* rotary encoder */
-unsigned long  switchDebounceTime       = 0;
-unsigned long  switchDebounceInterval   = 250;
+unsigned long  switchDebounceTime          = 0;
+unsigned long  switchDebounceInterval      = 250;
+unsigned long  switchSystemResetTime       = 0;
+unsigned long  switchSystemResetInterval   = 10000;
 #define rotLeft              -1
 #define rotRight              1
 #define rotInit               0
@@ -95,24 +105,27 @@ int            SPIFFS_LAST_TARGET_TEMPERATURE;
 /*===================================================================================================================*/
 /* function declarations */
 /*===================================================================================================================*/
+/* setup */
 void GPIO_CONFIG(void);
 void SPIFFS_INIT(void);
-void SPIFFS_MAIN(void);
 void DISPLAY_INIT(void);
 void WIFI_CONNECT(void);
+void MQTT_CONNECT(void);
+void OTA_INIT(void);
+/* loop */
 void HANDLE_SYSTEM_STATE(void);
 void SENSOR_MAIN(void);
-LOCAL void sensor_cb(void *arg); /* sensor timer callback */
 void HEATING_CONTROL_MAIN(void);
 void DRAW_DISPLAY_MAIN(void);
-void MQTT_CONNECT(void);
 void MQTT_MAIN(void);
-void messageReceived(String &topic, String &payload); /* MQTT callback */
-void OTA_INIT(void);
-void HANDLE_OTA_UPDATE(void);
+void SPIFFS_MAIN(void);
 void HANDLE_HTTP_UPDATE(void);
+/* callback */
+LOCAL void sensor_cb(void *arg); /* sensor timer callback */
+void messageReceived(String &topic, String &payload); /* MQTT callback */
 void encoderSwitch (void);
 void updateEncoder(void);
+/* others */
 void homeAssistantDiscovery(void);
 void mqttPubState(void);
 
@@ -319,8 +332,9 @@ void setup()
    /* enable interrupts on encoder pins to decode gray code and recognize switch event*/
    attachInterrupt(ENCODER_PIN1, updateEncoder, CHANGE);
    attachInterrupt(ENCODER_PIN2, updateEncoder, CHANGE);
-   attachInterrupt(ENCODER_SWITCH_PIN, encoderSwitch, FALLING);
-
+   attachInterrupt(ENCODER_BUTTON_PIN, encoderSwitch, FALLING);
+   
+   SENSOR_MAIN();    /* acquire first sensor data before staring loop() */
 }
 
 /*===================================================================================================================*/
@@ -443,7 +457,7 @@ void GPIO_CONFIG(void)
    /* initialize encoder pins */
    pinMode(ENCODER_PIN1, INPUT_PULLUP);
    pinMode(ENCODER_PIN2, INPUT_PULLUP);
-   pinMode(ENCODER_SWITCH_PIN, INPUT_PULLUP);
+   pinMode(ENCODER_BUTTON_PIN, INPUT_PULLUP);
 }
 
 /* Display */
@@ -584,16 +598,40 @@ void MQTT_CONNECT(void)
 /*===================================================================================================================*/
 void loop()
 {
-   HANDLE_SYSTEM_STATE(); /*handle system state class and trigger reconnects */
-   SENSOR_MAIN();   /* get sensor data */
-   HEATING_CONTROL_MAIN(); /* control relay for heating */
-   MQTT_MAIN(); /* handle MQTT each loop */
-   DRAW_DISPLAY_MAIN(); /* draw display each loop */
-   HANDLE_HTTP_UPDATE(); /* pull update from server if it was requested via MQTT*/
-   HANDLE_OTA_UPDATE();
-   SPIFFS_MAIN();
+  ArduinoOTA.handle();
+  myMqttClient.loop();
+  delay(20);               /* <- fixes some issues with WiFi stability */
 
-   yield();
+  /* call every 50 ms */
+  if (TimeReached(loop50msMillis))
+  {
+    SetNextTimeInterval(loop50msMillis, loop50ms);
+    /* nothing yet */
+  }
+  /* call every 100 ms */
+  if (TimeReached(loop100msMillis))
+  {
+    SetNextTimeInterval(loop100msMillis, loop100ms);
+    HANDLE_SYSTEM_STATE();   /* handle system state class and trigger reconnects */
+    HEATING_CONTROL_MAIN();  /* control relay for heating */
+    MQTT_MAIN();             /* handle MQTT each loop */
+    DRAW_DISPLAY_MAIN();     /* draw display each loop */
+  }
+  /* call every 500 ms */
+  if (TimeReached(loop500msMillis))
+  {
+    SetNextTimeInterval(loop500msMillis, loop500ms);
+    /* nothing yet */
+  }
+  /* call every second */
+  if (TimeReached(loop1000msMillis))
+  {
+    SetNextTimeInterval(loop1000msMillis, loop1000ms);
+    SENSOR_MAIN();          /* get sensor data */
+    SPIFFS_MAIN();
+    HANDLE_HTTP_UPDATE();   /* pull update from server if it was requested via MQTT*/
+  }
+  yield();
 }
 
 /*===================================================================================================================*/
@@ -634,6 +672,28 @@ void HANDLE_SYSTEM_STATE(void)
          MQTT_CONNECT();
          OTA_INIT();
       }
+   }
+   /* check if rotary encoder button is pushed for 10 seconds to request a reset */
+   if (LOW == digitalRead(ENCODER_BUTTON_PIN))
+   {
+      #ifdef CFG_DEBUG
+      Serial.println("Encoder Button pressed: "+ String(digitalRead(ENCODER_BUTTON_PIN)));
+      Serial.println("Target Time: "+ String(switchSystemResetTime + switchSystemResetInterval));
+      Serial.println("Current time: "+ String(millis()));
+      #endif
+
+      if (switchSystemResetTime + switchSystemResetInterval < millis())
+      {
+         mySystemState.setSystemRestartRequest(true);
+      }
+      else
+      {
+         /* waiting */
+      }
+   }
+   else
+   {
+      switchSystemResetTime = millis();
    }
 }
 
@@ -842,7 +902,7 @@ void MQTT_MAIN(void)
       }
       else
       {
-         SetNextTimeInterval(mqttReconnectTime, mqttReconnectInterval); /* reset interval  if everything is fine */
+         /* do nothing */
       }
 
       /* HTTP Update */
@@ -858,14 +918,11 @@ void MQTT_MAIN(void)
          SetNextTimeInterval(mqttPubCycleTime, mqttPubCycleInterval);
          mqttPubState();
       }
-      else if ( TimeReached(mqttPubCycleTime) )   /* check if data was not published for the PubCycleInterval */
+      else if (TimeReached(mqttPubCycleTime) )   /* check if data was not published for the PubCycleInterval */
       {
          SetNextTimeInterval(mqttPubCycleTime, mqttPubCycleInterval);
          mqttPubState();
       }
-
-      myMqttClient.loop();
-      delay(20); // <- fixes some issues with WiFi stability
    }
 }
 
@@ -892,14 +949,6 @@ void HANDLE_HTTP_UPDATE(void)
              Serial.println("HTTP_UPDATE_OK");
               break;
       }
-   }
-}
-
-void HANDLE_OTA_UPDATE(void)
-{
-   if (systemState_online == mySystemState.getSystemState())
-   {
-      ArduinoOTA.handle();
    }
 }
 
@@ -1027,7 +1076,7 @@ void homeAssistantDiscovery(void)
 
 void mqttPubState(void)
 {
-   myMqttClient.publish(myMqttHelper.getTopicData(), myMqttHelper.buildStateJSON(String(intToFloat(myThermostat.getFilteredTemperature())), String(intToFloat(myThermostat.getFilteredHumidity())), String(boolToStringOnOff(myThermostat.getActualState())), String(intToFloat(myThermostat.getTargetTemperature())), String(myThermostat.getSensorError()), String(boolToStringHeatOff(myThermostat.getThermostatMode())), String(myThermostat.getSensorCalibFactor()), String(intToFloat(myThermostat.getSensorCalibOffset())), WiFi.localIP().toString(), String(FIRMWARE_VERSION)), false, 1);
+   myMqttClient.publish(myMqttHelper.getTopicData(), myMqttHelper.buildStateJSON(String(intToFloat(myThermostat.getFilteredTemperature())), String(intToFloat(myThermostat.getFilteredHumidity())), String(boolToStringOnOff(myThermostat.getActualState())), String(intToFloat(myThermostat.getTargetTemperature())), String(myThermostat.getSensorError()), String(boolToStringHeatOff(myThermostat.getThermostatMode())), String(myThermostat.getSensorCalibFactor()), String(intToFloat(myThermostat.getSensorCalibOffset())), WiFi.localIP().toString(), String(FIRMWARE_VERSION)), true, 1);
 }
 
 void messageReceived(String &topic, String &payload)
@@ -1045,12 +1094,6 @@ void messageReceived(String &topic, String &payload)
       {
          mySystemState.setSystemRestartRequest(true);
       }
-      else
-      {
-         mySystemState.setSystemRestartRequest(false);
-      }
-
-      
    }
 
    /* HTTP Update */
