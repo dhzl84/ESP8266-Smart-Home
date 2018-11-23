@@ -1,5 +1,6 @@
 #include "cMQTT.h"
 
+
 // The Home Asistant discovery topic need to follow a specific format:
 //
 //     <discovery_prefix>/<component>/[<node_id>/]<object_id>/<>
@@ -26,11 +27,9 @@ void mqttHelper::init()
    nameChanged = false;
 }
 
-void mqttHelper::setup(String name)
+void mqttHelper::setup(void)
 {
-   Serial.println("MQTT setup: "+ String(name));
-   setName(name);
-   buildTopics();
+   mqttHelper::buildTopics();
 }
 
 void mqttHelper::buildTopics(void)

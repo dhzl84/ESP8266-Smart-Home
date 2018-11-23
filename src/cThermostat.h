@@ -25,7 +25,7 @@ class Thermostat
     ~Thermostat(void);
     void init(void);
     void setup(unsigned char gpio, unsigned char tarTemp);
-    void loop(void);
+
     // heating
     void setActualState(bool value);
     void setTargetTemperature(int value);
