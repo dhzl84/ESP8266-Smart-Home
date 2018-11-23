@@ -115,7 +115,6 @@ void OTA_INIT(void);
 /* loop */
 void HANDLE_SYSTEM_STATE(void);
 void SENSOR_MAIN(void);
-void HEATING_CONTROL_MAIN(void);
 void DRAW_DISPLAY_MAIN(void);
 void MQTT_MAIN(void);
 void SPIFFS_MAIN(void);
@@ -472,8 +471,9 @@ void DISPLAY_INIT(void)
    myDisplay.clear();
    myDisplay.setFont(Roboto_Condensed_16);
    myDisplay.setTextAlignment(TEXT_ALIGN_CENTER);
-   myDisplay.drawString(64, 11, "Initialize");
-   myDisplay.drawString(64, 33, myMqttHelper.getName());
+   myDisplay.drawString(64, 4, "Initialize");
+   myDisplay.drawString(64, 24, myMqttHelper.getName());
+   myDisplay.drawString(64, 44, FIRMWARE_VERSION);
    myDisplay.display();
 }
 
@@ -613,7 +613,7 @@ void loop()
   {
     SetNextTimeInterval(loop100msMillis, loop100ms);
     HANDLE_SYSTEM_STATE();   /* handle system state class and trigger reconnects */
-    HEATING_CONTROL_MAIN();  /* control relay for heating */
+    myThermostat.loop();     /* control relay for heating */
     MQTT_MAIN();             /* handle MQTT each loop */
     DRAW_DISPLAY_MAIN();     /* draw display each loop */
   }
@@ -758,56 +758,6 @@ void SENSOR_MAIN()
             }
          }
          #endif
-      }
-   }
-}
-
-void HEATING_CONTROL_MAIN(void)
-{
-   if (myThermostat.getSensorError())
-   {
-      /* switch off heating if sensor does not provide values */
-      #ifdef CFG_DEBUG
-      Serial.println("not heating, sensor data invalid");
-      #endif
-      if (myThermostat.getActualState() == TH_HEAT)
-      {
-         myThermostat.setActualState(TH_OFF);
-      }
-   }
-   else /* sensor is healthy */
-   {
-      if (myThermostat.getThermostatMode() == TH_HEAT) /* check if heating is allowed by user */
-      {
-         if (myThermostat.getFilteredTemperature() < myThermostat.getTargetTemperature()) /* check if measured temperature is lower than heating target */
-         {
-            if (myThermostat.getActualState() == TH_OFF) /* switch on heating if target temperature is higher than measured temperature */
-            {
-               #ifdef CFG_DEBUG
-               Serial.println("heating");
-               #endif
-               myThermostat.setActualState(TH_HEAT);
-            }
-         }
-         else if (myThermostat.getFilteredTemperature() > myThermostat.getTargetTemperature()) /* check if measured temperature is higher than heating target */
-         {
-            if (myThermostat.getActualState() == TH_HEAT) /* switch off heating if target temperature is lower than measured temperature */
-            {
-               #ifdef CFG_DEBUG
-               Serial.println("not heating");
-               #endif
-               myThermostat.setActualState(TH_OFF);
-            }
-         }
-         else
-         {
-            /* remain in current heating state if temperatures are equal */
-         }
-      }
-      else
-      {
-         /* disable heating if heating is set to not allowed by user */
-         myThermostat.setActualState(TH_OFF);
       }
    }
 }

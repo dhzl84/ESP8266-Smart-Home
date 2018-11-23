@@ -64,6 +64,57 @@ void Thermostat::setup(unsigned char gpio, unsigned char tarTemp)
    digitalWrite(relayGpio,HIGH); /* switch relay OFF */
 }
 
+void Thermostat::loop(void)
+{
+   if (getSensorError())
+   {
+      /* switch off heating if sensor does not provide values */
+      #ifdef CFG_DEBUG
+      Serial.println("not heating, sensor data invalid");
+      #endif
+      if (getActualState() == TH_HEAT)
+      {
+         setActualState(TH_OFF);
+      }
+   }
+   else /* sensor is healthy */
+   {
+      if (getThermostatMode() == TH_HEAT) /* check if heating is allowed by user */
+      {
+         if (getFilteredTemperature() < getTargetTemperature()) /* check if measured temperature is lower than heating target */
+         {
+            if (getActualState() == TH_OFF) /* switch on heating if target temperature is higher than measured temperature */
+            {
+               #ifdef CFG_DEBUG
+               Serial.println("heating");
+               #endif
+               setActualState(TH_HEAT);
+            }
+         }
+         else if (getFilteredTemperature() > getTargetTemperature()) /* check if measured temperature is higher than heating target */
+         {
+            if (getActualState() == TH_HEAT) /* switch off heating if target temperature is lower than measured temperature */
+            {
+               #ifdef CFG_DEBUG
+               Serial.println("not heating");
+               #endif
+               setActualState(TH_OFF);
+            }
+         }
+         else
+         {
+            /* remain in current heating state if temperatures are equal */
+         }
+      }
+      else
+      {
+         /* disable heating if heating is set to not allowed by user */
+         setActualState(TH_OFF);
+      }
+   }
+}
+
+
 bool Thermostat::getActualState(void)              { return actualState; }
 int  Thermostat::getTargetTemperature(void)        { return targetTemperature; }
 bool Thermostat::getNewData()                      { return newData; }
