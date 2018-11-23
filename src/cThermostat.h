@@ -24,8 +24,8 @@ class Thermostat
     Thermostat(void);
     ~Thermostat(void);
     void init(void);
-    void setup(unsigned char gpio, unsigned char tarTemp);
-
+    void setup(unsigned char gpio, unsigned char tarTemp, int calibFactor, int calibOffset);
+    void loop(void);
     // heating
     void setActualState(bool value);
     void setTargetTemperature(int value);
@@ -45,7 +45,7 @@ class Thermostat
     void setCurrentHumidity(int value);
     void setLastSensorReadFailed(bool value);
     void resetNewCalib();
-    void setSensorCalibData(int offset, int factor, bool calib);
+    void setSensorCalibData(int factor, int offset, bool calib);
     int  getSensorFailureCounter(void);
     int  getCurrentTemperature(void);
     int  getCurrentHumidity(void);

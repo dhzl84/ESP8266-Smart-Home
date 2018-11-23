@@ -46,8 +46,10 @@ void Thermostat::init()
    }
 }
 
-void Thermostat::setup(unsigned char gpio, unsigned char tarTemp)
+void Thermostat::setup(unsigned char gpio, unsigned char tarTemp, int calibFactor, int calibOffset)
 {
+   setSensorCalibData(calibFactor, calibOffset, false);
+
    /* limit target temperature range */
    if (tarTemp < minTargetTemp) {
       targetTemperature = minTargetTemp;
@@ -62,6 +64,56 @@ void Thermostat::setup(unsigned char gpio, unsigned char tarTemp)
    relayGpio          = gpio;    /* assign GPIO */
    pinMode(relayGpio, OUTPUT);   /* configure GPIO */
    digitalWrite(relayGpio,HIGH); /* switch relay OFF */
+}
+
+void Thermostat::loop(void)
+{
+   if (getSensorError())
+   {
+      /* switch off heating if sensor does not provide values */
+      #ifdef CFG_DEBUG
+      Serial.println("not heating, sensor data invalid");
+      #endif
+      if (getActualState() == TH_HEAT)
+      {
+         setActualState(TH_OFF);
+      }
+   }
+   else /* sensor is healthy */
+   {
+      if (getThermostatMode() == TH_HEAT) /* check if heating is allowed by user */
+      {
+         if (getFilteredTemperature() < getTargetTemperature()) /* check if measured temperature is lower than heating target */
+         {
+            if (getActualState() == TH_OFF) /* switch on heating if target temperature is higher than measured temperature */
+            {
+               #ifdef CFG_DEBUG
+               Serial.println("heating");
+               #endif
+               setActualState(TH_HEAT);
+            }
+         }
+         else if (getFilteredTemperature() > getTargetTemperature()) /* check if measured temperature is higher than heating target */
+         {
+            if (getActualState() == TH_HEAT) /* switch off heating if target temperature is lower than measured temperature */
+            {
+               #ifdef CFG_DEBUG
+               Serial.println("not heating");
+               #endif
+               setActualState(TH_OFF);
+            }
+         }
+         else
+         {
+            /* remain in current heating state if temperatures are equal */
+         }
+      }
+      else
+      {
+         /* disable heating if heating is set to not allowed by user */
+         setActualState(TH_OFF);
+      }
+   }
 }
 
 bool Thermostat::getActualState(void)              { return actualState; }
@@ -162,10 +214,10 @@ void Thermostat::toggleThermostatMode()
 
 void Thermostat::setCurrentTemperature(int value)
 {
-   currentTemperature = ((value * tempFactor/100) + tempOffset);
+   currentTemperature = ((int)((float) value * ((float)tempFactor/(float)100)) + tempOffset);
 
    // add new temperature to filter
-   tempValueQueue[tempValueSampleID] = value;
+   tempValueQueue[tempValueSampleID] = currentTemperature;
    tempValueSampleID++;
    if (tempValueSampleID == CFG_MEDIAN_QUEUE_SIZE)
    {
@@ -275,7 +327,7 @@ void Thermostat::setLastSensorReadFailed(bool value)
    }
 }
 
-void Thermostat::setSensorCalibData(int offset, int factor, bool calib)
+void Thermostat::setSensorCalibData(int factor, int offset, bool calib)
 {
    if (tempOffset != offset)
    {
@@ -290,5 +342,4 @@ void Thermostat::setSensorCalibData(int offset, int factor, bool calib)
          newCalib   = calib;
       }
    }
-
 }

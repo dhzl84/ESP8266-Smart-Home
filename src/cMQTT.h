@@ -27,7 +27,7 @@ public:
    mqttHelper(void);
    ~mqttHelper(void);
    void   init(void);
-   void   setup(void);
+   void   setup(String name);
    void   changeName(String value);
    void   setName(String value);
    void   buildTopics(void);
