@@ -64,3 +64,33 @@ void SetNextTimeInterval(unsigned long& timer, const unsigned long step)
   // Try to get in sync again.
   timer = millis() + (step - passed);
 }
+
+/* sensor calibration parameters are received and stored as a string <offset>;<factor> */
+bool splitSensorDataString(String sensorCalib, int *offset, int *factor)
+{
+   bool ret = false;
+   String delimiter = ";";
+   size_t pos = 0;
+
+   pos = (sensorCalib.indexOf(delimiter));
+
+   /* don't accept empty substring or strings without delimiter */
+   if ((pos > 0) && (pos < UINT32_MAX))
+   {
+      ret = true;
+      *offset = (sensorCalib.substring(0, pos)).toInt();
+      *factor = (sensorCalib.substring(pos+1)).toInt();
+   }
+   #ifdef CFG_DEBUG
+   else
+   {
+      Serial.println("Malformed sensor calibration string >> calibration update denied");
+   }
+
+   Serial.println("Delimiter: " + delimiter);
+   Serial.println("Position of delimiter: " + String(pos));
+   Serial.println("Offset: " + String(*offset));
+   Serial.println("Factor: " + String(*factor));
+   #endif
+   return ret;
+}
