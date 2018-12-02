@@ -8,6 +8,7 @@ Basic building blocks and technologies:
 * WiFi 
 * MQTT
 * [Home Assistant](https://home-assistant.io/)
+* c++
 
 SW Built with PlatformIO in Visual Studio Code, some great [Arduino](https://www.arduino.cc) libraries and ESP8266 Arduino
 
@@ -20,6 +21,7 @@ SW Built with PlatformIO in Visual Studio Code, some great [Arduino](https://www
   * DHT sensor library for ESPx
   * ESP8266 and ESP32 Oled Driver for SSD1306 display
   * MQTT
+  * ArduinoJSON
 
 ## 2. General hints
 See [my Home Assistant configuration](https://github.com/dhzl84/Home-Assistant-Configuration) for the usage of this devices.
@@ -28,12 +30,14 @@ Since there is certain information in my software that I do not want everyone to
 
 My *config.h* for building a thermostat SW contains the following information:
 ```c++
-#define WIFI_SSID          "xxx"
-#define WIFI_PWD           "xxx"
-#define LOCAL_MQTT_HOST    "123.456.789.012"
-#define LOCAL_MQTT_USER    "xxx"
-#define LOCAL_MQTT_PWD     "xxx"
-#define THERMOSTAT_BINARY  "http://<domain or ip>/<name>.bin"
+#define WIFI_SSID              "xxx"
+#define WIFI_PWD               "xxx"
+#define LOCAL_MQTT_HOST        "123.456.789.012"
+#define LOCAL_MQTT_PORT        1234
+#define LOCAL_MQTT_USER        "xxx"
+#define LOCAL_MQTT_PWD         "xxx"
+#define THERMOSTAT_BINARY      "http://<domain or ip>/<name>.bin"
+#define SENSOR_UPDATE_INTERVAL 20000
 ```
 
 For Travis CI compatibility there is the *config.sh* script which generates the above mentioned dummy code.
