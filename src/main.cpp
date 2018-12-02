@@ -666,8 +666,16 @@ void SPIFFS_MAIN(void)
 
    if(myThermostat.getNewCalib())
    {
-      /* ToDo: store calib parameters in SPIFF */
-      mySystemState.setSystemRestartRequest(true);
+      myConfig.calibF = myThermostat.getSensorCalibFactor();
+      myConfig.calibO = myThermostat.getSensorCalibOffset();
+      if (saveConfiguration(myConfig))
+      {
+         myThermostat.resetNewCalib();
+      }
+      else
+      {
+         /* write failed, retry next loop */
+      }
    }
 
    /* avoid extensive writing to SPIFFS, therefore check if the target temperature didn't change for a certain time before writing. */
@@ -760,9 +768,9 @@ void ICACHE_RAM_ATTR updateEncoder(void)
    LAST_ENCODED = encoded; /* store this value for next time */
 }
 
+   /* Home Assistant discovery on connect; used to define entities in HA to communicate with*/
 void homeAssistantDiscovery(void)
 {
-   /* Home Assistant discovery on connect */
    myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryClimate(),       myMqttHelper.buildHassDiscoveryClimate(),       true, 1);    // make HA discover the climate component
    myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(),  myMqttHelper.buildHassDiscoveryBinarySensor(),  true, 1);    // make HA discover the binary_sensor for sensor failure
    myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sTemp),   myMqttHelper.buildHassDiscoverySensor(sTemp),   true, 1);    // make HA discover the temperature sensor
@@ -775,6 +783,7 @@ void homeAssistantDiscovery(void)
    myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swUpdate),myMqttHelper.buildHassDiscoverySwitch(swUpdate),true, 1);    // make HA discover the update switch
 }
 
+/* publish state topic in JSON format */
 void mqttPubState(void)
 {
    myMqttClient.publish( \
@@ -795,6 +804,7 @@ void mqttPubState(void)
    );
 }
 
+/* MQTT callback if a message was received */
 void messageReceived(String &topic, String &payload)
 {
    #ifdef CFG_DEBUG
