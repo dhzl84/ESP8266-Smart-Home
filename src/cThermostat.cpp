@@ -46,8 +46,10 @@ void Thermostat::init()
    }
 }
 
-void Thermostat::setup(unsigned char gpio, unsigned char tarTemp)
+void Thermostat::setup(unsigned char gpio, unsigned char tarTemp, int calibFactor, int calibOffset)
 {
+   setSensorCalibData(calibFactor, calibOffset, false);
+
    /* limit target temperature range */
    if (tarTemp < minTargetTemp) {
       targetTemperature = minTargetTemp;
@@ -113,7 +115,6 @@ void Thermostat::loop(void)
       }
    }
 }
-
 
 bool Thermostat::getActualState(void)              { return actualState; }
 int  Thermostat::getTargetTemperature(void)        { return targetTemperature; }
@@ -213,10 +214,10 @@ void Thermostat::toggleThermostatMode()
 
 void Thermostat::setCurrentTemperature(int value)
 {
-   currentTemperature = ((value * tempFactor/100) + tempOffset);
+   currentTemperature = ((int)((float) value * ((float)tempFactor/(float)100)) + tempOffset);
 
    // add new temperature to filter
-   tempValueQueue[tempValueSampleID] = value;
+   tempValueQueue[tempValueSampleID] = currentTemperature;
    tempValueSampleID++;
    if (tempValueSampleID == CFG_MEDIAN_QUEUE_SIZE)
    {
@@ -326,7 +327,7 @@ void Thermostat::setLastSensorReadFailed(bool value)
    }
 }
 
-void Thermostat::setSensorCalibData(int offset, int factor, bool calib)
+void Thermostat::setSensorCalibData(int factor, int offset, bool calib)
 {
    if (tempOffset != offset)
    {
@@ -341,5 +342,4 @@ void Thermostat::setSensorCalibData(int offset, int factor, bool calib)
          newCalib   = calib;
       }
    }
-
 }
