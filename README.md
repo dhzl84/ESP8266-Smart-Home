@@ -14,7 +14,7 @@ SW Built with PlatformIO in Visual Studio Code, some great [Arduino](https://www
 
 [Circuit and PCB](https://github.com/dhzl84/ESP8266_Thermostat_PCB.git) made with [Target 3001](https://ibfriedrich.com/de/index.html)
 
-## 1. Build Status [![Build Status](https://travis-ci.org/dhzl84/ESP8266-Smart-Home.svg?branch=master)](https://travis-ci.org/dhzl84/ESP8266-Smart-Home)
+## 1. Build Status Master: [![Build Status](https://travis-ci.org/dhzl84/ESP8266-Smart-Home.svg?branch=master)](https://travis-ci.org/dhzl84/ESP8266-Smart-Home) Develop: [![Build Status](https://travis-ci.org/dhzl84/ESP8266-Smart-Home.svg?branch=develop)](https://travis-ci.org/dhzl84/ESP8266-Smart-Home)
 * Master branch
 * ESP8266 Arduino 2.4.2
 * custom libraries:
@@ -37,7 +37,9 @@ My *config.h* for building a thermostat SW contains the following information:
 #define LOCAL_MQTT_USER        "xxx"
 #define LOCAL_MQTT_PWD         "xxx"
 #define THERMOSTAT_BINARY      "http://<domain or ip>/<name>.bin"
-#define SENSOR_UPDATE_INTERVAL 20
+#define SENSOR_UPDATE_INTERVAL 20      /* seconds */
+#define THERMOSTAT_HYSTERESIS  2       /* seconds */
+#define WIFI_RECONNECT_TIME    30      /* seconds */
 ```
 
 For Travis CI compatibility there is the *config.sh* script which generates the above mentioned dummy code.
