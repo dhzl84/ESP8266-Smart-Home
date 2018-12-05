@@ -13,7 +13,8 @@ typedef enum {
   sIP,
   sCalibF,
   sCalibO,
-  sFW
+  sFW,
+  sHysteresis
 }sensor_t;
 
 typedef enum {
@@ -41,13 +42,14 @@ public:
    String getTopicLastWill(void);
    String getTopicSystemRestartRequest(void);
    String getTopicChangeSensorCalib(void);
+   String getTopicChangeHysteresis(void);
    String getTopicTargetTempCmd(void);
    String getTopicThermostatModeCmd(void);
    String getTopicHassDiscoveryClimate(void);
    String getTopicHassDiscoveryBinarySensor(void);
    String getTopicHassDiscoverySensor(sensor_t sensor);
    String getTopicHassDiscoverySwitch(switch_t switches);
-   String buildStateJSON(String Temp, String humid, String actState, String tarTemp, String sensError, String thermoMode, String calibF, String calibO, String ip, String firmware);
+   String buildStateJSON(String Temp, String humid, String hysteresis, String actState, String tarTemp, String sensError, String thermoMode, String calibF, String calibO, String ip, String firmware);
    String buildHassDiscoveryClimate(void);
    String buildHassDiscoveryBinarySensor(void);
    String buildHassDiscoverySensor(sensor_t sensor);
@@ -74,6 +76,7 @@ private:
    String mqttGeneralBaseTopic;
    String mqttHassDiscoveryTopic;
    String mqttChangeSensorCalib;
+   String mqttChangeHysteresis;
    String mqttThermostatModeCmd;
    String mqttTargetTempCmd;
 };

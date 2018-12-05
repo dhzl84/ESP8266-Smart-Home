@@ -43,6 +43,7 @@ void mqttHelper::buildTopics(void)
    mqttChangeSensorCalib =       "/changeSensorCalib";
    mqttTargetTempCmd =           "/targetTempCmd";
    mqttThermostatModeCmd =       "/thermostatModeCmd";
+   mqttChangeHysteresis =        "/changeHysteresis";
 //pub
    mqttUpdateFirmwareAccepted =  "/updateFirmwareAccepted";
    mqttWill =                    "/availability";
@@ -50,7 +51,7 @@ void mqttHelper::buildTopics(void)
    mqttData =                    "/state";
 }
 
-String mqttHelper::buildStateJSON(String temp, String humid, String actState, String tarTemp, String sensError, String thermoMode, String calibF, String calibO, String ip, String firmware)
+String mqttHelper::buildStateJSON(String temp, String humid, String hysteresis, String actState, String tarTemp, String sensError, String thermoMode, String calibF, String calibO, String ip, String firmware)
 {
    String JSON = \
    "{\n" \
@@ -61,6 +62,7 @@ String mqttHelper::buildStateJSON(String temp, String humid, String actState, St
    "  \"target_temp\":\"" + tarTemp + "\",\n" \
    "  \"current_temp\":\"" + temp + "\",\n" \
    "  \"humidity\":\"" + humid + "\",\n" \
+   "  \"hysteresis\":\"" + hysteresis + "\",\n" \
    "  \"sens_status\":\"" + sensError + "\",\n" \
    "  \"sens_scale\":\"" + calibF + "\",\n" \
    "  \"sens_offs\":\"" + calibO + "\",\n" \
@@ -216,6 +218,21 @@ String mqttHelper::buildHassDiscoverySensor(sensor_t sensor)
          "}";
       }
       break;
+      case sHysteresis:
+      {
+         JSON = \
+         "{\n" \
+         "  \"~\":\"" + mqttGeneralBaseTopic + "\",\n" \
+         "  \"name\":\"Hysteresis " + mqttNodeId + "\",\n" \
+         "  \"stat_t\":\"~" + mqttData + "\",\n" \
+         "  \"val_tpl\":\"{{value_json.hysteresis}}\",\n" \
+         "  \"unit_of_meas\":\"°C\",\n" \
+         "  \"avty_t\":\"~" + mqttWill + "\",\n" \
+         "  \"pl_avail\":\"online\",\n" \
+         "  \"pl_not_avail\":\"offline\"\n" \
+         "}";
+      }
+      break;
       default:
       break;
    }
@@ -303,6 +320,7 @@ String mqttHelper::getTopicChangeName(void)                       { return mqttG
 String mqttHelper::getTopicLastWill(void)                         { return mqttGeneralBaseTopic + mqttWill; }
 String mqttHelper::getTopicSystemRestartRequest(void)             { return mqttGeneralBaseTopic + mqttSystemRestartRequest; }
 String mqttHelper::getTopicChangeSensorCalib(void)                { return mqttGeneralBaseTopic + mqttChangeSensorCalib; }
+String mqttHelper::getTopicChangeHysteresis(void)                 { return mqttGeneralBaseTopic + mqttChangeHysteresis; }
 String mqttHelper::getTopicTargetTempCmd(void)                    { return mqttGeneralBaseTopic + mqttTargetTempCmd; }
 String mqttHelper::getTopicThermostatModeCmd(void)                { return mqttGeneralBaseTopic + mqttThermostatModeCmd; }
 String mqttHelper::getTopicHassDiscoveryClimate(void)             { return mqttGeneralBaseTopic + mqttHassDiscoveryTopic; }
@@ -332,6 +350,9 @@ String mqttHelper::getTopicHassDiscoverySensor(sensor_t sensor)
       break;
       case sFW:
          topic = mqttPrefix + mqttCompSensor + loweredMqttNodeId + mqttObjectId + "FW" + mqttHassDiscoveryTopic;
+      break;
+      case sHysteresis:
+         topic = mqttPrefix + mqttCompSensor + loweredMqttNodeId + mqttObjectId + "Hysteresis" + mqttHassDiscoveryTopic;
       break;
       default:
       break;
