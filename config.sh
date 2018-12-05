@@ -12,6 +12,7 @@ cat > config.h << EOF
 #define THERMOSTAT_BINARY       "http://<domain or ip>/<name>.bin"
 #define SENSOR_UPDATE_INTERVAL  20
 #define THERMOSTAT_HYSTERESIS   2
+#define WIFI_RECONNECT_TIME     30
 
 #endif /* CONFIG_H_ */
 EOF
