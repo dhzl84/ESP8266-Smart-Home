@@ -16,8 +16,11 @@ void Thermostat::init()
    thermostatMode             = TH_HEAT;
    actualState                = TH_OFF;
    targetTemperature          = 200;      // initial value if setup() is not called; resolution is 0.1 °C
-   newData                    = true;    // flag to indicate new data to be displayed and transmitted vai MQTT
+   newData                    = true;     // flag to indicate new data to be displayed and transmitted vai MQTT
    relayGpio                  = 16;       // relay GPIO if setup() is not called
+   thermostatHysteresis       = 2;        // hysteresis initialized to 0.2 °C
+   thermostatHysteresisHigh   = 1;
+   thermostatHysteresisLow    = 1;
    //sensor
    sensorError                = false;    // filtered sensor error
    currentTemperature         = 0;        // current sensor temperature
@@ -83,7 +86,7 @@ void Thermostat::loop(void)
    {
       if (getThermostatMode() == TH_HEAT) /* check if heating is allowed by user */
       {
-         if (getFilteredTemperature() < getTargetTemperature()) /* check if measured temperature is lower than heating target */
+         if (getFilteredTemperature() < ( getTargetTemperature() - getThermostatHysteresisLow() ) ) /* check if measured temperature is lower than heating target */
          {
             if (getActualState() == TH_OFF) /* switch on heating if target temperature is higher than measured temperature */
             {
@@ -93,7 +96,7 @@ void Thermostat::loop(void)
                setActualState(TH_HEAT);
             }
          }
-         else if (getFilteredTemperature() > getTargetTemperature()) /* check if measured temperature is higher than heating target */
+         else if (getFilteredTemperature() > (getTargetTemperature() + getThermostatHysteresisHigh() ) ) /* check if measured temperature is higher than heating target */
          {
             if (getActualState() == TH_HEAT) /* switch off heating if target temperature is lower than measured temperature */
             {
@@ -120,7 +123,6 @@ bool Thermostat::getActualState(void)              { return actualState; }
 int  Thermostat::getTargetTemperature(void)        { return targetTemperature; }
 bool Thermostat::getNewData()                      { return newData; }
 bool Thermostat::getThermostatMode()               { return thermostatMode; }
-void Thermostat::resetNewCalib()                   { newCalib  = false; }
 int  Thermostat::getSensorFailureCounter(void)     { return sensorFailureCounter; }
 int  Thermostat::getCurrentTemperature(void)       { return currentTemperature; }
 int  Thermostat::getCurrentHumidity(void)          { return currentHumidity; }
@@ -130,7 +132,49 @@ bool Thermostat::getSensorError(void)              { return sensorError; }
 bool Thermostat::getNewCalib(void)                 { return newCalib; }
 int  Thermostat::getSensorCalibOffset(void)        { return tempOffset; }
 int  Thermostat::getSensorCalibFactor(void)        { return tempFactor; }
+int  Thermostat::getThermostatHysteresis(void)     { return thermostatHysteresis; }
+int  Thermostat::getThermostatHysteresisHigh(void) { return thermostatHysteresisHigh; }
+int  Thermostat::getThermostatHysteresisLow(void)  { return thermostatHysteresisLow; }
 
+void Thermostat::setThermostatHysteresis(int hysteresis)
+{ 
+   /*
+   if hysteresis can not be applied symmetrically due to the internal resolution of 0.1 °C, round up (ceil) hysteresis high and round down (floor) hysteresis low
+   example:
+      thermostatHysteresis of 0.5 would need a resultion of 0.05 °C to accomplis +/- 0.25 °C
+   result:
+      hysteresis high will be 0.3
+      hysteresis low will be 0.2
+   */
+   if (hysteresis > maxHysteresis)
+   {
+      hysteresis = maxHysteresis;
+   }
+   if (hysteresis < minHysteresis)
+   {
+      hysteresis = minHysteresis;
+   }
+   if (hysteresis != thermostatHysteresis)
+   {
+      newData = true;
+      thermostatHysteresis = hysteresis;
+
+      if (hysteresis % 2 == 0)
+      {
+         thermostatHysteresisLow  = (hysteresis / 2);
+         thermostatHysteresisHigh = (hysteresis / 2);
+      }
+      else
+      {
+         thermostatHysteresisLow  = ( (int)(floorf( ((float)hysteresis) / 2) ) );
+         thermostatHysteresisHigh = ( (int)(ceilf(  ((float)hysteresis) / 2) ) );
+      }
+   }
+}
+
+
+
+void Thermostat::resetNewCalib()                   { newCalib  = false; }
 void Thermostat::setActualState(bool value)
 {
    if (value != actualState)

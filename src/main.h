@@ -10,6 +10,7 @@ struct configuration
 {
   char    name[64];
   int     tTemp;  /* persistent target temperature */
+  int     tHyst;  /* thermostat hysteresis */
   int     calibF;
   int     calibO;
   char    ssid[64];
@@ -41,7 +42,6 @@ void MQTT_MAIN(void);
 void SPIFFS_MAIN(void);
 void HANDLE_HTTP_UPDATE(void);
 /* callback */
-LOCAL void sensor_cb(void *arg); /* sensor timer callback */
 void messageReceived(String &topic, String &payload); /* MQTT callback */
 void encoderSwitch (void);
 void updateEncoder(void);
@@ -51,7 +51,6 @@ void mqttPubState(void);
 void loadConfiguration(configuration &config);
 bool saveConfiguration(const configuration &config);
 String readSpiffs(String file);
-boolean writeSpiffs(String file, String newFileContent);
 /*===================================================================================================================*/
 /* library functions */
 /*===================================================================================================================*/

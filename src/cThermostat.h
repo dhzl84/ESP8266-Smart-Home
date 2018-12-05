@@ -4,11 +4,19 @@
 #include "Arduino.h"
 
 #ifndef minTargetTemp
-  #define minTargetTemp (unsigned char)150
+  #define minTargetTemp (int)150  // 15.0 °C
 #endif
 
 #ifndef maxTargetTemp
-  #define maxTargetTemp (unsigned char)250
+  #define maxTargetTemp (int)250  // 25.0 °C
+#endif
+
+#ifndef maxHysteresis
+  #define maxHysteresis (int)20   // 2.0 °C
+#endif
+
+#ifndef minHysteresis
+  #define minHysteresis (int)2    // 0.2 °C
 #endif
 
 #ifndef CFG_MEDIAN_QUEUE_SIZE
@@ -44,6 +52,7 @@ class Thermostat
     void setCurrentTemperature(int temperature);
     void setCurrentHumidity(int value);
     void setLastSensorReadFailed(bool value);
+    void setThermostatHysteresis(int hysteresis);
     void resetNewCalib();
     void setSensorCalibData(int factor, int offset, bool calib);
     int  getSensorFailureCounter(void);
@@ -53,6 +62,9 @@ class Thermostat
     int  getFilteredHumidity(void);
     int  getSensorCalibOffset(void);
     int  getSensorCalibFactor(void);
+    int  getThermostatHysteresis(void);
+    int  getThermostatHysteresisHigh(void);
+    int  getThermostatHysteresisLow(void);
     bool getSensorError(void);
     bool getNewCalib();
 
@@ -63,6 +75,9 @@ class Thermostat
     uint8     targetTemperature;
     uint8     relayGpio;
     bool      newData;
+    int       thermostatHysteresis;
+    int       thermostatHysteresisHigh;
+    int       thermostatHysteresisLow;
     // sensor
     int       currentTemperature;
     int       currentHumidity;
