@@ -15,7 +15,7 @@
   "mqttUser":"xxxxxxxxxxxxx",
   "mqttPwd":"xxxxxxxxxxxxx",
   "updServer":"http://192.168.178.12:88/firmware/thermostat/firmware.bin",
-  "sensUpdInterval":"20000",
+  "sensUpdInterval":"20",
   "mqttPubCycleInterval":"5"
 }
 */

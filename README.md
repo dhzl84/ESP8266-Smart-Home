@@ -37,7 +37,7 @@ My *config.h* for building a thermostat SW contains the following information:
 #define LOCAL_MQTT_USER        "xxx"
 #define LOCAL_MQTT_PWD         "xxx"
 #define THERMOSTAT_BINARY      "http://<domain or ip>/<name>.bin"
-#define SENSOR_UPDATE_INTERVAL 20000
+#define SENSOR_UPDATE_INTERVAL 20
 ```
 
 For Travis CI compatibility there is the *config.sh* script which generates the above mentioned dummy code.
