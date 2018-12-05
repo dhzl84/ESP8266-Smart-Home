@@ -11,6 +11,7 @@ cat > config.h << EOF
 #define LOCAL_MQTT_PWD          "xxx"
 #define THERMOSTAT_BINARY       "http://<domain or ip>/<name>.bin"
 #define SENSOR_UPDATE_INTERVAL  20000
+#define THERMOSTAT_HYSTERESIS   2
 
 #endif /* CONFIG_H_ */
 EOF
