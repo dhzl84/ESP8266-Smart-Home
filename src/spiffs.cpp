@@ -63,6 +63,12 @@ void loadConfiguration(configuration &config)
    strlcpy(config.updServer,     root["updServer"]             | THERMOSTAT_BINARY, sizeof(config.updServer));
    config.sensUpdInterval =      root["sensUpdInterval"]       | SENSOR_UPDATE_INTERVAL;
    config.mqttPubCycleInterval = root["mqttPubCycleInterval"]  | 5;
+
+   /* sensUpdInterval is now seconds instead of millisesconds, these line are only here for migration */
+   if (config.sensUpdInterval == 20000)
+   {
+      config.sensUpdInterval = SENSOR_UPDATE_INTERVAL;
+   }
 }
 
 // Saves the configuration to a file

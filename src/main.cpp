@@ -12,7 +12,9 @@
   #define LOCAL_MQTT_PORT             1234
   #define LOCAL_MQTT_HOST             "123.456.789.012"
   #define THERMOSTAT_BINARY           "http://<domain or ip>/<name>.bin"
-  #define SENSOR_UPDATE_INTERVAL      20
+  #define SENSOR_UPDATE_INTERVAL      20      // seconds
+  #define THERMOSTAT_HYSTERESIS       2       // seconds 
+  #define WIFI_RECONNECT_TIME         30      // seconds
 */
 
 #include "version.h"
