@@ -19,21 +19,24 @@
 
 #include "version.h"
 #include "main.h"
-#include <ESP8266WiFi.h>
-#include <DHTesp.h>
 #include "cThermostat.h"
+#include "cMQTT.h"
+#include <ESP8266WiFi.h>
+#include "ESP8266WebServer.h"
+#include <ESP8266mDNS.h>
+#include <DHTesp.h>
 #include <osapi.h>   /* for sensor timer */
 #include <os_type.h> /* for sensor timer */
 #include "UserFonts.h"
 #include <SSD1306.h>
 #include "MQTTClient.h"
-#include "cMQTT.h"
 #include <ESP8266httpUpdate.h>
 #include <ArduinoOTA.h>
 
 /*===================================================================================================================*/
 /* GPIO config */
 /*===================================================================================================================*/
+ADC_MODE(ADC_VCC);             /* measure Vcc */
 #define DHT_PIN              2 /* sensor */
 #define SDA_PIN              4 /* I²C */
 #define SCL_PIN              5 /* I²C */
@@ -87,12 +90,13 @@ unsigned long readSensorScheduled = 0;
 #define drawTargetTempYOffset 0
 #define drawHeating drawXbm(0,drawTempYOffset,myThermo_width,myThermo_height,myThermo)
 /* classes */
-DHTesp         myDHT;
-SSD1306        myDisplay(0x3c,SDA_PIN,SCL_PIN);
-WiFiClient     myWiFiClient;
-Thermostat     myThermostat;
-MQTTClient     myMqttClient(1024);
-mqttHelper     myMqttHelper;
+DHTesp            myDHT;
+SSD1306           myDisplay(0x3c,SDA_PIN,SCL_PIN);
+WiFiClient        myWiFiClient;
+Thermostat        myThermostat;
+MQTTClient        myMqttClient(1024);
+mqttHelper        myMqttHelper;
+ESP8266WebServer  webServer(80);
 
 bool           SYSTEM_RESTART_REQUEST = false;
 unsigned long  wifiReconnectTimer = 30000;
@@ -103,6 +107,8 @@ unsigned long  wifiReconnectTimer = 30000;
 #define        SPIFFS_WRITE_DEBOUNCE      20000 /* write target temperature to spiffs if it wasn't changed for 20 s (time in ms) */
 boolean        SPIFFS_WRITTEN =           true;
 unsigned long  SPIFFS_REFERENCE_TIME;
+
+
 
 /*===================================================================================================================*/
 /* The setup function is called once at startup of the sketch */
@@ -124,6 +130,13 @@ void setup()
    OTA_INIT();
    myMqttHelper.setup(String(myConfig.name));
    MQTT_CONNECT();   /* connect to MQTT host and build subscriptions, must be called after SPIFFS_INIT()*/
+   
+   if (MDNS.begin(myConfig.name))
+   {
+      Serial.println("MDNS responder started for: " + String(myConfig.name));
+   }
+   webServer.begin();
+   webServer.on("/", handleWebServerClient);
 
    /* enable interrupts on encoder pins to decode gray code and recognize switch event*/
    attachInterrupt(ENCODER_PIN1, updateEncoder, CHANGE);
@@ -131,6 +144,15 @@ void setup()
    attachInterrupt(ENCODER_BUTTON_PIN, encoderSwitch, FALLING);
    
    SENSOR_MAIN();    /* acquire first sensor data before staring loop() */
+
+   #ifdef CFG_DEBUG
+   Serial.println("Reset Reason: "+ String(ESP.getResetReason()));
+   Serial.println("Flash Size: "+ String(ESP.getFlashChipRealSize()));
+   Serial.println("Sketch Size: "+ String(ESP.getSketchSize()));
+   Serial.println("Free for Sketch: "+ String(ESP.getFreeSketchSpace()));
+   Serial.println("Free Heap: "+ String(ESP.getFreeHeap()));
+   Serial.println("Vcc: "+ String(ESP.getVcc()/1000.0));
+   #endif
 }
 
 /*===================================================================================================================*/
@@ -192,7 +214,7 @@ void SPIFFS_INIT(void)
 
    loadConfiguration(myConfig); // load config
 
-   /* code for SPIFFS migraions from several files to one JSON file */
+   /* code for SPIFFS migration from several files to one JSON file */
    if (SPIFFS.exists(SPIFFS_MQTT_ID_FILE))  // first time with new config
    {
       String myName = readSpiffs(SPIFFS_MQTT_ID_FILE);
@@ -254,10 +276,6 @@ void WIFI_CONNECT(void)
 
       WiFi.mode(WIFI_STA);
       WiFi.begin(myConfig.ssid, myConfig.wifiPwd);
-
-      #ifdef CFG_DEBUG
-      Serial.println("WiFi Status: "+ String(WiFi.begin(myConfig.ssid, myConfig.wifiPwd)));
-      #endif
    }
 
    /* try to connect to WiFi, proceed offline if not connecting here*/
@@ -267,6 +285,10 @@ void WIFI_CONNECT(void)
      return;
    }
 
+   #ifdef CFG_DEBUG
+   Serial.println("WiFi Status: "+ String(WiFi.status()));
+   #endif
+
    Serial.print("IP address: ");
    Serial.println(WiFi.localIP());
 
@@ -275,49 +297,47 @@ void WIFI_CONNECT(void)
 /* OTA */
 void OTA_INIT(void)
 {
-   if (WiFi.status() == WL_CONNECTED)
+   ArduinoOTA.setHostname((myMqttHelper.getLoweredName()).c_str());
+
+   ArduinoOTA.onStart([]()
    {
-      ArduinoOTA.setHostname((myMqttHelper.getLoweredName()).c_str());
+      OTA_UPDATE = TH_OTA_ACTIVE;
+      DRAW_DISPLAY_MAIN();
+      Serial.println("Start");
+   });
 
-      ArduinoOTA.onStart([]()
-      {
-         OTA_UPDATE = TH_OTA_ACTIVE;
-         DRAW_DISPLAY_MAIN();
-         Serial.println("Start");
-      });
+   ArduinoOTA.onEnd([]()
+   {
+      OTA_UPDATE = TH_OTA_FINISHED;
+      DRAW_DISPLAY_MAIN();
+      Serial.println("\nEnd");
+   });
 
-      ArduinoOTA.onEnd([]()
-      {
-         OTA_UPDATE = TH_OTA_FINISHED;
-         DRAW_DISPLAY_MAIN();
-         Serial.println("\nEnd");
-      });
+   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total)
+   {
+      Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+   });
 
-      ArduinoOTA.onProgress([](unsigned int progress, unsigned int total)
-      {
-         Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-      });
-
-      ArduinoOTA.onError([](ota_error_t error)
-      {
-         OTA_UPDATE = TH_OTA_ERROR;
-         DRAW_DISPLAY_MAIN();
-         Serial.printf("Error[%u]: ", error);
-         if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-         else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-         else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-         else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-         else if (error == OTA_END_ERROR) Serial.println("End Failed");
-         SYSTEM_RESTART_REQUEST = true;
-      });
-      ArduinoOTA.begin();
-   }
+   ArduinoOTA.onError([](ota_error_t error)
+   {
+      OTA_UPDATE = TH_OTA_ERROR;
+      DRAW_DISPLAY_MAIN();
+      Serial.printf("Error[%u]: ", error);
+      if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+      else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+      else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+      else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+      else if (error == OTA_END_ERROR) Serial.println("End Failed");
+      SYSTEM_RESTART_REQUEST = true;
+   });
+   ArduinoOTA.begin();
 }
 
 void MQTT_CONNECT(void)
 {
    if (WiFi.status() == WL_CONNECTED)
    {
+      myMqttClient.disconnect();
       /* broker shall publish 'offline' on ungraceful disconnect >> Last Will */
       myMqttClient.setWill((myMqttHelper.getTopicLastWill()).c_str() ,"offline", false, 1);
       myMqttClient.begin(myConfig.mqttHost, myConfig.mqttPort, myWiFiClient);
@@ -350,6 +370,7 @@ void loop()
   ArduinoOTA.handle();
   myMqttClient.loop();
   delay(20);               /* <- fixes some issues with WiFi stability */
+  webServer.handleClient();
 
   /* call every 50 ms */
   if (TimeReached(loop50msMillis))
@@ -408,8 +429,6 @@ void HANDLE_SYSTEM_STATE(void)
          #endif
          /* try to come online, debounced to avoid reconnect each loop*/
          WIFI_CONNECT();
-         MQTT_CONNECT();
-         OTA_INIT();
       }
    }
    /* check if rotary encoder button is pushed for 10 seconds to request a reset */
@@ -789,6 +808,20 @@ void mqttPubState(void)
          String(FIRMWARE_VERSION) ), \
       true, /* retain */ \
       1 /* QoS */\
+   );
+}
+
+void handleWebServerClient(void)
+{
+   webServer.send(200, "text/plain", \
+      "Reset Reason: "+ String(ESP.getResetReason()) + "\n" \
+      "Flash Size: "+ String(ESP.getFlashChipRealSize()) + "\n" \
+      "Sketch Size: "+ String(ESP.getSketchSize()) + "\n" \
+      "Free for Sketch: "+ String(ESP.getFreeSketchSpace()) + "\n" \
+      "Free Heap: "+ String(ESP.getFreeHeap()) + "\n" \
+      "Vcc: "+ String(ESP.getVcc()/1000.0) + "\n" \
+      "WiFi Status: " + String(WiFi.status()) + "\n" \
+      "MQTT Status: " + String(myMqttClient.connected()) \
    );
 }
 
