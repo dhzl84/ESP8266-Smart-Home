@@ -49,9 +49,10 @@ void Thermostat::init()
    }
 }
 
-void Thermostat::setup(unsigned char gpio, unsigned char tarTemp, int calibFactor, int calibOffset)
+void Thermostat::setup(unsigned char gpio, unsigned char tarTemp, int calibFactor, int calibOffset, int tHyst)
 {
    setSensorCalibData(calibFactor, calibOffset, false);
+   setThermostatHysteresis(tHyst);
 
    /* limit target temperature range */
    if (tarTemp < minTargetTemp) {
@@ -86,7 +87,7 @@ void Thermostat::loop(void)
    {
       if (getThermostatMode() == TH_HEAT) /* check if heating is allowed by user */
       {
-         if (getFilteredTemperature() < ( getTargetTemperature() - getThermostatHysteresisLow() ) ) /* check if measured temperature is lower than heating target */
+         if (getFilteredTemperature() <= ( getTargetTemperature() - getThermostatHysteresisLow() ) ) /* check if measured temperature is lower than heating target */
          {
             if (getActualState() == TH_OFF) /* switch on heating if target temperature is higher than measured temperature */
             {
@@ -96,7 +97,7 @@ void Thermostat::loop(void)
                setActualState(TH_HEAT);
             }
          }
-         else if (getFilteredTemperature() > (getTargetTemperature() + getThermostatHysteresisHigh() ) ) /* check if measured temperature is higher than heating target */
+         else if (getFilteredTemperature() >= (getTargetTemperature() + getThermostatHysteresisHigh() ) ) /* check if measured temperature is higher than heating target */
          {
             if (getActualState() == TH_HEAT) /* switch off heating if target temperature is lower than measured temperature */
             {

@@ -14,8 +14,14 @@ typedef enum {
   sCalibF,
   sCalibO,
   sFW,
-  sHysteresis
+  sHysteresis,
+  sState
 }sensor_t;
+
+typedef enum {
+  bsSensFail,
+  bsState
+}binarySensor_t;
 
 typedef enum {
   swReset,
@@ -46,12 +52,12 @@ public:
    String getTopicTargetTempCmd(void);
    String getTopicThermostatModeCmd(void);
    String getTopicHassDiscoveryClimate(void);
-   String getTopicHassDiscoveryBinarySensor(void);
+   String getTopicHassDiscoveryBinarySensor(binarySensor_t binarySensor);
    String getTopicHassDiscoverySensor(sensor_t sensor);
    String getTopicHassDiscoverySwitch(switch_t switches);
    String buildStateJSON(String Temp, String humid, String hysteresis, String actState, String tarTemp, String sensError, String thermoMode, String calibF, String calibO, String ip, String firmware);
    String buildHassDiscoveryClimate(void);
-   String buildHassDiscoveryBinarySensor(void);
+   String buildHassDiscoveryBinarySensor(binarySensor_t binarySensor);
    String buildHassDiscoverySensor(sensor_t sensor);
    String buildHassDiscoverySwitch(switch_t switches);
    String getTopicData(void);

@@ -42,6 +42,7 @@ void MQTT_MAIN(void);
 void SPIFFS_MAIN(void);
 void HANDLE_HTTP_UPDATE(void);
 /* callback */
+void handleWebServerClient(void);
 void messageReceived(String &topic, String &payload); /* MQTT callback */
 void encoderSwitch (void);
 void updateEncoder(void);

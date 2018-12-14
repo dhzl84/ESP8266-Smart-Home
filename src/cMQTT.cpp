@@ -28,7 +28,9 @@ void mqttHelper::init()
 
 void mqttHelper::setup(String name)
 {
+   #if CFG_DEBUG
    Serial.println("MQTT setup: "+ name);
+   #endif
    setName(name);
    buildTopics();
 }
@@ -103,22 +105,47 @@ String mqttHelper::buildHassDiscoveryClimate(void)
    return (JSON);
 }
 
-String mqttHelper::buildHassDiscoveryBinarySensor(void)
+String mqttHelper::buildHassDiscoveryBinarySensor(binarySensor_t binarySensor)
 {
-   String JSON = \
-   "{\n" \
-   "  \"~\":\"" + mqttGeneralBaseTopic + "\",\n" \
-   "  \"name\":\"Sensorfehler " + mqttNodeId + "\",\n" \
-   "  \"dev_cla\":\"problem\",\n" \
-   "  \"stat_t\":\"~" + mqttData + "\",\n" \
-   "  \"val_tpl\":\"{{value_json.sens_status}}\",\n" \
-   "  \"pl_on\":\"1\",\n" \
-   "  \"pl_off\":\"0\",\n" \
-   "  \"avty_t\":\"~" + mqttWill + "\",\n" \
-   "  \"pl_avail\":\"online\",\n" \
-   "  \"pl_not_avail\":\"offline\"\n" \
-   "}";
+   String JSON;
+   switch (binarySensor)
+   {
+      case bsSensFail:
+      {
+         JSON = \
+         "{\n" \
+         "  \"~\":\"" + mqttGeneralBaseTopic + "\",\n" \
+         "  \"name\":\"Sensorfehler " + mqttNodeId + "\",\n" \
+         "  \"dev_cla\":\"problem\",\n" \
+         "  \"stat_t\":\"~" + mqttData + "\",\n" \
+         "  \"val_tpl\":\"{{value_json.sens_status}}\",\n" \
+         "  \"pl_on\":\"1\",\n" \
+         "  \"pl_off\":\"0\",\n" \
+         "  \"avty_t\":\"~" + mqttWill + "\",\n" \
+         "  \"pl_avail\":\"online\",\n" \
+         "  \"pl_not_avail\":\"offline\"\n" \
+         "}";
+      }
+      break;
 
+      case bsState:
+      {
+         JSON = \
+         "{\n" \
+         "  \"~\":\"" + mqttGeneralBaseTopic + "\",\n" \
+         "  \"name\":\"State " + mqttNodeId + "\",\n" \
+         "  \"dev_cla\":\"heat\",\n" \
+         "  \"stat_t\":\"~" + mqttData + "\",\n" \
+         "  \"val_tpl\":\"{{value_json.state}}\",\n" \
+         "  \"pl_on\":\"on\",\n" \
+         "  \"pl_off\":\"off\",\n" \
+         "  \"avty_t\":\"~" + mqttWill + "\",\n" \
+         "  \"pl_avail\":\"online\",\n" \
+         "  \"pl_not_avail\":\"offline\"\n" \
+         "}";
+      }
+      break;
+   }
    return (JSON);
 }
 
@@ -324,8 +351,28 @@ String mqttHelper::getTopicChangeHysteresis(void)                 { return mqttG
 String mqttHelper::getTopicTargetTempCmd(void)                    { return mqttGeneralBaseTopic + mqttTargetTempCmd; }
 String mqttHelper::getTopicThermostatModeCmd(void)                { return mqttGeneralBaseTopic + mqttThermostatModeCmd; }
 String mqttHelper::getTopicHassDiscoveryClimate(void)             { return mqttGeneralBaseTopic + mqttHassDiscoveryTopic; }
-String mqttHelper::getTopicHassDiscoveryBinarySensor(void)        { return mqttPrefix + mqttCompBinarySensor + loweredMqttNodeId + mqttObjectId + mqttHassDiscoveryTopic; }
 String mqttHelper::getTopicData(void)                             { return mqttGeneralBaseTopic + mqttData; }
+
+String mqttHelper::getTopicHassDiscoveryBinarySensor(binarySensor_t binarySensor)
+{
+   String topic = "void";
+
+   switch (binarySensor)
+   {
+      case bsSensFail:
+      {
+         topic = mqttPrefix + mqttCompBinarySensor + loweredMqttNodeId + mqttObjectId + "SensFail" + mqttHassDiscoveryTopic;
+      }
+      break;
+
+      case bsState:
+      {
+         topic = mqttPrefix + mqttCompBinarySensor + loweredMqttNodeId + mqttObjectId + "State" + mqttHassDiscoveryTopic;
+      }
+      break;
+   }
+   return (topic);
+}
 
 String mqttHelper::getTopicHassDiscoverySensor(sensor_t sensor)
 {

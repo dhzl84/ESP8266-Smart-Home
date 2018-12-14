@@ -38,7 +38,7 @@ My *config.h* for building a thermostat SW contains the following information:
 #define LOCAL_MQTT_PWD         "xxx"
 #define THERMOSTAT_BINARY      "http://<domain or ip>/<name>.bin"
 #define SENSOR_UPDATE_INTERVAL 20      /* seconds */
-#define THERMOSTAT_HYSTERESIS  2       /* seconds */
+#define THERMOSTAT_HYSTERESIS  2       /* 0.2 °C */
 #define WIFI_RECONNECT_TIME    30      /* seconds */
 ```
 

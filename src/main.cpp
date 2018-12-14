@@ -19,21 +19,24 @@
 
 #include "version.h"
 #include "main.h"
-#include <ESP8266WiFi.h>
-#include <DHTesp.h>
 #include "cThermostat.h"
+#include "cMQTT.h"
+#include <ESP8266WiFi.h>
+#include "ESP8266WebServer.h"
+#include <ESP8266mDNS.h>
+#include <DHTesp.h>
 #include <osapi.h>   /* for sensor timer */
 #include <os_type.h> /* for sensor timer */
 #include "UserFonts.h"
 #include <SSD1306.h>
 #include "MQTTClient.h"
-#include "cMQTT.h"
 #include <ESP8266httpUpdate.h>
 #include <ArduinoOTA.h>
 
 /*===================================================================================================================*/
 /* GPIO config */
 /*===================================================================================================================*/
+ADC_MODE(ADC_VCC);             /* measure Vcc */
 #define DHT_PIN              2 /* sensor */
 #define SDA_PIN              4 /* I²C */
 #define SCL_PIN              5 /* I²C */
@@ -87,12 +90,13 @@ unsigned long readSensorScheduled = 0;
 #define drawTargetTempYOffset 0
 #define drawHeating drawXbm(0,drawTempYOffset,myThermo_width,myThermo_height,myThermo)
 /* classes */
-DHTesp         myDHT;
-SSD1306        myDisplay(0x3c,SDA_PIN,SCL_PIN);
-WiFiClient     myWiFiClient;
-Thermostat     myThermostat;
-MQTTClient     myMqttClient(1024);
-mqttHelper     myMqttHelper;
+DHTesp            myDHT;
+SSD1306           myDisplay(0x3c,SDA_PIN,SCL_PIN);
+WiFiClient        myWiFiClient;
+Thermostat        myThermostat;
+MQTTClient        myMqttClient(1024);
+mqttHelper        myMqttHelper;
+ESP8266WebServer  webServer(80);
 
 bool           SYSTEM_RESTART_REQUEST = false;
 unsigned long  wifiReconnectTimer = 30000;
@@ -104,26 +108,36 @@ unsigned long  wifiReconnectTimer = 30000;
 boolean        SPIFFS_WRITTEN =           true;
 unsigned long  SPIFFS_REFERENCE_TIME;
 
+
+
 /*===================================================================================================================*/
 /* The setup function is called once at startup of the sketch */
 /*===================================================================================================================*/
 void setup()
 {
    Serial.begin(115200);
-   delay(1000);
    #ifdef CFG_DEBUG
    Serial.println("Serial connection established");
    #endif
 
    SPIFFS_INIT();   /* read stuff from SPIFFS */
    GPIO_CONFIG();    /* configure GPIOs */
-   myThermostat.setup(RELAY_PIN, myConfig.tTemp, myConfig.calibF, myConfig.calibO); /*GPIO to switch connected relay and initial target temperature */
+   myThermostat.setup(RELAY_PIN, myConfig.tTemp, myConfig.calibF, myConfig.calibO, myConfig.tHyst); /*GPIO to switch connected relay and initial target temperature */
    myDHT.setup(DHT_PIN, DHTesp::DHT22);    /* init DHT sensor */
    DISPLAY_INIT();   /* init Display */
    WIFI_CONNECT();   /* connect to WiFi */
    OTA_INIT();
    myMqttHelper.setup(String(myConfig.name));
    MQTT_CONNECT();   /* connect to MQTT host and build subscriptions, must be called after SPIFFS_INIT()*/
+   
+   if (MDNS.begin(myConfig.name))
+   {
+      #ifdef CFG_DEBUG
+      Serial.println("MDNS responder started for: " + String(myConfig.name));
+      #endif
+   }
+   webServer.begin();
+   webServer.on("/", handleWebServerClient);
 
    /* enable interrupts on encoder pins to decode gray code and recognize switch event*/
    attachInterrupt(ENCODER_PIN1, updateEncoder, CHANGE);
@@ -131,6 +145,18 @@ void setup()
    attachInterrupt(ENCODER_BUTTON_PIN, encoderSwitch, FALLING);
    
    SENSOR_MAIN();    /* acquire first sensor data before staring loop() */
+
+   Serial.println("Reset Reason: "+ String(ESP.getResetReason()));
+   Serial.println("Flash Size: "+ String(ESP.getFlashChipRealSize()));
+   Serial.println("Sketch Size: "+ String(ESP.getSketchSize()));
+   Serial.println("Free for Sketch: "+ String(ESP.getFreeSketchSpace()));
+   Serial.println("Free Heap: "+ String(ESP.getFreeHeap()));
+   Serial.println("Vcc: "+ String(ESP.getVcc()/1000.0));
+
+   #ifndef CFG_DEBUG
+   delay(1000);
+   Serial.end();
+   #endif
 }
 
 /*===================================================================================================================*/
@@ -192,7 +218,7 @@ void SPIFFS_INIT(void)
 
    loadConfiguration(myConfig); // load config
 
-   /* code for SPIFFS migraions from several files to one JSON file */
+   /* code for SPIFFS migration from several files to one JSON file */
    if (SPIFFS.exists(SPIFFS_MQTT_ID_FILE))  // first time with new config
    {
       String myName = readSpiffs(SPIFFS_MQTT_ID_FILE);
@@ -255,90 +281,89 @@ void WIFI_CONNECT(void)
       WiFi.mode(WIFI_STA);
       WiFi.begin(myConfig.ssid, myConfig.wifiPwd);
 
-      #ifdef CFG_DEBUG
-      Serial.println("WiFi Status: "+ String(WiFi.begin(myConfig.ssid, myConfig.wifiPwd)));
-      #endif
+      /* try to connect to WiFi, proceed offline if not connecting here*/
+      if (WiFi.waitForConnectResult() != WL_CONNECTED)
+      {
+         Serial.println("Failed to connect to WiFi, continue offline");
+      }
    }
 
-   /* try to connect to WiFi, proceed offline if not connecting here*/
-   if (WiFi.waitForConnectResult() != WL_CONNECTED)
-   {
-     Serial.println("Failed to connect to WiFi, continue offline");
-     return;
-   }
+   #ifdef CFG_DEBUG
+   Serial.println("WiFi Status: "+ String(WiFi.status()));
+   #endif
 
    Serial.print("IP address: ");
    Serial.println(WiFi.localIP());
-
 }
 
 /* OTA */
 void OTA_INIT(void)
 {
-   if (WiFi.status() == WL_CONNECTED)
+   ArduinoOTA.setHostname((myMqttHelper.getLoweredName()).c_str());
+
+   ArduinoOTA.onStart([]()
    {
-      ArduinoOTA.setHostname((myMqttHelper.getLoweredName()).c_str());
+      myMqttClient.disconnect();
+      OTA_UPDATE = TH_OTA_ACTIVE;
+      DRAW_DISPLAY_MAIN();
+      Serial.println("Start");
+   });
 
-      ArduinoOTA.onStart([]()
-      {
-         OTA_UPDATE = TH_OTA_ACTIVE;
-         DRAW_DISPLAY_MAIN();
-         Serial.println("Start");
-      });
+   ArduinoOTA.onEnd([]()
+   {
+      OTA_UPDATE = TH_OTA_FINISHED;
+      DRAW_DISPLAY_MAIN();
+      Serial.println("\nEnd");
+   });
 
-      ArduinoOTA.onEnd([]()
-      {
-         OTA_UPDATE = TH_OTA_FINISHED;
-         DRAW_DISPLAY_MAIN();
-         Serial.println("\nEnd");
-      });
+   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total)
+   {
+      Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+   });
 
-      ArduinoOTA.onProgress([](unsigned int progress, unsigned int total)
-      {
-         Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-      });
-
-      ArduinoOTA.onError([](ota_error_t error)
-      {
-         OTA_UPDATE = TH_OTA_ERROR;
-         DRAW_DISPLAY_MAIN();
-         Serial.printf("Error[%u]: ", error);
-         if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-         else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-         else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-         else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-         else if (error == OTA_END_ERROR) Serial.println("End Failed");
-         SYSTEM_RESTART_REQUEST = true;
-      });
-      ArduinoOTA.begin();
-   }
+   ArduinoOTA.onError([](ota_error_t error)
+   {
+      OTA_UPDATE = TH_OTA_ERROR;
+      DRAW_DISPLAY_MAIN();
+      Serial.printf("Error[%u]: ", error);
+      if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+      else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+      else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+      else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+      else if (error == OTA_END_ERROR) Serial.println("End Failed");
+      SYSTEM_RESTART_REQUEST = true;
+   });
+   ArduinoOTA.begin();
 }
 
 void MQTT_CONNECT(void)
 {
    if (WiFi.status() == WL_CONNECTED)
    {
-      /* broker shall publish 'offline' on ungraceful disconnect >> Last Will */
-      myMqttClient.setWill((myMqttHelper.getTopicLastWill()).c_str() ,"offline", false, 1);
-      myMqttClient.begin(myConfig.mqttHost, myConfig.mqttPort, myWiFiClient);
-      myMqttClient.onMessage(messageReceived);       /* register callback */
-      (void)myMqttClient.connect((myMqttHelper.getLoweredName()).c_str(), myConfig.mqttUser, myConfig.mqttPwd);
+      if (!myMqttClient.connected())
+      {
+         myMqttClient.setOptions(63,true,1000);                                                    /* setOptions(int keepAlive, bool cleanSession, int timeout) */
+         myMqttClient.setWill((myMqttHelper.getTopicLastWill()).c_str() ,"offline", false, LWMQTT_QOS1);     /* broker shall publish 'offline' on ungraceful disconnect >> Last Will */
+         myMqttClient.begin(myConfig.mqttHost, myConfig.mqttPort, myWiFiClient);
+         myMqttClient.onMessage(messageReceived);                                                  /* register callback */
+         (void)myMqttClient.connect((myMqttHelper.getLoweredName()).c_str(), myConfig.mqttUser, myConfig.mqttPwd);
 
-      /* subscribe some topics */
-      (void)myMqttClient.subscribe(myMqttHelper.getTopicTargetTempCmd());
-      (void)myMqttClient.subscribe(myMqttHelper.getTopicThermostatModeCmd());
-      (void)myMqttClient.subscribe(myMqttHelper.getTopicUpdateFirmware());
-      (void)myMqttClient.subscribe(myMqttHelper.getTopicChangeName());
-      (void)myMqttClient.subscribe(myMqttHelper.getTopicChangeHysteresis());
-      (void)myMqttClient.subscribe(myMqttHelper.getTopicChangeSensorCalib());
-      (void)myMqttClient.subscribe(myMqttHelper.getTopicSystemRestartRequest());
-      
-      homeAssistantDiscovery();
+         /* subscribe some topics */
+         (void)myMqttClient.subscribe(myMqttHelper.getTopicTargetTempCmd(), LWMQTT_QOS1);
+         (void)myMqttClient.subscribe(myMqttHelper.getTopicThermostatModeCmd(), LWMQTT_QOS1);
+         (void)myMqttClient.subscribe(myMqttHelper.getTopicUpdateFirmware(), LWMQTT_QOS1);
+         (void)myMqttClient.subscribe(myMqttHelper.getTopicChangeName(), LWMQTT_QOS1);
+         (void)myMqttClient.subscribe(myMqttHelper.getTopicChangeHysteresis(), LWMQTT_QOS1);
+         (void)myMqttClient.subscribe(myMqttHelper.getTopicChangeSensorCalib(), LWMQTT_QOS1);
+         (void)myMqttClient.subscribe(myMqttHelper.getTopicSystemRestartRequest(), LWMQTT_QOS1);
 
-      /* publish restart = false on connect */
-      myMqttClient.publish(myMqttHelper.getTopicSystemRestartRequest(),       "0",                                            false, 1);
-      /* publish online in will topic */
-      myMqttClient.publish(myMqttHelper.getTopicLastWill(),                   "online",                                       true, 1);
+         homeAssistantDiscovery();
+
+         /* publish restart = false on connect */
+         myMqttClient.publish(myMqttHelper.getTopicSystemRestartRequest(),       "0",                                            false, 1);
+         /* publish online in will topic */
+         myMqttClient.publish(myMqttHelper.getTopicLastWill(),                   "online",                                       true, 1);
+      }
    }
 }
 
@@ -347,10 +372,6 @@ void MQTT_CONNECT(void)
 /*===================================================================================================================*/
 void loop()
 {
-  ArduinoOTA.handle();
-  myMqttClient.loop();
-  delay(20);               /* <- fixes some issues with WiFi stability */
-
   /* call every 50 ms */
   if (TimeReached(loop50msMillis))
   {
@@ -380,7 +401,11 @@ void loop()
     SPIFFS_MAIN();          /* check for new data and write SPIFFS is necessary */
     HANDLE_HTTP_UPDATE();   /* pull update from server if it was requested via MQTT*/
   }
-  yield();
+
+  webServer.handleClient();
+  myMqttClient.loop();
+  delay(10);
+  ArduinoOTA.handle();
 }
 
 /*===================================================================================================================*/
@@ -408,14 +433,12 @@ void HANDLE_SYSTEM_STATE(void)
          #endif
          /* try to come online, debounced to avoid reconnect each loop*/
          WIFI_CONNECT();
-         MQTT_CONNECT();
-         OTA_INIT();
       }
    }
    /* check if rotary encoder button is pushed for 10 seconds to request a reset */
    if (LOW == digitalRead(ENCODER_BUTTON_PIN))
    {
-      #ifdef CFG_DEBUG
+      #ifdef CFG_DEBUG_ENCODER
       Serial.println("Encoder Button pressed: "+ String(digitalRead(ENCODER_BUTTON_PIN)));
       Serial.println("Target Time: "+ String(switchSystemResetTime + switchSystemResetInterval));
       Serial.println("Current time: "+ String(millis()));
@@ -566,7 +589,7 @@ void DRAW_DISPLAY_MAIN(void)
          }
       }
    }
-   #ifdef CFG_DEBUG
+   #ifdef CFG_DEBUG_SHOW_VERSION
    myDisplay.setTextAlignment(TEXT_ALIGN_LEFT);
    myDisplay.setFont(Roboto_Condensed_16);
    myDisplay.drawString(0, drawTargetTempYOffset, String(VERSION));
@@ -732,7 +755,7 @@ void ICACHE_RAM_ATTR updateEncoder(void)
 
    if (encoded == 0b11) /* if the encoder is in an end position, evaluate the number of interrupts to left/right. simple majority wins */
    {
-      #ifdef CFG_DEBUG
+      #ifdef CFG_DEBUG_ENCODER
       Serial.println("Rotary encoder interrupts: " + String(ROTARY_ENCODER_DIRECTION_INTS));
       #endif
 
@@ -757,17 +780,18 @@ void ICACHE_RAM_ATTR updateEncoder(void)
    /* Home Assistant discovery on connect; used to define entities in HA to communicate with*/
 void homeAssistantDiscovery(void)
 {
-   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryClimate(),                   myMqttHelper.buildHassDiscoveryClimate(),                   true, 1);    // make HA discover the climate component
-   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(),              myMqttHelper.buildHassDiscoveryBinarySensor(),              true, 1);    // make HA discover the binary_sensor for sensor failure
-   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sTemp),               myMqttHelper.buildHassDiscoverySensor(sTemp),               true, 1);    // make HA discover the temperature sensor
-   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sHum),                myMqttHelper.buildHassDiscoverySensor(sHum),                true, 1);    // make HA discover the humidity sensor
-   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sIP),                 myMqttHelper.buildHassDiscoverySensor(sIP),                 true, 1);    // make HA discover the IP sensor
-   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sCalibF),             myMqttHelper.buildHassDiscoverySensor(sCalibF),             true, 1);    // make HA discover the scaling sensor
-   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sCalibO),             myMqttHelper.buildHassDiscoverySensor(sCalibO),             true, 1);    // make HA discover the offset sensor
-   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sHysteresis),         myMqttHelper.buildHassDiscoverySensor(sHysteresis),         true, 1);    // make HA discover the hysteresis sensor
-   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sFW),                 myMqttHelper.buildHassDiscoverySensor(sFW),                 true, 1);    // make HA discover the firmware version sensor
-   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swReset),             myMqttHelper.buildHassDiscoverySwitch(swReset),             true, 1);    // make HA discover the reset switch
-   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swUpdate),            myMqttHelper.buildHassDiscoverySwitch(swUpdate),            true, 1);    // make HA discover the update switch
+   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryClimate(),                   myMqttHelper.buildHassDiscoveryClimate(),                   true, LWMQTT_QOS1);    // make HA discover the climate component
+   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(bsSensFail),    myMqttHelper.buildHassDiscoveryBinarySensor(bsSensFail),    true, LWMQTT_QOS1);    // make HA discover the binary_sensor for sensor failure
+   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(bsState),       myMqttHelper.buildHassDiscoveryBinarySensor(bsState),       true, LWMQTT_QOS1);    // make HA discover the binary_sensor for thermostat state
+   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sTemp),               myMqttHelper.buildHassDiscoverySensor(sTemp),               true, LWMQTT_QOS1);    // make HA discover the temperature sensor
+   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sHum),                myMqttHelper.buildHassDiscoverySensor(sHum),                true, LWMQTT_QOS1);    // make HA discover the humidity sensor
+   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sIP),                 myMqttHelper.buildHassDiscoverySensor(sIP),                 true, LWMQTT_QOS1);    // make HA discover the IP sensor
+   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sCalibF),             myMqttHelper.buildHassDiscoverySensor(sCalibF),             true, LWMQTT_QOS1);    // make HA discover the scaling sensor
+   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sCalibO),             myMqttHelper.buildHassDiscoverySensor(sCalibO),             true, LWMQTT_QOS1);    // make HA discover the offset sensor
+   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sHysteresis),         myMqttHelper.buildHassDiscoverySensor(sHysteresis),         true, LWMQTT_QOS1);    // make HA discover the hysteresis sensor
+   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sFW),                 myMqttHelper.buildHassDiscoverySensor(sFW),                 true, LWMQTT_QOS1);    // make HA discover the firmware version sensor
+   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swReset),             myMqttHelper.buildHassDiscoverySwitch(swReset),             true, LWMQTT_QOS1);    // make HA discover the reset switch
+   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swUpdate),            myMqttHelper.buildHassDiscoverySwitch(swUpdate),            true, LWMQTT_QOS1);    // make HA discover the update switch
 }
 
 /* publish state topic in JSON format */
@@ -788,7 +812,23 @@ void mqttPubState(void)
          WiFi.localIP().toString(), \
          String(FIRMWARE_VERSION) ), \
       true, /* retain */ \
-      1 /* QoS */\
+      LWMQTT_QOS1 /* QoS */\
+   );
+}
+
+void handleWebServerClient(void)
+{
+   webServer.send(200, "text/plain", \
+      "Reset Reason: "+ String(ESP.getResetReason()) + "\n" \
+      "Flash Size: "+ String(ESP.getFlashChipRealSize()) + "\n" \
+      "Sketch Size: "+ String(ESP.getSketchSize()) + "\n" \
+      "Free for Sketch: "+ String(ESP.getFreeSketchSpace()) + "\n" \
+      "Free Heap: "+ String(ESP.getFreeHeap()) + "\n" \
+      "Vcc: "+ String(ESP.getVcc()/1000.0) + "\n" \
+      "WiFi Status: " + String(WiFi.status()) + "\n" \
+      "WiFi RSSI: " + String(WiFi.RSSI()) + "\n" \
+      "MQTT Status: " + String(myMqttClient.connected()) + "\n" \
+      "MQTT last error: " + String(myMqttClient.lastError()) \
    );
 }
 
