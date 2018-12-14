@@ -5,7 +5,7 @@
 {
   "name":"ABCDEFGHIJKLMNOPQRSTUVWXYZ",
   "tTemp":"200",
-  "tHyst":"2",
+  "tHyst":"4",
   "calibF":"95",
   "calibO":"20",
   "ssid":"xxxxxxxxxxxxxxxx",
