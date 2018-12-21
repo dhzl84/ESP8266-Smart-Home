@@ -1,4 +1,4 @@
-#define VERSION "0.8.1"
+#define VERSION "0.8.2"
 
 #if defined CFG_DEBUG
 #define FW_PREFIX "d"
