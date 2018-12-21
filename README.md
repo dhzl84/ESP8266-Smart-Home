@@ -74,3 +74,6 @@ So I thought about buying them but they were either expensive as hell or just di
 
 ### 3.4 Wiring
 ![image](https://user-images.githubusercontent.com/5675570/35767892-47fde138-08f4-11e8-863e-870828831ac0.png)
+
+### 3.5 Picture
+![image](https://user-images.githubusercontent.com/5675570/50345529-b7659380-052f-11e9-8c72-13e437296978.jpg)
