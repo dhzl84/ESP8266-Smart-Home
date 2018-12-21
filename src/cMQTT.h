@@ -4,7 +4,7 @@
 #include "Arduino.h"
 
 #ifndef MQTT_RECONNECT_TIME
-  #define MQTT_RECONNECT_TIME 10000   /* 10s in milliseconds */
+  #define MQTT_RECONNECT_TIME 5000   /* 5 s in milliseconds */
 #endif
 
 typedef enum {
