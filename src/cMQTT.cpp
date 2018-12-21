@@ -58,7 +58,6 @@ String mqttHelper::buildStateJSON(String temp, String humid, String hysteresis, 
    String JSON = \
    "{\n" \
    "  \"name\":\"" + mqttNodeId + "\",\n" \
-   "  \"dev_cla\":\"climate\",\n" \
    "  \"mode\":\"" + thermoMode + "\",\n" \
    "  \"state\":\"" + actState + "\",\n" \
    "  \"target_temp\":\"" + tarTemp + "\",\n" \
@@ -81,7 +80,6 @@ String mqttHelper::buildHassDiscoveryClimate(void)
    "{\n" \
    "  \"~\":\"" + mqttGeneralBaseTopic + "\",\n" \
    "  \"name\":\"" + mqttNodeId + "\",\n" \
-   "  \"dev_cla\":\"climate\",\n" \
    "  \"mode_cmd_t\":\"~" + mqttThermostatModeCmd + "\",\n" \
    "  \"mode_stat_t\":\"~" + mqttData + "\",\n" \
    "  \"mode_stat_tpl\":\"{{value_json.mode}}\",\n" \
@@ -286,7 +284,8 @@ String mqttHelper::buildHassDiscoverySwitch(switch_t switches)
          "  \"pl_off\":\"false\",\n" \
          "  \"avty_t\":\"~" + mqttWill + "\",\n" \
          "  \"pl_avail\":\"online\",\n" \
-         "  \"pl_not_avail\":\"offline\"\n" \
+         "  \"pl_not_avail\":\"offline\",\n" \
+         "  \"qos\":\"1\"\n" \
          "}";
       }
       break;
@@ -302,7 +301,8 @@ String mqttHelper::buildHassDiscoverySwitch(switch_t switches)
          "  \"pl_off\":\"false\",\n" \
          "  \"avty_t\":\"~" + mqttWill + "\",\n" \
          "  \"pl_avail\":\"online\",\n" \
-         "  \"pl_not_avail\":\"offline\"\n" \
+         "  \"pl_not_avail\":\"offline\",\n" \
+         "  \"qos\":\"1\"\n" \
          "}";
       }
       break;
