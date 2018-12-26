@@ -40,13 +40,19 @@ install:
 
 script:
     - chmod a+x config.sh
-    - echo "generate config.h dummy"
-    - ./config.sh
+    - echo "generate config.h for rotary encoder input"
+    - ./config.sh false
     - cat config.h
     - ls -l
     - mv config.h src/config.h
     - platformio run
-    
+
+    - echo "generate config.h for push button input"
+    - ./config.sh true
+    - cat config.h
+    - ls -l
+    - mv config.h src/config.h
+    - platformio run
 notifications:
   email:
     on_success: change

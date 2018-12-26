@@ -1,6 +1,7 @@
 #ifndef _MAIN_H_
 #define _MAIN_H_
 #include "Arduino.h"
+#include "config.h"
 #include <FS.h> // SPIFFS
 
 /*===================================================================================================================*/
@@ -44,8 +45,14 @@ void HANDLE_HTTP_UPDATE(void);
 /* callback */
 void handleWebServerClient(void);
 void messageReceived(String &topic, String &payload); /* MQTT callback */
-void encoderSwitch (void);
+void onOffButton(void);
+#if CFG_PUSH_BUTTONS
+void upButton(void);
+void downButton(void);
+#else
 void updateEncoder(void);
+#endif /* CFG_PUSH_BUTTONS */
+
 /* others */
 void homeAssistantDiscovery(void);
 void mqttPubState(void);
