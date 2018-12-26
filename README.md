@@ -40,6 +40,7 @@ My *config.h* for building a thermostat SW contains the following information:
 #define SENSOR_UPDATE_INTERVAL 20      /* seconds */
 #define THERMOSTAT_HYSTERESIS  2       /* 0.2 °C */
 #define WIFI_RECONNECT_TIME    30      /* seconds */
+#define CFG_PUSH_BUTTONS       false
 ```
 
 For Travis CI compatibility there is the *config.sh* script which generates the above mentioned dummy code.
@@ -69,7 +70,7 @@ So I thought about buying them but they were either expensive as hell or just di
 * SRD-05VDC-SL-C 230V 10A relay
 * IRM-03-5 230V AC to 5V DC print module
 * 3,3 V DC voltage reulator
-* rotary encoder with push button
+* rotary encoder with push button or just push buttons
 * wires, resistors, capacitors, diodes, transistor, optocoupler, circuit board, etc
 
 ### 3.4 Wiring

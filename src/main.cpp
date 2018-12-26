@@ -40,9 +40,9 @@ ADC_MODE(ADC_VCC);             /* measure Vcc */
 #define DHT_PIN              2 /* sensor */
 #define SDA_PIN              4 /* I²C */
 #define SCL_PIN              5 /* I²C */
-#define ENCODER_PIN1        12 /* rotary left/right */
-#define ENCODER_PIN2        13 /* rotary left/right */
-#define ENCODER_BUTTON_PIN  14 /* push button switch */
+#define PHYS_INPUT_1_PIN    12 /* rotary left/right OR down/up */
+#define PHYS_INPUT_2_PIN    13 /* rotary left/right OR down/up */
+#define PHYS_INPUT_3_PIN    14 /* on/off/ok/reset */
 #define RELAY_PIN           16 /* relay control */
 
 /*===================================================================================================================*/
@@ -71,23 +71,29 @@ unsigned long loop100msMillis  = 22; /* start loops with some offset to avoid ca
 unsigned long loop500msMillis  = 44; /* start loops with some offset to avoid calling all loops every second */
 unsigned long loop1000msMillis = 66; /* start loops with some offset to avoid calling all loops every second */
 /* HTTP Update */
-bool     FETCH_UPDATE          = false;       /* global variable used to decide whether an update shall be fetched from server or not */
+bool fetchUpdate = false;       /* global variable used to decide whether an update shall be fetched from server or not */
 /* OTA */
 typedef enum otaUpdate { TH_OTA_IDLE, TH_OTA_ACTIVE, TH_OTA_FINISHED, TH_OTA_ERROR } OtaUpdate_t;       /* global variable used to change display in case OTA update is initiated */
 OtaUpdate_t OTA_UPDATE = TH_OTA_IDLE;
-/* rotary encoder */
-unsigned long  switchDebounceTime          = 0;
-unsigned long  switchDebounceInterval      = 250;
-unsigned long  switchSystemResetTime       = 0;
-unsigned long  switchSystemResetInterval   = 10000;
-#define rotLeft              -1
-#define rotRight              1
-#define rotInit               0
+/* rotary encoder / push buttons */
+unsigned long  onOffButtonDebounceTime        = 0;
+#if CFG_PUSH_BUTTONS
+unsigned long  upButtonDebounceTime           = 0;
+unsigned long  downButtonDebounceTime         = 0;
+#else
+#define rotLeft                                 -1
+#define rotRight                                1
+#define rotInit                                 0
+volatile int lastEncoded                      = 0b11;        /* initial state of the rotary encoders gray code */
+volatile int rotaryEncoderDirectionInts       = rotInit;     /* initialize rotary encoder with no direction */
+#endif /* CFG_PUSH_BUTTONS */
+unsigned long buttonDebounceInterval         = 250;
+unsigned long onOffButtonSystemResetTime     = 0;
+unsigned long onOffButtonSystemResetInterval = 10000;
+
 #define tempStep              5
 #define displayTemp           0
 #define displayHumid          1
-volatile int LAST_ENCODED                    = 0b11;        /* initial state of the rotary encoders gray code */
-volatile int ROTARY_ENCODER_DIRECTION_INTS   = rotInit;     /* initialize rotary encoder with no direction */
 /* sensor */
 unsigned long readSensorScheduled = 0;
 /* Display */
@@ -103,7 +109,7 @@ MQTTClient        myMqttClient(1024); /* 1024 byte buffer */
 mqttHelper        myMqttHelper;
 ESP8266WebServer  webServer(80);
 
-bool           SYSTEM_RESTART_REQUEST = false;
+bool           systemRestartRequest = false;
 unsigned long  wifiReconnectTimer = 30000;
 
 #define        SPIFFS_MQTT_ID_FILE        String("/itsme")
@@ -127,27 +133,28 @@ void setup()
 
    SPIFFS_INIT();   /* read stuff from SPIFFS */
    GPIO_CONFIG();    /* configure GPIOs */
-   myThermostat.setup(RELAY_PIN, myConfig.tTemp, myConfig.calibF, myConfig.calibO, myConfig.tHyst); /*GPIO to switch connected relay and initial target temperature */
+   myThermostat.setup(RELAY_PIN, myConfig.tTemp, myConfig.calibF, myConfig.calibO, myConfig.tHyst); /*GPIO to switch connected relay, initial target temperature, sensor calbigration and thermostat hysteresis */
    myDHT.setup(DHT_PIN, DHTesp::DHT22);    /* init DHT sensor */
    DISPLAY_INIT();   /* init Display */
    WIFI_CONNECT();   /* connect to WiFi */
    OTA_INIT();
    myMqttHelper.setup(String(myConfig.name));
    MQTT_CONNECT();   /* connect to MQTT host and build subscriptions, must be called after SPIFFS_INIT()*/
-   
-   if (MDNS.begin(myConfig.name))
-   {
-      #ifdef CFG_DEBUG
-      Serial.println("MDNS responder started for: " + String(myConfig.name));
-      #endif
-   }
+
    webServer.begin();
    webServer.on("/", handleWebServerClient);
 
+   #if CFG_PUSH_BUTTONS
+   attachInterrupt(PHYS_INPUT_1_PIN, upButton   , FALLING);
+   attachInterrupt(PHYS_INPUT_2_PIN, downButton , FALLING);
+   attachInterrupt(PHYS_INPUT_3_PIN, onOffButton, FALLING);
+   #else
    /* enable interrupts on encoder pins to decode gray code and recognize switch event*/
-   attachInterrupt(ENCODER_PIN1, updateEncoder, CHANGE);
-   attachInterrupt(ENCODER_PIN2, updateEncoder, CHANGE);
-   attachInterrupt(ENCODER_BUTTON_PIN, encoderSwitch, FALLING);
+   attachInterrupt(PHYS_INPUT_1_PIN, updateEncoder, CHANGE);
+   attachInterrupt(PHYS_INPUT_2_PIN, updateEncoder, CHANGE);
+   attachInterrupt(PHYS_INPUT_3_PIN, onOffButton,   FALLING);
+   #endif /* CFG_PUSH_BUTTONS */
+
    
    SENSOR_MAIN();    /* acquire first sensor data before staring loop() */
 
@@ -247,10 +254,10 @@ void SPIFFS_INIT(void)
 
 void GPIO_CONFIG(void)
 {
-   /* initialize encoder pins */
-   pinMode(ENCODER_PIN1, INPUT_PULLUP);
-   pinMode(ENCODER_PIN2, INPUT_PULLUP);
-   pinMode(ENCODER_BUTTON_PIN, INPUT_PULLUP);
+   /* initialize encoder / push button pins */
+   pinMode(PHYS_INPUT_1_PIN, INPUT_PULLUP);
+   pinMode(PHYS_INPUT_2_PIN, INPUT_PULLUP);
+   pinMode(PHYS_INPUT_3_PIN, INPUT_PULLUP);
 }
 
 /* Display */
@@ -283,21 +290,26 @@ void WIFI_CONNECT(void)
 
       WiFi.mode(WIFI_STA);
       WiFi.setSleepMode(WIFI_NONE_SLEEP);
+      WiFi.hostname(myConfig.name);
       WiFi.begin(myConfig.ssid, myConfig.wifiPwd);
 
       /* try to connect to WiFi, proceed offline if not connecting here*/
       if (WiFi.waitForConnectResult() != WL_CONNECTED)
       {
+         #ifdef CFG_DEBUG
          Serial.println("Failed to connect to WiFi, continue offline");
+         #endif
       }
    }
 
+   MDNS.begin(myConfig.name);
+   MDNS.addService("http", "tcp", 80);
+
    #ifdef CFG_DEBUG
    Serial.println("WiFi Status: "+ String(WiFi.status()));
-   #endif
-
    Serial.print("IP address: ");
    Serial.println(WiFi.localIP());
+   #endif
 }
 
 /* OTA */
@@ -335,7 +347,7 @@ void OTA_INIT(void)
       else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
       else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
       else if (error == OTA_END_ERROR) Serial.println("End Failed");
-      SYSTEM_RESTART_REQUEST = true;
+      systemRestartRequest = true;
    });
    ArduinoOTA.begin();
 }
@@ -416,10 +428,10 @@ void loop()
 /*===================================================================================================================*/
 void HANDLE_SYSTEM_STATE(void)
 {
-   if (SYSTEM_RESTART_REQUEST == true)
+   if (systemRestartRequest == true)
    {
       DRAW_DISPLAY_MAIN();
-      SYSTEM_RESTART_REQUEST = false;
+      systemRestartRequest = false;
       Serial.println("Restarting in 3 seconds");
       myMqttClient.disconnect();
       delay(3000);
@@ -439,18 +451,18 @@ void HANDLE_SYSTEM_STATE(void)
          WIFI_CONNECT();
       }
    }
-   /* check if rotary encoder button is pushed for 10 seconds to request a reset */
-   if (LOW == digitalRead(ENCODER_BUTTON_PIN))
+   /* check if button is pushed for 10 seconds to request a reset */
+   if (LOW == digitalRead(PHYS_INPUT_3_PIN))
    {
       #ifdef CFG_DEBUG_ENCODER
-      Serial.println("Encoder Button pressed: "+ String(digitalRead(ENCODER_BUTTON_PIN)));
-      Serial.println("Target Time: "+ String(switchSystemResetTime + switchSystemResetInterval));
+      Serial.println("Encoder Button pressed: "+ String(digitalRead(PHYS_INPUT_3_PIN)));
+      Serial.println("Target Time: "+ String(onOffButtonSystemResetTime + onOffButtonSystemResetInterval));
       Serial.println("Current time: "+ String(millis()));
       #endif
 
-      if (switchSystemResetTime + switchSystemResetInterval < millis())
+      if (onOffButtonSystemResetTime + onOffButtonSystemResetInterval < millis())
       {
-         SYSTEM_RESTART_REQUEST = true;
+         systemRestartRequest = true;
       }
       else
       {
@@ -459,7 +471,7 @@ void HANDLE_SYSTEM_STATE(void)
    }
    else
    {
-      switchSystemResetTime = millis();
+      onOffButtonSystemResetTime = millis();
    }
 }
 
@@ -534,7 +546,7 @@ void DRAW_DISPLAY_MAIN(void)
 
    myDisplay.setContrast(50);
 
-   if (SYSTEM_RESTART_REQUEST == true)
+   if (systemRestartRequest == true)
    {
       myDisplay.setFont(Roboto_Condensed_16);
       myDisplay.setTextAlignment(TEXT_ALIGN_CENTER);
@@ -561,7 +573,7 @@ void DRAW_DISPLAY_MAIN(void)
       }
    }
    /* HTTP Update */
-   else if (FETCH_UPDATE == true)
+   else if (fetchUpdate == true)
    {
       myDisplay.setFont(Roboto_Condensed_16);
       myDisplay.setTextAlignment(TEXT_ALIGN_CENTER);
@@ -630,14 +642,14 @@ void MQTT_MAIN(void)
 
 void HANDLE_HTTP_UPDATE(void)
 {
-   if (FETCH_UPDATE == true)
+   if (fetchUpdate == true)
    {
       /* publish and loop here before fetching the update */
       myMqttClient.publish(myMqttHelper.getTopicUpdateFirmwareAccepted(), String(false), false, MQTT_QOS); /* publish accepted update with value false to reset the switch in Home Assistant */
       myMqttClient.loop();
 
       DRAW_DISPLAY_MAIN();
-      FETCH_UPDATE = false;
+      fetchUpdate = false;
       Serial.printf("Remote update started");
 
       t_httpUpdate_return ret = ESPhttpUpdate.update(myConfig.updServer);
@@ -666,7 +678,7 @@ void SPIFFS_MAIN(void)
       if (saveConfiguration(myConfig))
       {
          /* write successful, restart to rebuild MQTT topics etc. */
-         SYSTEM_RESTART_REQUEST = true;
+         systemRestartRequest = true;
       }
       else
       {
@@ -716,45 +728,66 @@ void SPIFFS_MAIN(void)
 /* callback, interrupt, timer, other functions */
 /*===================================================================================================================*/
 
-void ICACHE_RAM_ATTR encoderSwitch(void)
+void ICACHE_RAM_ATTR onOffButton(void)
 {
    /* debouncing routine for encoder switch */
-   if (TimeReached(switchDebounceTime))
+   if (TimeReached(onOffButtonDebounceTime))
    {
-      SetNextTimeInterval(switchDebounceTime, switchDebounceInterval);
+      SetNextTimeInterval(onOffButtonDebounceTime, buttonDebounceInterval);
       myThermostat.toggleThermostatMode();
    }
 }
 
+#if CFG_PUSH_BUTTONS
+void ICACHE_RAM_ATTR upButton(void)
+{
+   /* debouncing routine for push button */
+   if (TimeReached(upButtonDebounceTime))
+   {
+      SetNextTimeInterval(upButtonDebounceTime, buttonDebounceInterval);
+      myThermostat.increaseTargetTemperature(tempStep);
+   }
+}
+
+void ICACHE_RAM_ATTR downButton(void)
+{
+   /* debouncing routine for push button */
+   if (TimeReached(downButtonDebounceTime))
+   {
+      SetNextTimeInterval(downButtonDebounceTime, buttonDebounceInterval);
+      myThermostat.decreaseTargetTemperature(tempStep);
+   }
+}
+#else
 void ICACHE_RAM_ATTR updateEncoder(void)
 {
-   int MSB = digitalRead(ENCODER_PIN1);
-   int LSB = digitalRead(ENCODER_PIN2);
+   int MSB = digitalRead(PHYS_INPUT_1_PIN);
+   int LSB = digitalRead(PHYS_INPUT_2_PIN);
 
    int encoded = (MSB << 1) |LSB;  /* converting the 2 pin value to single number */
 
-   int sum  = (LAST_ENCODED << 2) | encoded; /* adding it to the previous encoded value */
+   int sum  = (lastEncoded << 2) | encoded; /* adding it to the previous encoded value */
 
    if(sum == 0b1101 || sum == 0b0100 || sum == 0b0010 || sum == 0b1011) /* gray patterns for rotation to right */
    {
-      ROTARY_ENCODER_DIRECTION_INTS += rotRight; /* count rotation interrupts to left and right, this shall make the encoder routine more robust against bouncing */
+      rotaryEncoderDirectionInts += rotRight; /* count rotation interrupts to left and right, this shall make the encoder routine more robust against bouncing */
    }
    if(sum == 0b1110 || sum == 0b0111 || sum == 0b0001 || sum == 0b1000)  /* gray patterns for rotation to left */
    {
-      ROTARY_ENCODER_DIRECTION_INTS += rotLeft;
+      rotaryEncoderDirectionInts += rotLeft;
    }
 
    if (encoded == 0b11) /* if the encoder is in an end position, evaluate the number of interrupts to left/right. simple majority wins */
    {
       #ifdef CFG_DEBUG_ENCODER
-      Serial.println("Rotary encoder interrupts: " + String(ROTARY_ENCODER_DIRECTION_INTS));
+      Serial.println("Rotary encoder interrupts: " + String(rotaryEncoderDirectionInts));
       #endif
 
-      if(ROTARY_ENCODER_DIRECTION_INTS > rotRight) /* if there was a higher amount of interrupts to the right, consider the encoder was turned to the right */
+      if(rotaryEncoderDirectionInts > rotRight) /* if there was a higher amount of interrupts to the right, consider the encoder was turned to the right */
       {
           myThermostat.increaseTargetTemperature(tempStep);
        }
-      else if (ROTARY_ENCODER_DIRECTION_INTS < rotLeft) /* if there was a higher amount of interrupts to the left, consider the encoder was turned to the left */
+      else if (rotaryEncoderDirectionInts < rotLeft) /* if there was a higher amount of interrupts to the left, consider the encoder was turned to the left */
       {
           myThermostat.decreaseTargetTemperature(tempStep);
        }
@@ -762,13 +795,14 @@ void ICACHE_RAM_ATTR updateEncoder(void)
       {
          /* do nothing here, left/right interrupts have occurred with same amount -> should never happen */
       }
-      ROTARY_ENCODER_DIRECTION_INTS = rotInit; /* reset interrupt count for next sequence */
+      rotaryEncoderDirectionInts = rotInit; /* reset interrupt count for next sequence */
    }
 
-   LAST_ENCODED = encoded; /* store this value for next time */
+   lastEncoded = encoded; /* store this value for next time */
 }
+#endif /* CFG_PUSH_BUTTONS */
 
-   /* Home Assistant discovery on connect; used to define entities in HA to communicate with*/
+/* Home Assistant discovery on connect; used to define entities in HA to communicate with*/
 void homeAssistantDiscovery(void)
 {
    myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryClimate(),                   myMqttHelper.buildHassDiscoveryClimate(),                   true, MQTT_QOS);    // make HA discover the climate component
@@ -842,7 +876,7 @@ void messageReceived(String &topic, String &payload)
       #endif
       if ( (payload == "true") || (payload == "1") )
       {
-         SYSTEM_RESTART_REQUEST = true;
+         systemRestartRequest = true;
       }
    }
 
@@ -854,7 +888,7 @@ void messageReceived(String &topic, String &payload)
          #ifdef CFG_DEBUG
          Serial.println("Firmware updated triggered via MQTT");
          #endif
-         FETCH_UPDATE = true;
+         fetchUpdate = true;
       }
    }
 
