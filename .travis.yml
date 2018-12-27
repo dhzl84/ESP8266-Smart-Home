@@ -26,35 +26,47 @@
 
 language: python
 python:
-    - "2.7"
+  - "2.7"
 
 sudo: false
 cache:
-    directories:
-        - "~/.platformio"
+  directories:
+    - "~/.platformio"
+
+stages:
+  - build rotary encoder
+  - build push buttons
+  - lint
 
 install:
-    - pip install -U platformio
-    - platformio update
-    - platformio lib -g install 1
-    - pip install cpplint
+  - pip install -U platformio
+  - platformio update
+  - platformio lib -g install 1
+  - pip install cpplint
 
-script:
-    - cpplint --root=src --repository=src --verbose=0 $(find src -name \*.cpp)
-    - chmod a+x config.sh
-    - echo "generate config.h for rotary encoder input"
-    - ./config.sh false
-    - cat config.h
-    - ls -l
-    - mv config.h src/config.h
-    - platformio run
+jobs:
+  include:
+    - stage: build rotary encoder
+      script:
+        - chmod a+x config.sh
+        - echo "generate config.h for rotary encoder input"
+        - ./config.sh false
+        - cat config.h
+        - ls -l
+        - mv config.h src/config.h
+        - platformio run
+    - stage: build push buttons
+      script:
+        - echo "generate config.h for push button input"
+        - ./config.sh true
+        - cat config.h
+        - ls -l
+        - mv config.h src/config.h
+        - platformio run
+    - stage: lint
+      script:
+        - cpplint --root=src --repository=src --verbose=0 $(find src -name \*.cpp)
 
-    - echo "generate config.h for push button input"
-    - ./config.sh true
-    - cat config.h
-    - ls -l
-    - mv config.h src/config.h
-    - platformio run
 notifications:
   email:
     on_success: change
