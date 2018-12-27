@@ -1,5 +1,5 @@
-#ifndef cMQTT_H_
-#define cMQTT_H_
+#ifndef CMQTT_H_
+#define CMQTT_H_
 
 #include "Arduino.h"
 
@@ -29,7 +29,7 @@ typedef enum {
 }switch_t;
 
 class mqttHelper {
-public:
+  public:
   mqttHelper(void);
   ~mqttHelper(void);
   void   init(void);
@@ -61,7 +61,7 @@ public:
   String buildHassDiscoverySwitch(switch_t switches);
   String getTopicData(void);
 
-private:
+  private:
   bool   nameChanged;
   String mqttData;
   String mqttUpdateFirmware;
@@ -86,4 +86,4 @@ private:
   String mqttTargetTempCmd;
 };
 
-#endif /* cMQTT_H_ */
+#endif  // CMQTT_H_
