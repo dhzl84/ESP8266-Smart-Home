@@ -64,7 +64,7 @@ jobs:
         - platformio run
     - stage: lint
       script:
-        - cpplint --root=src --repository=src --verbose=0 $(find src -name \*.cpp)
+        - cpplint --root=src --repository=src --verbose=0 $(find src -name \*.cpp OR -name \*.h)
 
 notifications:
   email:
