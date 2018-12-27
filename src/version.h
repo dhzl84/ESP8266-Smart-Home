@@ -1,4 +1,7 @@
-#define VERSION "0.8.4"
+#ifndef VERSION_H_
+#define VERSION_H_
+
+#define VERSION "0.8.5"
 
 #if defined CFG_DEBUG
 #define FW_PREFIX "d"
@@ -7,3 +10,5 @@
 #endif
 
 #define FIRMWARE_VERSION (FW_PREFIX VERSION)
+
+#endif  // VERSION_H_
