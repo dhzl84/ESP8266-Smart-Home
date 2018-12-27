@@ -46,7 +46,6 @@ install:
 jobs:
   include:
     - stage: build
-      name: "build rotary encoder binary"
       script:
         - chmod a+x config.sh
         - echo "generate config.h for rotary encoder input"
@@ -56,7 +55,6 @@ jobs:
         - mv config.h src/config.h
         - platformio run
     - script:
-      name: "build push buttons binary"
         - chmod a+x config.sh
         - echo "generate config.h for push button input"
         - ./config.sh true
