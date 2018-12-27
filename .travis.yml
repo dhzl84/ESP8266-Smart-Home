@@ -37,8 +37,10 @@ install:
     - pip install -U platformio
     - platformio update
     - platformio lib -g install 1
+    - pip install cpplint
 
 script:
+    - cpplint --repository=src --root=src
     - chmod a+x config.sh
     - echo "generate config.h for rotary encoder input"
     - ./config.sh false
