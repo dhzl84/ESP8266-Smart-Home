@@ -55,6 +55,7 @@ jobs:
         - mv config.h src/config.h
         - platformio run
       script:
+        - chmod a+x config.sh
         - echo "generate config.h for push button input"
         - ./config.sh true
         - cat config.h
