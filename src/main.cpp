@@ -124,48 +124,47 @@ unsigned long  SPIFFS_REFERENCE_TIME;
 /*===================================================================================================================*/
 /* The setup function is called once at startup of the sketch */
 /*===================================================================================================================*/
-void setup()
-{
-   #ifdef CFG_DEBUG
-   Serial.begin(115200);
-   Serial.println("Serial connection established");
-   #endif
+void setup() {
+  #ifdef CFG_DEBUG
+  Serial.begin(115200);
+  Serial.println("Serial connection established");
+  #endif
 
-   SPIFFS_INIT();   /* read stuff from SPIFFS */
-   GPIO_CONFIG();    /* configure GPIOs */
-   myThermostat.setup(RELAY_PIN, myConfig.tTemp, myConfig.calibF, myConfig.calibO, myConfig.tHyst); /*GPIO to switch connected relay, initial target temperature, sensor calbigration and thermostat hysteresis */
-   myDHT.setup(DHT_PIN, DHTesp::DHT22);    /* init DHT sensor */
-   DISPLAY_INIT();   /* init Display */
-   WIFI_CONNECT();   /* connect to WiFi */
-   OTA_INIT();
-   myMqttHelper.setup(String(myConfig.name));
-   MQTT_CONNECT();   /* connect to MQTT host and build subscriptions, must be called after SPIFFS_INIT()*/
+  SPIFFS_INIT();                                                                                   /* read stuff from SPIFFS */
+  GPIO_CONFIG();                                                                                   /* configure GPIOs */
+  myThermostat.setup(RELAY_PIN, myConfig.tTemp, myConfig.calibF, myConfig.calibO, myConfig.tHyst); /*GPIO to switch connected relay, initial target temperature, sensor calbigration and thermostat hysteresis */
+  myDHT.setup(DHT_PIN, DHTesp::DHT22);                                                             /* init DHT sensor */
+  DISPLAY_INIT();                                                                                  /* init Display */
+  WIFI_CONNECT();                                                                                  /* connect to WiFi */
+  OTA_INIT();
+  myMqttHelper.setup(String(myConfig.name));
+  MQTT_CONNECT(); /* connect to MQTT host and build subscriptions, must be called after SPIFFS_INIT()*/
 
-   webServer.begin();
-   webServer.on("/", handleWebServerClient);
+  MDNS.begin(myConfig.name);
+  webServer.begin();
+  webServer.on("/", handleWebServerClient);
 
-   #if CFG_PUSH_BUTTONS
-   attachInterrupt(PHYS_INPUT_1_PIN, upButton   , FALLING);
-   attachInterrupt(PHYS_INPUT_2_PIN, downButton , FALLING);
-   attachInterrupt(PHYS_INPUT_3_PIN, onOffButton, FALLING);
-   #else
-   /* enable interrupts on encoder pins to decode gray code and recognize switch event*/
-   attachInterrupt(PHYS_INPUT_1_PIN, updateEncoder, CHANGE);
-   attachInterrupt(PHYS_INPUT_2_PIN, updateEncoder, CHANGE);
-   attachInterrupt(PHYS_INPUT_3_PIN, onOffButton,   FALLING);
-   #endif /* CFG_PUSH_BUTTONS */
+  #if CFG_PUSH_BUTTONS
+  attachInterrupt(PHYS_INPUT_1_PIN, upButton,   FALLING);
+  attachInterrupt(PHYS_INPUT_2_PIN, downButton, FALLING);
+  attachInterrupt(PHYS_INPUT_3_PIN, onOffButton, FALLING);
+  #else
+  /* enable interrupts on encoder pins to decode gray code and recognize switch event*/
+  attachInterrupt(PHYS_INPUT_1_PIN, updateEncoder, CHANGE);
+  attachInterrupt(PHYS_INPUT_2_PIN, updateEncoder, CHANGE);
+  attachInterrupt(PHYS_INPUT_3_PIN, onOffButton,   FALLING);
+  #endif /* CFG_PUSH_BUTTONS */
 
-   
-   SENSOR_MAIN();    /* acquire first sensor data before staring loop() */
+  SENSOR_MAIN(); /* acquire first sensor data before staring loop() */
 
-   #ifdef CFG_DEBUG
-   Serial.println("Reset Reason: "+ String(ESP.getResetReason()));
-   Serial.println("Flash Size: "+ String(ESP.getFlashChipRealSize()));
-   Serial.println("Sketch Size: "+ String(ESP.getSketchSize()));
-   Serial.println("Free for Sketch: "+ String(ESP.getFreeSketchSpace()));
-   Serial.println("Free Heap: "+ String(ESP.getFreeHeap()));
-   Serial.println("Vcc: "+ String(ESP.getVcc()/1000.0));
-   #endif
+  #ifdef CFG_DEBUG
+  Serial.println("Reset Reason: " + String(ESP.getResetReason()));
+  Serial.println("Flash Size: " + String(ESP.getFlashChipRealSize()));
+  Serial.println("Sketch Size: " + String(ESP.getSketchSize()));
+  Serial.println("Free for Sketch: " + String(ESP.getFreeSketchSpace()));
+  Serial.println("Free Heap: " + String(ESP.getFreeHeap()));
+  Serial.println("Vcc: " + String(ESP.getVcc() / 1000.0));
+  #endif
 }
 
 /*===================================================================================================================*/
@@ -278,38 +277,32 @@ void DISPLAY_INIT(void)
    myDisplay.display();
 }
 
-void WIFI_CONNECT(void)
-{
-   WiFiConnectCounter++;
-   /* init WiFi */
-   if (WiFi.status() != WL_CONNECTED)
-   {
+void WIFI_CONNECT(void) {
+  WiFiConnectCounter++;
+  /* init WiFi */
+  if (WiFi.status() != WL_CONNECTED) {
+    #ifdef CFG_DEBUG
+    Serial.println("Initialize WiFi ");
+    #endif
+
+    WiFi.mode(WIFI_STA);
+    WiFi.setSleepMode(WIFI_NONE_SLEEP);
+    WiFi.hostname(myConfig.name);
+    WiFi.begin(myConfig.ssid, myConfig.wifiPwd);
+
+    /* try to connect to WiFi, proceed offline if not connecting here*/
+    if (WiFi.waitForConnectResult() != WL_CONNECTED) {
       #ifdef CFG_DEBUG
-      Serial.println("Initialize WiFi ");
+      Serial.println("Failed to connect to WiFi, continue offline");
       #endif
+    }
+  }
 
-      WiFi.mode(WIFI_STA);
-      WiFi.setSleepMode(WIFI_NONE_SLEEP);
-      WiFi.hostname(myConfig.name);
-      WiFi.begin(myConfig.ssid, myConfig.wifiPwd);
-
-      /* try to connect to WiFi, proceed offline if not connecting here*/
-      if (WiFi.waitForConnectResult() != WL_CONNECTED)
-      {
-         #ifdef CFG_DEBUG
-         Serial.println("Failed to connect to WiFi, continue offline");
-         #endif
-      }
-   }
-
-   MDNS.begin(myConfig.name);
-   MDNS.addService("http", "tcp", 80);
-
-   #ifdef CFG_DEBUG
-   Serial.println("WiFi Status: "+ String(WiFi.status()));
-   Serial.print("IP address: ");
-   Serial.println(WiFi.localIP());
-   #endif
+  #ifdef CFG_DEBUG
+  Serial.println("WiFi Status: "+ String(WiFi.status()));
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+  #endif
 }
 
 /* OTA */
