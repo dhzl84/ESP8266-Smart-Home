@@ -34,8 +34,7 @@ cache:
     - "~/.platformio"
 
 stages:
-  - build rotary encoder
-  - build push buttons
+  - build
   - lint
 
 install:
@@ -46,8 +45,9 @@ install:
 
 jobs:
   include:
-    - stage: build rotary encoder
+    - stage: build
       script:
+      name: "build rotary encoder binary"
         - chmod a+x config.sh
         - echo "generate config.h for rotary encoder input"
         - ./config.sh false
@@ -55,8 +55,8 @@ jobs:
         - ls -l
         - mv config.h src/config.h
         - platformio run
-    - stage: build push buttons
       script:
+      name: "build push buttons binary"
         - echo "generate config.h for push button input"
         - ./config.sh true
         - cat config.h
