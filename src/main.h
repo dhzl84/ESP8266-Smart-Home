@@ -1,7 +1,7 @@
-#ifndef _MAIN_H_
-#define _MAIN_H_
+#ifndef MAIN_H_
+#define MAIN_H_
 #include "Arduino.h"
-#include <FS.h> // SPIFFS
+#include <FS.h>  // SPIFFS
 #include "config.h"
 
 /* the config.h file contains your personal configuration of the parameters below: 
@@ -57,7 +57,7 @@ void SPIFFS_MAIN(void);
 void HANDLE_HTTP_UPDATE(void);
 /* callback */
 void handleWebServerClient(void);
-void messageReceived(String &topic, String &payload); /* MQTT callback */
+void messageReceived(String &topic, String &payload);  // NOLINT: pass by reference
 void onOffButton(void);
 #if CFG_PUSH_BUTTONS
 void upButton(void);
@@ -66,10 +66,12 @@ void downButton(void);
 void updateEncoder(void);
 #endif /* CFG_PUSH_BUTTONS */
 
-/* others */
+/*===================================================================================================================*/
+/* global scope functions */
+/*===================================================================================================================*/
 void homeAssistantDiscovery(void);
 void mqttPubState(void);
-void loadConfiguration(configuration &config);
+void loadConfiguration(configuration &config);  // NOLINT: pass by reference
 bool saveConfiguration(const configuration &config);
 String readSpiffs(String file);
 /*===================================================================================================================*/
@@ -82,7 +84,7 @@ String boolToStringHeatOff(bool boolean);
 int32_t TimeDifference(uint32_t prev, uint32_t next);
 int32_t TimePassedSince(uint32_t timestamp);
 bool TimeReached(uint32_t timer);
-void SetNextTimeInterval(uint32_t& timer, const uint32_t step);
+void SetNextTimeInterval(uint32_t& timer, const uint32_t step);  // NOLINT: pass by reference
 bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor);
 
-#endif /* _MAIN_H_ */
+#endif  // MAIN_H_
