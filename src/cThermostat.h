@@ -1,5 +1,5 @@
-#ifndef cTHERMOSTAT_H_
-#define cTHERMOSTAT_H_
+#ifndef CTHERMOSTAT_H_
+#define CTHERMOSTAT_H_
 
 #include "Arduino.h"
 
@@ -26,76 +26,75 @@
 #define TH_HEAT true
 #define TH_OFF  false
 
-class Thermostat
-{
-  public:
-    Thermostat(void);
-    ~Thermostat(void);
-    void init(void);
-    void setup(uint8_t gpio, uint8_t tarTemp, int16_t calibFactor, int16_t calibOffset, int16_t tHyst);
-    void loop(void);
-    // heating
-    void setActualState(bool value);
-    void setTargetTemperature(int16_t value);
-    void increaseTargetTemperature(uint16_t value);
-    void decreaseTargetTemperature(uint16_t value);
-    void resetTransmitRequest();
-    void resetNewData();
-    bool getActualState(void);
-    bool getNewData();
-    bool getThermostatMode();
-    void setThermostatMode(bool value);
-    void toggleThermostatMode();
-    int16_t getTargetTemperature(void);
+class Thermostat {
+ public:
+  Thermostat(void);
+  ~Thermostat(void);
+  void init(void);
+  void setup(uint8_t gpio, uint8_t tarTemp, int16_t calibFactor, int16_t calibOffset, int16_t tHyst);
+  void loop(void);
+  // heating
+  void setActualState(bool value);
+  void setTargetTemperature(int16_t value);
+  void increaseTargetTemperature(uint16_t value);
+  void decreaseTargetTemperature(uint16_t value);
+  void resetTransmitRequest();
+  void resetNewData();
+  bool getActualState(void);
+  bool getNewData();
+  bool getThermostatMode();
+  void setThermostatMode(bool value);
+  void toggleThermostatMode();
+  int16_t getTargetTemperature(void);
 
-    //sensor
-    void setCurrentTemperature(int16_t temperature);
-    void setCurrentHumidity(int16_t value);
-    void setLastSensorReadFailed(bool value);
-    void setThermostatHysteresis(int16_t hysteresis);
-    void resetNewCalib();
-    void setSensorCalibData(int16_t factor, int16_t offset, bool calib);
-    bool getSensorError(void);
-    bool getNewCalib();
-    int16_t getSensorFailureCounter(void);
-    int16_t getCurrentTemperature(void);
-    int16_t getCurrentHumidity(void);
-    int16_t getFilteredTemperature(void);
-    int16_t getFilteredHumidity(void);
-    int16_t getSensorCalibOffset(void);
-    int16_t getSensorCalibFactor(void);
-    int16_t getThermostatHysteresis(void);
-    int16_t getThermostatHysteresisHigh(void);
-    int16_t getThermostatHysteresisLow(void);
+  // sensor
+  void setCurrentTemperature(int16_t temperature);
+  void setCurrentHumidity(int16_t value);
+  void setLastSensorReadFailed(bool value);
+  void setThermostatHysteresis(int16_t hysteresis);
+  void resetNewCalib();
+  void setSensorCalibData(int16_t factor, int16_t offset, bool calib);
+  bool getSensorError(void);
+  bool getNewCalib();
+  int16_t getSensorFailureCounter(void);
+  int16_t getCurrentTemperature(void);
+  int16_t getCurrentHumidity(void);
+  int16_t getFilteredTemperature(void);
+  int16_t getFilteredHumidity(void);
+  int16_t getSensorCalibOffset(void);
+  int16_t getSensorCalibFactor(void);
+  int16_t getThermostatHysteresis(void);
+  int16_t getThermostatHysteresisHigh(void);
+  int16_t getThermostatHysteresisLow(void);
 
-  private:
-    // heating
-    bool      newData;
-    bool      thermostatMode;
-    bool      actualState;
-    uint8_t   targetTemperature;
-    uint8_t   relayGpio;
-    int16_t   thermostatHysteresis;
-    int16_t   thermostatHysteresisHigh;
-    int16_t   thermostatHysteresisLow;
-    // sensor
-    bool      sensorError;
-    bool      newCalib;
-    int16_t   currentTemperature;
-    int16_t   currentHumidity;
-    int16_t   filteredTemperature;
-    int16_t   filteredHumidity;
-    int16_t   sensorFailureCounter;
-    int16_t   tempOffset;
-    int16_t   tempFactor;
-    const int16_t sensorErrorThreshold = 3;
-    // filter
-    bool      tempValueQueueFilled;
-    bool      humidValueQueueFilled;
-    int16_t   tempValueSampleID;
-    int16_t   tempValueQueue[CFG_MEDIAN_QUEUE_SIZE];
-    int16_t   humidValueSampleID;
-    int16_t   humidValueQueue[CFG_MEDIAN_QUEUE_SIZE];
+ private:
+  // heating
+  bool newData;
+  bool thermostatMode;
+  bool actualState;
+  uint8_t targetTemperature;
+  uint8_t relayGpio;
+  int16_t thermostatHysteresis;
+  int16_t thermostatHysteresisHigh;
+  int16_t thermostatHysteresisLow;
+  // sensor
+  bool sensorError;
+  bool newCalib;
+  int16_t currentTemperature;
+  int16_t currentHumidity;
+  int16_t filteredTemperature;
+  int16_t filteredHumidity;
+  int16_t sensorFailureCounter;
+  int16_t tempOffset;
+  int16_t tempFactor;
+  const int16_t sensorErrorThreshold = 3;
+  // filter
+  bool tempValueQueueFilled;
+  bool humidValueQueueFilled;
+  int16_t tempValueSampleID;
+  int16_t tempValueQueue[CFG_MEDIAN_QUEUE_SIZE];
+  int16_t humidValueSampleID;
+  int16_t humidValueQueue[CFG_MEDIAN_QUEUE_SIZE];
 };
 
-#endif /* cTHERMOSTAT_H_ */
+#endif  // CTHERMOSTAT_H_
