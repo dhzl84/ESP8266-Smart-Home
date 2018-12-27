@@ -29,7 +29,7 @@ typedef enum {
 }switch_t;
 
 class mqttHelper {
-  public:
+ public:
   mqttHelper(void);
   ~mqttHelper(void);
   void   init(void);
@@ -61,7 +61,7 @@ class mqttHelper {
   String buildHassDiscoverySwitch(switch_t switches);
   String getTopicData(void);
 
-  private:
+ private:
   bool   nameChanged;
   String mqttData;
   String mqttUpdateFirmware;
