@@ -54,6 +54,7 @@ jobs:
         - ls -l
         - mv config.h src/config.h
         - platformio run
+        name: Build rotary encoder binary
     - script:
         - chmod a+x config.sh
         - echo "generate config.h for push button input"
@@ -62,6 +63,7 @@ jobs:
         - ls -l
         - mv config.h src/config.h
         - platformio run
+        name: Build push button binary
     - script: cpplint --root=src --repository=src --verbose=0 $(find src -name \*.cpp -or -name \*.h)
       name: Lint
 
