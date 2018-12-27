@@ -35,7 +35,7 @@ cache:
 
 stages:
   - build
-  - lint
+  # - lint
 
 install:
   - pip install -U platformio
@@ -62,9 +62,8 @@ jobs:
         - ls -l
         - mv config.h src/config.h
         - platformio run
-    - stage: lint
-      script:
-        - cpplint --root=src --repository=src --verbose=0 $(find src -name \*.cpp OR -name \*.h)
+    - script: cpplint --root=src --repository=src --verbose=0 $(find src -name \*.cpp -or -name \*.h)
+      name: Lint
 
 notifications:
   email:
