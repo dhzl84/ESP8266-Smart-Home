@@ -40,7 +40,7 @@ install:
     - pip install cpplint
 
 script:
-    - cpplint --root=src --repository=src --verbose=0 (find src -name \*.h -or -name \*.cpp)
+    - cpplint --root=src --repository=src --verbose=0 $(find src -name \*.cpp)
     - chmod a+x config.sh
     - echo "generate config.h for rotary encoder input"
     - ./config.sh false
