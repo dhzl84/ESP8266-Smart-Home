@@ -126,6 +126,7 @@ void setup() {
   myMqttHelper.setup(String(myConfig.name));
   MQTT_CONNECT(); /* connect to MQTT host and build subscriptions, must be called after SPIFFS_INIT()*/
 
+  MDNS.begin(myConfig.name);
   webServer.begin();
   webServer.on("/", handleWebServerClient);
 
@@ -268,9 +269,6 @@ void WIFI_CONNECT(void) {
       #endif
     }
   }
-
-  MDNS.begin(myConfig.name);
-  MDNS.addService("http", "tcp", 80);
 
   #ifdef CFG_DEBUG
   Serial.println("WiFi Status: "+ String(WiFi.status()));
