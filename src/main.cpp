@@ -118,12 +118,12 @@ void setup() {
 
   SPIFFS_INIT();                                                                                   /* read stuff from SPIFFS */
   GPIO_CONFIG();                                                                                   /* configure GPIOs */
-  myThermostat.setup(RELAY_PIN, myConfig.tTemp, myConfig.calibF, myConfig.calibO, myConfig.tHyst); /*GPIO to switch connected relay, initial target temperature, sensor calbigration and thermostat hysteresis */
+  myThermostat.setup(RELAY_PIN, myConfig.tTemp, myConfig.calibF, myConfig.calibO, myConfig.tHyst); /* GPIO to switch the connected relay, initial target temperature, sensor calbigration and thermostat hysteresis */
   myDHT.setup(DHT_PIN, DHTesp::DHT22);                                                             /* init DHT sensor */
   DISPLAY_INIT();                                                                                  /* init Display */
   WIFI_CONNECT();                                                                                  /* connect to WiFi */
   OTA_INIT();
-  myMqttHelper.setup(String(myConfig.name));
+  myMqttHelper.setup(String(myConfig.name));                                                       /* build MQTT topics based on the defined device name */
   MQTT_CONNECT(); /* connect to MQTT host and build subscriptions, must be called after SPIFFS_INIT()*/
 
   MDNS.begin(myConfig.name);
@@ -141,7 +141,7 @@ void setup() {
   attachInterrupt(PHYS_INPUT_3_PIN, onOffButton,   FALLING);
   #endif /* CFG_PUSH_BUTTONS */
 
-  SENSOR_MAIN(); /* acquire first sensor data before staring loop() */
+  SENSOR_MAIN(); /* acquire first sensor data before staring loop() to avoid relay toggle due to current temperature being 0 °C (init value) until first sensor value is read */
 
   #ifdef CFG_DEBUG
   Serial.println("Reset Reason: " + String(ESP.getResetReason()));
@@ -154,9 +154,10 @@ void setup() {
 }
 
 /*===================================================================================================================*/
-/* functions called by setup() */
+/* functions called by setup()                                                                                       */
 /*===================================================================================================================*/
-void SPIFFS_INIT(void) {
+
+void SPIFFS_INIT(void) {  // initializes the SPIFFS when first used and loads the configuration from SPIFFS to RAM
   SPIFFS.begin();
 
   if (!SPIFFS.exists("/formatted")) {
@@ -225,14 +226,12 @@ void SPIFFS_INIT(void) {
   Serial.println("My name is: " + String(myConfig.name));
 }
 
-void GPIO_CONFIG(void) {
-  /* initialize encoder / push button pins */
+void GPIO_CONFIG(void) {  /* initialize encoder / push button pins */
   pinMode(PHYS_INPUT_1_PIN, INPUT_PULLUP);
   pinMode(PHYS_INPUT_2_PIN, INPUT_PULLUP);
   pinMode(PHYS_INPUT_3_PIN, INPUT_PULLUP);
 }
 
-/* Display */
 void DISPLAY_INIT(void) {
   #ifdef CFG_DEBUG
   Serial.println("Initialize display");
@@ -251,7 +250,6 @@ void DISPLAY_INIT(void) {
 
 void WIFI_CONNECT(void) {
   WiFiConnectCounter++;
-  /* init WiFi */
   if (WiFi.status() != WL_CONNECTED) {
     #ifdef CFG_DEBUG
     Serial.println("Initialize WiFi ");
@@ -277,7 +275,6 @@ void WIFI_CONNECT(void) {
   #endif
 }
 
-/* OTA */
 void OTA_INIT(void) {
   ArduinoOTA.setHostname((myMqttHelper.getLoweredName()).c_str());
 
@@ -379,15 +376,6 @@ void loop() {
 /* functions called by loop() */
 /*===================================================================================================================*/
 void HANDLE_SYSTEM_STATE(void) {
-  if (systemRestartRequest == true) {
-    DRAW_DISPLAY_MAIN();
-    systemRestartRequest = false;
-    Serial.println("Restarting in 3 seconds");
-    myMqttClient.disconnect();
-    delay(3000);
-    ESP.restart();
-  }
-
   /* check WiFi connection every 30 seconds*/
   if (TimeReached(wifiReconnectTimer)) {
     SetNextTimeInterval(wifiReconnectTimer, (WIFI_RECONNECT_TIME * secondsToMillisecondsFactor));
@@ -415,6 +403,16 @@ void HANDLE_SYSTEM_STATE(void) {
   } else {
     onOffButtonSystemResetTime = millis();
   }
+
+  /* restart handling */
+  if (systemRestartRequest == true) {
+    DRAW_DISPLAY_MAIN();
+    systemRestartRequest = false;
+    Serial.println("Restarting in 3 seconds");
+    myMqttClient.disconnect();
+    delay(3000);
+    ESP.restart();
+  }
 }
 
 void SENSOR_MAIN() {
@@ -438,7 +436,6 @@ void SENSOR_MAIN() {
       #endif
     } else {
       myThermostat.setLastSensorReadFailed(false);   /* set no failure during read sensor */
-
       myThermostat.setCurrentHumidity((int16_t)(10* dhtHumid));     /* read value and convert to one decimal precision integer */
       myThermostat.setCurrentTemperature((int16_t)(10* dhtTemp));   /* read value and convert to one decimal precision integer */
 
@@ -459,7 +456,7 @@ void SENSOR_MAIN() {
       #endif
 
       #ifdef CFG_PRINT_TEMPERATURE_QUEUE
-      for (int16_t i = 0; i < CFG_MEDIAN_QUEUE_SIZE; i++) {
+      for (int16_t i = 0; i < CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE; i++) {
         int16_t temperature;
         int16_t humidity;
         if ( (myTemperatureFilter.getRawSampleValue(i, &temperature)) && (myHumidityFilter.getRawSampleValue(i, &humidity)) ) {
@@ -478,7 +475,7 @@ void SENSOR_MAIN() {
 
 void DRAW_DISPLAY_MAIN(void) {
   myDisplay.clear();
-  myDisplay.setContrast(50);
+  myDisplay.setContrast(80);
 
   if (systemRestartRequest == true) {
     myDisplay.setFont(Roboto_Condensed_16);
@@ -536,17 +533,17 @@ void DRAW_DISPLAY_MAIN(void) {
 
 void MQTT_MAIN(void) {
   if ( (myMqttClient.connected() != true) || (myMqttClient.returnCode() != LWMQTT_CONNECTION_ACCEPTED) ) {
-    if (TimeReached(mqttReconnectTime)) {
+    if (TimeReached(mqttReconnectTime)) {  /* try reconnect to MQTT broker after mqttReconnectTime expired */
+        SetNextTimeInterval(mqttReconnectTime, mqttReconnectInterval); /* reset interval */
         MQTT_CONNECT();
-        SetNextTimeInterval(mqttReconnectTime, mqttReconnectInterval); /* reset interval if MQTT_CONNECT was called*/
-    } else { /* try reconnect to MQTT broker after mqttReconnectTime expired */
+        mqttPubState();
+    } else {
       /* just wait */
     }
-  } else {
-    /* check if there is new data to publish and shift PubCycle if data is published on event, else publish every PubCycleInterval */
+  } else {  /* check if there is new data to publish and shift PubCycle if data is published on event, else publish every PubCycleInterval */
     if ( TimeReached(mqttPubCycleTime) || myThermostat.getNewData() ) {
-        myThermostat.resetNewData();
         SetNextTimeInterval(mqttPubCycleTime, myConfig.mqttPubCycleInterval * minutesToMillisecondsFactor);
+        myThermostat.resetNewData();
         mqttPubState();
     }
   }
@@ -698,8 +695,8 @@ void homeAssistantDiscovery(void) {
 /* publish state topic in JSON format */
 void mqttPubState(void) {
   myMqttClient.publish( \
-    myMqttHelper.getTopicData(), /* topic */ \
-    myMqttHelper.buildStateJSON( /* JSON payload */\
+    myMqttHelper.getTopicData(), /* get topic */ \
+    myMqttHelper.buildStateJSON( /* build JSON payload */\
       String(intToFloat(myThermostat.getFilteredTemperature()), 1), \
       String(intToFloat(myThermostat.getFilteredHumidity()), 1), \
       String(intToFloat(myThermostat.getThermostatHysteresis()), 1), \
