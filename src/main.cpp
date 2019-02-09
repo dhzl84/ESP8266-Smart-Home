@@ -688,7 +688,7 @@ void homeAssistantDiscovery(void) {
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sCalibO),             myMqttHelper.buildHassDiscoverySensor(sCalibO),             true, MQTT_QOS);    // make HA discover the offset sensor
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sHysteresis),         myMqttHelper.buildHassDiscoverySensor(sHysteresis),         true, MQTT_QOS);    // make HA discover the hysteresis sensor
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sFW),                 myMqttHelper.buildHassDiscoverySensor(sFW),                 true, MQTT_QOS);    // make HA discover the firmware version sensor
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swReset),             myMqttHelper.buildHassDiscoverySwitch(swReset),             true, MQTT_QOS);    // make HA discover the reset switch
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swRestart),             myMqttHelper.buildHassDiscoverySwitch(swRestart),             true, MQTT_QOS);    // make HA discover the reset switch
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swUpdate),            myMqttHelper.buildHassDiscoverySwitch(swUpdate),            true, MQTT_QOS);    // make HA discover the update switch
 }
 

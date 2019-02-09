@@ -261,13 +261,12 @@ String mqttHelper::buildHassDiscoverySwitch(switch_t switches) {
   String JSON = "void";
 
   switch (switches) {
-    case swReset:
+    case swRestart:
     {
       JSON = \
       "{\n" \
       "  \"~\":\"" + mqttGeneralBaseTopic + "\",\n" \
       "  \"name\":\"Neustart " + mqttNodeId + "\",\n" \
-      "  \"dev_cla\":\"temperature\",\n" \
       "  \"cmd_t\":\"~" + mqttSystemRestartRequest + "\",\n" \
       "  \"stat_t\":\"~" + mqttSystemRestartResponse + "\",\n" \
       "  \"pl_on\":\"true\",\n" \
@@ -393,7 +392,7 @@ String mqttHelper::getTopicHassDiscoverySwitch(switch_t switches) {
   String topic = "void";
 
   switch (switches) {
-    case swReset:
+    case swRestart:
       topic = mqttPrefix + mqttCompSwitch + loweredMqttNodeId + mqttObjectId + "Reset" + mqttHassDiscoveryTopic;
     break;
     case swUpdate:

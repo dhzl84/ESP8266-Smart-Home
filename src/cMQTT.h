@@ -24,7 +24,7 @@ typedef enum {
 }binarySensor_t;
 
 typedef enum {
-  swReset,
+  swRestart,
   swUpdate
 }switch_t;
 
