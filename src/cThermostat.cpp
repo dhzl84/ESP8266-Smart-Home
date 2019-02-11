@@ -22,8 +22,8 @@ void Thermostat::init() {
   sensorError                = false;    // filtered sensor error
   currentTemperature         = 0;        // current sensor temperature
   currentHumidity            = 0;        // current sensor humidity
-  filteredTemperature        = 0;        // filtered sensor temperature; median of CFG_MEDIAN_QUEUE_SIZE samples
-  filteredHumidity           = 0;        // filtered sensor humidity; median of CFG_MEDIAN_QUEUE_SIZE samples
+  filteredTemperature        = 0;        // filtered sensor temperature; mean value of CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE samples
+  filteredHumidity           = 0;        // filtered sensor humidity; mean value of CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE samples
   sensorFailureCounter       = 0;        // count sensor failures during read
   tempOffset                 = 0;        // offset in 0.1 *C
   tempFactor                 = 100;      // factor in percent
@@ -31,7 +31,7 @@ void Thermostat::init() {
   tempValueQueueFilled       = false;
   tempValueSampleID          = 0;
 
-  for (int16_t i=0; i < CFG_MEDIAN_QUEUE_SIZE; i++) {
+  for (int16_t i=0; i < CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE; i++) {
     tempValueQueue[i] = (int16_t)0;
   }
 
@@ -39,7 +39,7 @@ void Thermostat::init() {
   humidValueQueueFilled      = false;
   humidValueSampleID         = 0;
 
-  for (int16_t i=0; i < CFG_MEDIAN_QUEUE_SIZE; i++) {
+  for (int16_t i=0; i < CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE; i++) {
     humidValueQueue[i] = (int16_t)0;
   }
 }
@@ -212,7 +212,7 @@ void Thermostat::setCurrentTemperature(int16_t value) {
   // add new temperature to filter
   tempValueQueue[tempValueSampleID] = currentTemperature;
   tempValueSampleID++;
-  if (tempValueSampleID == CFG_MEDIAN_QUEUE_SIZE) {
+  if (tempValueSampleID == CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE) {
     tempValueSampleID = 0;
     if (tempValueQueueFilled == false) {
       tempValueQueueFilled = true;
@@ -222,10 +222,10 @@ void Thermostat::setCurrentTemperature(int16_t value) {
   // calculate new filtered temeprature
   float tempValue = (int16_t) 0;
   if (tempValueQueueFilled == true) {
-    for (int16_t i=0; i < CFG_MEDIAN_QUEUE_SIZE; i++) {
+    for (int16_t i=0; i < CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE; i++) {
       tempValue += (tempValueQueue[i]);
     }
-    tempValue = (tempValue / (int16_t) (CFG_MEDIAN_QUEUE_SIZE));
+    tempValue = (tempValue / (int16_t) (CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE));
   } else {  /* return partially filtered value until queue is filled */
     if (tempValueSampleID > 0) {
       for (int16_t i=0; i < tempValueSampleID; i++) {
@@ -243,7 +243,7 @@ void Thermostat::setCurrentHumidity(int16_t value) {
   // add new humdity to filter
   humidValueQueue[humidValueSampleID] = value;
   humidValueSampleID++;
-  if (humidValueSampleID == CFG_MEDIAN_QUEUE_SIZE) {
+  if (humidValueSampleID == CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE) {
     humidValueSampleID = 0;
     if (humidValueQueueFilled == false) {
       humidValueQueueFilled = true;
@@ -253,10 +253,10 @@ void Thermostat::setCurrentHumidity(int16_t value) {
   // calculate new filtered temeprature
   float humidValue = (int16_t) 0;
   if (humidValueQueueFilled == true) {
-    for (int16_t i=0; i < CFG_MEDIAN_QUEUE_SIZE; i++) {
+    for (int16_t i=0; i < CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE; i++) {
       humidValue += (humidValueQueue[i]);
     }
-    humidValue = (humidValue / (int16_t) (CFG_MEDIAN_QUEUE_SIZE));
+    humidValue = (humidValue / (int16_t) (CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE));
   } else {  /* return partially filtered value until queue is filled */
     if (humidValueSampleID > 0) {
       for (int16_t i=0; i < humidValueSampleID; i++) {
