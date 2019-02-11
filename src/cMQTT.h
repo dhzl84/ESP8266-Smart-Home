@@ -24,7 +24,7 @@ typedef enum {
 }binarySensor_t;
 
 typedef enum {
-  swReset,
+  swRestart,
   swUpdate
 }switch_t;
 
@@ -33,14 +33,8 @@ class mqttHelper {
   mqttHelper(void);
   ~mqttHelper(void);
   void   init(void);
-  void   setup(String name);
-  void   changeName(String value);
-  void   setName(String value);
+  void   setup(void);
   void   buildTopics(void);
-  bool   getNameChanged();
-  void   resetNameChanged();
-  String getName(void);
-  String getLoweredName(void);
   String getTopicUpdateFirmware(void);
   String getTopicUpdateFirmwareAccepted(void);
   String getTopicChangeName(void);
@@ -54,11 +48,11 @@ class mqttHelper {
   String getTopicHassDiscoveryBinarySensor(binarySensor_t binarySensor);
   String getTopicHassDiscoverySensor(sensor_t sensor);
   String getTopicHassDiscoverySwitch(switch_t switches);
-  String buildStateJSON(String Temp, String humid, String hysteresis, String actState, String tarTemp, String sensError, String thermoMode, String calibF, String calibO, String ip, String firmware);
-  String buildHassDiscoveryClimate(void);
-  String buildHassDiscoveryBinarySensor(binarySensor_t binarySensor);
-  String buildHassDiscoverySensor(sensor_t sensor);
-  String buildHassDiscoverySwitch(switch_t switches);
+  String buildStateJSON(String name, String Temp, String humid, String hysteresis, String actState, String tarTemp, String sensError, String thermoMode, String calibF, String calibO, String ip, String firmware);
+  String buildHassDiscoveryClimate(String name, String firmware);
+  String buildHassDiscoveryBinarySensor(String name, binarySensor_t binarySensor);
+  String buildHassDiscoverySensor(String name, sensor_t sensor);
+  String buildHassDiscoverySwitch(String name, switch_t switches);
   String getTopicData(void);
 
  private:
@@ -72,7 +66,7 @@ class mqttHelper {
   String mqttSystemRestartResponse;
   String mqttPrefix;
   String mqttNodeId;
-  String loweredMqttNodeId;
+  String mqttDeviceName;
   String mqttCompClimate;
   String mqttCompSensor;
   String mqttCompSwitch;

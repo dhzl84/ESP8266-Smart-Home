@@ -19,8 +19,8 @@
   #define minHysteresis (int16_t)2    // 0.2 °C
 #endif
 
-#ifndef CFG_MEDIAN_QUEUE_SIZE
-  #define CFG_MEDIAN_QUEUE_SIZE 10
+#ifndef CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE
+  #define CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE 10
 #endif
 
 #define TH_HEAT true
@@ -92,9 +92,9 @@ class Thermostat {
   bool tempValueQueueFilled;
   bool humidValueQueueFilled;
   int16_t tempValueSampleID;
-  int16_t tempValueQueue[CFG_MEDIAN_QUEUE_SIZE];
+  int16_t tempValueQueue[CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE];
   int16_t humidValueSampleID;
-  int16_t humidValueQueue[CFG_MEDIAN_QUEUE_SIZE];
+  int16_t humidValueQueue[CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE];
 };
 
 #endif  // CTHERMOSTAT_H_
