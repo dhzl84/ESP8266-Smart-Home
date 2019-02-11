@@ -13,28 +13,22 @@ mqttHelper::mqttHelper()  { mqttHelper::init(); }
 mqttHelper::~mqttHelper() {}
 
 void mqttHelper::init() {
+}
+
+void mqttHelper::setup() {
   mqttPrefix              = "homeassistant/";
-  mqttNodeId              = "unknown";                     // to be set by SPIFFS_INIT before mqttHelper setup
+  mqttNodeId              = String(ESP.getChipId(), HEX);                     // to be set by SPIFFS_INIT before mqttHelper setup
   mqttObjectId            = "/thermostat";
   mqttCompClimate         = "climate/";
   mqttCompBinarySensor    = "binary_sensor/";
   mqttCompSensor          = "sensor/";
   mqttCompSwitch          = "switch/";
-  mqttGeneralBaseTopic    = "";                            // built in buildTopics
-
-  nameChanged = false;
-}
-
-void mqttHelper::setup(String name) {
-  #if CFG_DEBUG
-  Serial.println("MQTT setup: "+ name);
-  #endif
-  setName(name);
+  mqttDeviceName          = "unknown";
   buildTopics();
 }
 
 void mqttHelper::buildTopics(void) {
-  mqttGeneralBaseTopic =        mqttPrefix + mqttCompClimate + loweredMqttNodeId + mqttObjectId;  // used for all topics except discovery of the non climate components
+  mqttGeneralBaseTopic =        mqttPrefix + mqttCompClimate + mqttNodeId + mqttObjectId;  // used for all topics except discovery of the non climate components
 // sub
   mqttUpdateFirmware =          "/updateFirmware";
   mqttChangeName =              "/changeName";
@@ -50,10 +44,11 @@ void mqttHelper::buildTopics(void) {
   mqttData =                    "/state";
 }
 
-String mqttHelper::buildStateJSON(String temp, String humid, String hysteresis, String actState, String tarTemp, String sensError, String thermoMode, String calibF, String calibO, String ip, String firmware) {
+String mqttHelper::buildStateJSON(String name, String temp, String humid, String hysteresis, String actState, String tarTemp, String sensError, String thermoMode, String calibF, String calibO, String ip, String firmware) {
   String JSON = \
   "{\n" \
-  "  \"name\":\"" + mqttNodeId + "\",\n" \
+  "  \"name\":\"" + name + "\",\n" \
+  "  \"device\":\"" + mqttNodeId + "\",\n" \
   "  \"mode\":\"" + thermoMode + "\",\n" \
   "  \"state\":\"" + actState + "\",\n" \
   "  \"target_temp\":\"" + tarTemp + "\",\n" \
@@ -70,11 +65,11 @@ String mqttHelper::buildStateJSON(String temp, String humid, String hysteresis, 
   return (JSON);
 }
 
-String mqttHelper::buildHassDiscoveryClimate(void) {
+String mqttHelper::buildHassDiscoveryClimate(String name, String firmware) {
   String JSON = \
   "{\n" \
   "  \"~\":\"" + mqttGeneralBaseTopic + "\",\n" \
-  "  \"name\":\"" + mqttNodeId + "\",\n" \
+  "  \"name\":\"" + name + "\",\n" \
   "  \"mode_cmd_t\":\"~" + mqttThermostatModeCmd + "\",\n" \
   "  \"mode_stat_t\":\"~" + mqttData + "\",\n" \
   "  \"mode_stat_tpl\":\"{{value_json.mode}}\",\n" \
@@ -92,13 +87,20 @@ String mqttHelper::buildHassDiscoveryClimate(void) {
   "  \"max_temp\":\"25\",\n" \
   "  \"temp_step\":\"0.5\",\n" \
   "  \"unit_of_meas\":\"°C\",\n" \
-  "  \"modes\":[\"heat\",\"off\"]\n" \
+  "  \"modes\":[\"heat\",\"off\"],\n" \
+  "  \"uniq_id\":\"" + mqttNodeId + "_climate\",\n" \
+  "  \"device\" : { \n" \
+  "    \"identifiers\":[\"" + mqttNodeId + "\"],\n" \
+  "    \"name\":\"" + name + "\",\n" \
+  "    \"sw_version\":\"" + firmware + "\",\n" \
+  "    \"manufacturer\":\"DHZL84\"\n" \
+  "  }\n" \
   "}";
 
   return (JSON);
 }
 
-String mqttHelper::buildHassDiscoveryBinarySensor(binarySensor_t binarySensor) {
+String mqttHelper::buildHassDiscoveryBinarySensor(String name, binarySensor_t binarySensor) {
   String JSON;
 
   switch (binarySensor) {
@@ -107,7 +109,7 @@ String mqttHelper::buildHassDiscoveryBinarySensor(binarySensor_t binarySensor) {
       JSON = \
       "{\n" \
       "  \"~\":\"" + mqttGeneralBaseTopic + "\",\n" \
-      "  \"name\":\"Sensorfehler " + mqttNodeId + "\",\n" \
+      "  \"name\":\"Sensorfehler " + name + "\",\n" \
       "  \"dev_cla\":\"problem\",\n" \
       "  \"stat_t\":\"~" + mqttData + "\",\n" \
       "  \"val_tpl\":\"{{value_json.sens_status}}\",\n" \
@@ -115,7 +117,11 @@ String mqttHelper::buildHassDiscoveryBinarySensor(binarySensor_t binarySensor) {
       "  \"pl_off\":\"0\",\n" \
       "  \"avty_t\":\"~" + mqttWill + "\",\n" \
       "  \"pl_avail\":\"online\",\n" \
-      "  \"pl_not_avail\":\"offline\"\n" \
+      "  \"pl_not_avail\":\"offline\",\n" \
+      "  \"uniq_id\":\"" + mqttNodeId + "_sensStatus\",\n" \
+      "  \"device\" : { \n" \
+      "    \"identifiers\":[\"" + mqttNodeId + "\"]\n" \
+      "  }\n" \
       "}";
     }
     break;
@@ -125,7 +131,7 @@ String mqttHelper::buildHassDiscoveryBinarySensor(binarySensor_t binarySensor) {
       JSON = \
       "{\n" \
       "  \"~\":\"" + mqttGeneralBaseTopic + "\",\n" \
-      "  \"name\":\"State " + mqttNodeId + "\",\n" \
+      "  \"name\":\"State " + name + "\",\n" \
       "  \"dev_cla\":\"heat\",\n" \
       "  \"stat_t\":\"~" + mqttData + "\",\n" \
       "  \"val_tpl\":\"{{value_json.state}}\",\n" \
@@ -133,7 +139,11 @@ String mqttHelper::buildHassDiscoveryBinarySensor(binarySensor_t binarySensor) {
       "  \"pl_off\":\"off\",\n" \
       "  \"avty_t\":\"~" + mqttWill + "\",\n" \
       "  \"pl_avail\":\"online\",\n" \
-      "  \"pl_not_avail\":\"offline\"\n" \
+      "  \"pl_not_avail\":\"offline\",\n" \
+      "  \"uniq_id\":\"" + mqttNodeId + "_state\",\n" \
+      "  \"device\" : { \n" \
+      "    \"identifiers\":[\"" + mqttNodeId + "\"]\n" \
+      "  }\n" \
       "}";
     }
     break;
@@ -141,7 +151,7 @@ String mqttHelper::buildHassDiscoveryBinarySensor(binarySensor_t binarySensor) {
   return (JSON);
 }
 
-String mqttHelper::buildHassDiscoverySensor(sensor_t sensor) {
+String mqttHelper::buildHassDiscoverySensor(String name, sensor_t sensor) {
   String JSON = "void";
 
   switch (sensor) {
@@ -150,14 +160,18 @@ String mqttHelper::buildHassDiscoverySensor(sensor_t sensor) {
       JSON = \
       "{\n" \
       "  \"~\":\"" + mqttGeneralBaseTopic + "\",\n" \
-      "  \"name\":\"Temperatur " + mqttNodeId + "\",\n" \
+      "  \"name\":\"Temperatur " + name + "\",\n" \
       "  \"dev_cla\":\"temperature\",\n" \
       "  \"stat_t\":\"~" + mqttData + "\",\n" \
       "  \"val_tpl\":\"{{value_json.current_temp}}\",\n" \
       "  \"unit_of_meas\":\"°C\",\n" \
       "  \"avty_t\":\"~" + mqttWill + "\",\n" \
       "  \"pl_avail\":\"online\",\n" \
-      "  \"pl_not_avail\":\"offline\"\n" \
+      "  \"pl_not_avail\":\"offline\",\n" \
+      "  \"uniq_id\":\"" + mqttNodeId + "_sensTemp\",\n" \
+      "  \"device\" : { \n" \
+      "    \"identifiers\":[\"" + mqttNodeId + "\"]\n" \
+      "  }\n" \
       "}";
     }
     break;
@@ -166,14 +180,18 @@ String mqttHelper::buildHassDiscoverySensor(sensor_t sensor) {
       JSON = \
       "{\n" \
       "  \"~\":\"" + mqttGeneralBaseTopic + "\",\n" \
-      "  \"name\":\"Luftfeuchtigkeit " + mqttNodeId + "\",\n" \
+      "  \"name\":\"Luftfeuchtigkeit " + name + "\",\n" \
       "  \"dev_cla\":\"humidity\",\n" \
       "  \"stat_t\":\"~" + mqttData + "\",\n" \
       "  \"val_tpl\":\"{{value_json.humidity}}\",\n" \
       "  \"unit_of_meas\":\"%\",\n" \
       "  \"avty_t\":\"~" + mqttWill + "\",\n" \
       "  \"pl_avail\":\"online\",\n" \
-      "  \"pl_not_avail\":\"offline\"\n" \
+      "  \"pl_not_avail\":\"offline\",\n" \
+      "  \"uniq_id\":\"" + mqttNodeId + "_sensHum\",\n" \
+      "  \"device\" : { \n" \
+      "    \"identifiers\":[\"" + mqttNodeId + "\"]\n" \
+      "  }\n" \
       "}";
     }
     break;
@@ -182,12 +200,16 @@ String mqttHelper::buildHassDiscoverySensor(sensor_t sensor) {
       JSON = \
       "{\n" \
       "  \"~\":\"" + mqttGeneralBaseTopic + "\",\n" \
-      "  \"name\":\"IP " + mqttNodeId + "\",\n" \
+      "  \"name\":\"IP " + name + "\",\n" \
       "  \"stat_t\":\"~" + mqttData + "\",\n" \
       "  \"val_tpl\":\"{{value_json.ip}}\",\n" \
       "  \"avty_t\":\"~" + mqttWill + "\",\n" \
       "  \"pl_avail\":\"online\",\n" \
-      "  \"pl_not_avail\":\"offline\"\n" \
+      "  \"pl_not_avail\":\"offline\",\n" \
+      "  \"uniq_id\":\"" + mqttNodeId + "_ip\",\n" \
+      "  \"device\" : { \n" \
+      "    \"identifiers\":[\"" + mqttNodeId + "\"]\n" \
+      "  }\n" \
       "}";
     }
     break;
@@ -196,13 +218,17 @@ String mqttHelper::buildHassDiscoverySensor(sensor_t sensor) {
       JSON = \
       "{\n" \
       "  \"~\":\"" + mqttGeneralBaseTopic + "\",\n" \
-      "  \"name\":\"Skalierung " + mqttNodeId + "\",\n" \
+      "  \"name\":\"Skalierung " + name + "\",\n" \
       "  \"stat_t\":\"~" + mqttData + "\",\n" \
       "  \"val_tpl\":\"{{value_json.sens_scale}}\",\n" \
       "  \"unit_of_meas\":\"%\",\n" \
       "  \"avty_t\":\"~" + mqttWill + "\",\n" \
       "  \"pl_avail\":\"online\",\n" \
-      "  \"pl_not_avail\":\"offline\"\n" \
+      "  \"pl_not_avail\":\"offline\",\n" \
+      "  \"uniq_id\":\"" + mqttNodeId + "_calibF\",\n" \
+      "  \"device\" : { \n" \
+      "    \"identifiers\":[\"" + mqttNodeId + "\"]\n" \
+      "  }\n" \
       "}";
     }
     break;
@@ -211,13 +237,17 @@ String mqttHelper::buildHassDiscoverySensor(sensor_t sensor) {
       JSON = \
       "{\n" \
       "  \"~\":\"" + mqttGeneralBaseTopic + "\",\n" \
-      "  \"name\":\"Offset " + mqttNodeId + "\",\n" \
+      "  \"name\":\"Offset " + name + "\",\n" \
       "  \"stat_t\":\"~" + mqttData + "\",\n" \
       "  \"val_tpl\":\"{{value_json.sens_offs}}\",\n" \
       "  \"unit_of_meas\":\"°C\",\n" \
       "  \"avty_t\":\"~" + mqttWill + "\",\n" \
       "  \"pl_avail\":\"online\",\n" \
-      "  \"pl_not_avail\":\"offline\"\n" \
+      "  \"pl_not_avail\":\"offline\",\n" \
+      "  \"uniq_id\":\"" + mqttNodeId + "_calibO\",\n" \
+      "  \"device\" : { \n" \
+      "    \"identifiers\":[\"" + mqttNodeId + "\"]\n" \
+      "  }\n" \
       "}";
     }
     break;
@@ -226,12 +256,16 @@ String mqttHelper::buildHassDiscoverySensor(sensor_t sensor) {
       JSON = \
       "{\n" \
       "  \"~\":\"" + mqttGeneralBaseTopic + "\",\n" \
-      "  \"name\":\"Firmware " + mqttNodeId + "\",\n" \
+      "  \"name\":\"Firmware " + name + "\",\n" \
       "  \"stat_t\":\"~" + mqttData + "\",\n" \
       "  \"val_tpl\":\"{{value_json.fw}}\",\n" \
       "  \"avty_t\":\"~" + mqttWill + "\",\n" \
       "  \"pl_avail\":\"online\",\n" \
-      "  \"pl_not_avail\":\"offline\"\n" \
+      "  \"pl_not_avail\":\"offline\",\n" \
+      "  \"uniq_id\":\"" + mqttNodeId + "_fw\",\n" \
+      "  \"device\" : { \n" \
+      "    \"identifiers\":[\"" + mqttNodeId + "\"]\n" \
+      "  }\n" \
       "}";
     }
     break;
@@ -240,13 +274,17 @@ String mqttHelper::buildHassDiscoverySensor(sensor_t sensor) {
       JSON = \
       "{\n" \
       "  \"~\":\"" + mqttGeneralBaseTopic + "\",\n" \
-      "  \"name\":\"Hysteresis " + mqttNodeId + "\",\n" \
+      "  \"name\":\"Hysteresis " + name + "\",\n" \
       "  \"stat_t\":\"~" + mqttData + "\",\n" \
       "  \"val_tpl\":\"{{value_json.hysteresis}}\",\n" \
       "  \"unit_of_meas\":\"°C\",\n" \
       "  \"avty_t\":\"~" + mqttWill + "\",\n" \
       "  \"pl_avail\":\"online\",\n" \
-      "  \"pl_not_avail\":\"offline\"\n" \
+      "  \"pl_not_avail\":\"offline\",\n" \
+      "  \"uniq_id\":\"" + mqttNodeId + "_hyst\",\n" \
+      "  \"device\" : { \n" \
+      "    \"identifiers\":[\"" + mqttNodeId + "\"]\n" \
+      "  }\n" \
       "}";
     }
     break;
@@ -257,7 +295,7 @@ String mqttHelper::buildHassDiscoverySensor(sensor_t sensor) {
   return (JSON);
 }
 
-String mqttHelper::buildHassDiscoverySwitch(switch_t switches) {
+String mqttHelper::buildHassDiscoverySwitch(String name, switch_t switches) {
   String JSON = "void";
 
   switch (switches) {
@@ -266,7 +304,7 @@ String mqttHelper::buildHassDiscoverySwitch(switch_t switches) {
       JSON = \
       "{\n" \
       "  \"~\":\"" + mqttGeneralBaseTopic + "\",\n" \
-      "  \"name\":\"Neustart " + mqttNodeId + "\",\n" \
+      "  \"name\":\"Neustart " + name + "\",\n" \
       "  \"cmd_t\":\"~" + mqttSystemRestartRequest + "\",\n" \
       "  \"stat_t\":\"~" + mqttSystemRestartResponse + "\",\n" \
       "  \"pl_on\":\"true\",\n" \
@@ -274,7 +312,11 @@ String mqttHelper::buildHassDiscoverySwitch(switch_t switches) {
       "  \"avty_t\":\"~" + mqttWill + "\",\n" \
       "  \"pl_avail\":\"online\",\n" \
       "  \"pl_not_avail\":\"offline\",\n" \
-      "  \"qos\":\"1\"\n" \
+      "  \"qos\":\"1\",\n" \
+      "  \"uniq_id\":\"" + mqttNodeId + "_swRestart\",\n" \
+      "  \"device\" : { \n" \
+      "    \"identifiers\":[\"" + mqttNodeId + "\"]\n" \
+      "  }\n" \
       "}";
     }
     break;
@@ -283,7 +325,7 @@ String mqttHelper::buildHassDiscoverySwitch(switch_t switches) {
       JSON = \
       "{\n" \
       "  \"~\":\"" + mqttGeneralBaseTopic + "\",\n" \
-      "  \"name\":\"Firmwareupdate " + mqttNodeId + "\",\n" \
+      "  \"name\":\"Firmwareupdate " + name + "\",\n" \
       "  \"cmd_t\":\"~" + mqttUpdateFirmware + "\",\n" \
       "  \"stat_t\":\"~" + mqttUpdateFirmwareAccepted + "\",\n" \
       "  \"pl_on\":\"true\",\n" \
@@ -291,7 +333,11 @@ String mqttHelper::buildHassDiscoverySwitch(switch_t switches) {
       "  \"avty_t\":\"~" + mqttWill + "\",\n" \
       "  \"pl_avail\":\"online\",\n" \
       "  \"pl_not_avail\":\"offline\",\n" \
-      "  \"qos\":\"1\"\n" \
+      "  \"qos\":\"1\",\n" \
+      "  \"uniq_id\":\"" + mqttNodeId + "_swUpdate\",\n" \
+      "  \"device\" : { \n" \
+      "    \"identifiers\":[\"" + mqttNodeId + "\"]\n" \
+      "  }\n" \
       "}";
     }
     break;
@@ -302,30 +348,6 @@ String mqttHelper::buildHassDiscoverySwitch(switch_t switches) {
   return (JSON);
 }
 
-void mqttHelper::changeName(String value) {
-  if (value != mqttNodeId) {
-    mqttNodeId = value;
-    loweredMqttNodeId = value;
-    loweredMqttNodeId.toLowerCase();
-    mqttHelper::buildTopics();
-    nameChanged = true;
-  }
-}
-
-void mqttHelper::setName(String value) {
-  if (value != mqttNodeId) {
-    mqttNodeId = value;
-    loweredMqttNodeId = value;
-    loweredMqttNodeId.toLowerCase();
-    mqttHelper::buildTopics();
-    nameChanged = false;
-  }
-}
-
-void   mqttHelper::resetNameChanged(void)                         { nameChanged = false; }
-bool   mqttHelper::getNameChanged(void)                           { return nameChanged; }
-String mqttHelper::getName(void)                                  { return mqttNodeId; }
-String mqttHelper::getLoweredName(void)                           { return loweredMqttNodeId; }
 String mqttHelper::getTopicUpdateFirmware(void)                   { return mqttGeneralBaseTopic + mqttUpdateFirmware;  }
 String mqttHelper::getTopicUpdateFirmwareAccepted(void)           { return mqttGeneralBaseTopic + mqttUpdateFirmwareAccepted; }
 String mqttHelper::getTopicChangeName(void)                       { return mqttGeneralBaseTopic + mqttChangeName; }
@@ -344,13 +366,13 @@ String mqttHelper::getTopicHassDiscoveryBinarySensor(binarySensor_t binarySensor
   switch (binarySensor) {
     case bsSensFail:
     {
-      topic = mqttPrefix + mqttCompBinarySensor + loweredMqttNodeId + mqttObjectId + "SensFail" + mqttHassDiscoveryTopic;
+      topic = mqttPrefix + mqttCompBinarySensor + mqttNodeId + mqttObjectId + "SensFail" + mqttHassDiscoveryTopic;
     }
     break;
 
     case bsState:
     {
-      topic = mqttPrefix + mqttCompBinarySensor + loweredMqttNodeId + mqttObjectId + "State" + mqttHassDiscoveryTopic;
+      topic = mqttPrefix + mqttCompBinarySensor + mqttNodeId + mqttObjectId + "State" + mqttHassDiscoveryTopic;
     }
     break;
   }
@@ -362,25 +384,25 @@ String mqttHelper::getTopicHassDiscoverySensor(sensor_t sensor) {
 
   switch (sensor) {
     case sTemp:
-      topic = mqttPrefix + mqttCompSensor + loweredMqttNodeId + mqttObjectId + "Temp" + mqttHassDiscoveryTopic;
+      topic = mqttPrefix + mqttCompSensor + mqttNodeId + mqttObjectId + "Temp" + mqttHassDiscoveryTopic;
     break;
     case sHum:
-      topic = mqttPrefix + mqttCompSensor + loweredMqttNodeId + mqttObjectId + "Hum" + mqttHassDiscoveryTopic;
+      topic = mqttPrefix + mqttCompSensor + mqttNodeId + mqttObjectId + "Hum" + mqttHassDiscoveryTopic;
     break;
     case sIP:
-      topic = mqttPrefix + mqttCompSensor + loweredMqttNodeId + mqttObjectId + "IP" + mqttHassDiscoveryTopic;
+      topic = mqttPrefix + mqttCompSensor + mqttNodeId + mqttObjectId + "IP" + mqttHassDiscoveryTopic;
     break;
     case sCalibF:
-      topic = mqttPrefix + mqttCompSensor + loweredMqttNodeId + mqttObjectId + "CalibF" + mqttHassDiscoveryTopic;
+      topic = mqttPrefix + mqttCompSensor + mqttNodeId + mqttObjectId + "CalibF" + mqttHassDiscoveryTopic;
     break;
     case sCalibO:
-      topic = mqttPrefix + mqttCompSensor + loweredMqttNodeId + mqttObjectId + "CalibO" + mqttHassDiscoveryTopic;
+      topic = mqttPrefix + mqttCompSensor + mqttNodeId + mqttObjectId + "CalibO" + mqttHassDiscoveryTopic;
     break;
     case sFW:
-      topic = mqttPrefix + mqttCompSensor + loweredMqttNodeId + mqttObjectId + "FW" + mqttHassDiscoveryTopic;
+      topic = mqttPrefix + mqttCompSensor + mqttNodeId + mqttObjectId + "FW" + mqttHassDiscoveryTopic;
     break;
     case sHysteresis:
-      topic = mqttPrefix + mqttCompSensor + loweredMqttNodeId + mqttObjectId + "Hysteresis" + mqttHassDiscoveryTopic;
+      topic = mqttPrefix + mqttCompSensor + mqttNodeId + mqttObjectId + "Hysteresis" + mqttHassDiscoveryTopic;
     break;
     default:
     break;
@@ -393,10 +415,10 @@ String mqttHelper::getTopicHassDiscoverySwitch(switch_t switches) {
 
   switch (switches) {
     case swRestart:
-      topic = mqttPrefix + mqttCompSwitch + loweredMqttNodeId + mqttObjectId + "Reset" + mqttHassDiscoveryTopic;
+      topic = mqttPrefix + mqttCompSwitch + mqttNodeId + mqttObjectId + "Reset" + mqttHassDiscoveryTopic;
     break;
     case swUpdate:
-      topic = mqttPrefix + mqttCompSwitch + loweredMqttNodeId + mqttObjectId + "Update" + mqttHassDiscoveryTopic;
+      topic = mqttPrefix + mqttCompSwitch + mqttNodeId + mqttObjectId + "Update" + mqttHassDiscoveryTopic;
     break;
     default:
     break;
