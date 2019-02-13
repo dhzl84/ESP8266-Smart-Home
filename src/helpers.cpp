@@ -89,8 +89,7 @@ bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor)
   return ret;
 }
 
-char* millisFormatted(void)
-{
+char* millisFormatted(void) {
   static char str[16];
   uint32_t t = millis()/1000;
 
