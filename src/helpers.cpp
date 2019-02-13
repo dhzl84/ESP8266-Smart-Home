@@ -88,3 +88,23 @@ bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor)
   #endif
   return ret;
 }
+
+char* millisFormatted(void)
+{
+  static char str[16];
+  uint32_t t = millis()/1000;
+
+  uint32_t d = t / 86400;
+  t = t % 86400;
+  uint32_t h = t / 3600;
+  t = t % 3600;
+  uint16_t m = t / 60;
+  uint16_t s = t % 60;
+
+  snprintf(str, sizeof(str), "%uT %02u:%02u:%02u", d, h, m, s);
+  #ifdef CFG_DEBUG
+  Serial.println(str);
+  #endif  // CFG_DEBUG
+
+  return str;
+}
