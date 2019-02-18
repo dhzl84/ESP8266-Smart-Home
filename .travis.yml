@@ -48,16 +48,32 @@ jobs:
     - stage: build
       script:
         - chmod a+x config.sh
-        - echo "generate config.h for rotary encoder input"
-        - ./config.sh false
+        - echo "generate config.h for rotary encoder input and ArduinoMQTT"
+        - ./config.sh false false
         - cat config.h
         - ls -l
         - mv config.h src/config.h
         - platformio run
     - script:
         - chmod a+x config.sh
-        - echo "generate config.h for push button input"
-        - ./config.sh true
+        - echo "generate config.h for rotary encoder input and PubSubClient"
+        - ./config.sh false true
+        - cat config.h
+        - ls -l
+        - mv config.h src/config.h
+        - platformio run
+    - script:
+        - chmod a+x config.sh
+        - echo "generate config.h for push button input and ArduinoMQTT"
+        - ./config.sh true false
+        - cat config.h
+        - ls -l
+        - mv config.h src/config.h
+        - platformio run
+    - script:
+        - chmod a+x config.sh
+        - echo "generate config.h for push button input and PubSubClient"
+        - ./config.sh true true
         - cat config.h
         - ls -l
         - mv config.h src/config.h
