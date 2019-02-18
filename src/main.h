@@ -3,6 +3,7 @@
 #include "Arduino.h"
 #include <FS.h>  // SPIFFS
 #include "config.h"
+#include <ESP8266WiFi.h>
 
 /* the config.h file contains your personal configuration of the parameters below: 
   #define WIFI_SSID                   "xxx"
@@ -57,7 +58,11 @@ void SPIFFS_MAIN(void);
 void HANDLE_HTTP_UPDATE(void);
 /* callback */
 void handleWebServerClient(void);
+#if CFG_MQTT_LIB == cArduinoMQTT
 void messageReceived(String &topic, String &payload);  // NOLINT: pass by reference
+#else
+void messageReceived(char* c_topic, byte* c_payload, unsigned int length);
+#endif
 void onOffButton(void);
 #if CFG_PUSH_BUTTONS
 void upButton(void);

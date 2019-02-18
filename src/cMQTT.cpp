@@ -1,5 +1,4 @@
 #include "cMQTT.h"
-
 // The Home Asistant discovery topic need to follow a specific format:
 //
 //     <discovery_prefix>/<component>/[<node_id>/]<object_id>/<>
@@ -61,7 +60,6 @@ String mqttHelper::buildStateJSON(String name, String temp, String humid, String
   "  \"fw\":\"" + firmware + "\",\n" \
   "  \"ip\":\"" + ip + "\"\n "\
   "}";
-
   return (JSON);
 }
 
