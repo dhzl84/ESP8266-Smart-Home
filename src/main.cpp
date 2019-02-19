@@ -779,7 +779,6 @@ void handleWebServerClient(void) {
     "WiFi RSSI: " + String(WiFi.RSSI()) + "\n" \
     "WiFi connects: " + String(WiFiConnectCounter) + "\n" \
     "MQTT connection: " + String((myMqttClient.connected()) == true ? "connected" : "disconnected") + "\n" \
-    "MQTT status: " + String(myMqttClient.state()) + "\n" \
     "MQTT connects: " + String(MQTTConnectCounter));
 }
 
