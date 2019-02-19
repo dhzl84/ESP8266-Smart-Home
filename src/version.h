@@ -1,11 +1,7 @@
 #ifndef VERSION_H_
 #define VERSION_H_
 
-<<<<<<< HEAD
-#define VERSION "0.8.7c"
-=======
-#define VERSION "0.8.7a"
->>>>>>> origin/feature/time_since_reset
+#define VERSION "0.8.7d"
 
 #if defined CFG_DEBUG
 #define FW_PREFIX "d"
