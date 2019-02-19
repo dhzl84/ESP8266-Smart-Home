@@ -6,8 +6,6 @@
 #include "ESP8266WebServer.h"
 #include <ESP8266mDNS.h>
 #include <DHTesp.h>
-#include <osapi.h>   /* for sensor timer */
-#include <os_type.h> /* for sensor timer */
 #include "UserFonts.h"
 #include <SSD1306.h>
 #include <ESP8266httpUpdate.h>
@@ -19,9 +17,6 @@
 #include "cMQTT.h"
 
 #if CFG_MQTT_LIB == cPubSubClient
-#define MQTT_MAX_PACKET_SIZE 1024
-#define MQTT_KEEPALIVE 60
-#define MQTT_SOCKET_TIMEOUT 60
 #include "PubSubClient.h"
 #else
 #include "MQTTClient.h"
@@ -743,8 +738,6 @@ void homeAssistantDiscovery(void) {
 
 /* publish state topic in JSON format */
 void mqttPubState(void) {
-  uint32_t dur;
-
   String payload = myMqttHelper.buildStateJSON( /* build JSON payload */\
       String(myConfig.name), \
       String(intToFloat(myThermostat.getFilteredTemperature()), 1), \
@@ -758,7 +751,6 @@ void mqttPubState(void) {
       String(intToFloat(myThermostat.getSensorCalibOffset()), 0), \
       WiFi.localIP().toString(), \
       String(FW) );
-  dur = millis();
   #if CFG_MQTT_LIB == cArduinoMQTT
   myMqttClient.publish( \
     myMqttHelper.getTopicData(), /* get topic */ \
@@ -771,8 +763,6 @@ void mqttPubState(void) {
     payload.c_str(), \
     true); /* retain */
   #endif
-  dur = millis() - dur;
-  Serial.println("pub duration: " + String(dur));
 }
 
 void handleWebServerClient(void) {
@@ -788,7 +778,8 @@ void handleWebServerClient(void) {
     "WiFi Status: " + String(WiFi.status()) + "\n" \
     "WiFi RSSI: " + String(WiFi.RSSI()) + "\n" \
     "WiFi connects: " + String(WiFiConnectCounter) + "\n" \
-    "MQTT Status: " + String((myMqttClient.connected()) == true ? "connected" : "disconnected") + "\n" \
+    "MQTT connection: " + String((myMqttClient.connected()) == true ? "connected" : "disconnected") + "\n" \
+    "MQTT status: " + String(myMqttClient.state()) + "\n" \
     "MQTT connects: " + String(MQTTConnectCounter));
 }
 

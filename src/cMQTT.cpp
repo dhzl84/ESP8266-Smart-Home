@@ -91,7 +91,7 @@ String mqttHelper::buildHassDiscoveryClimate(String name, String firmware) {
   "    \"identifiers\":[\"" + mqttNodeId + "\"],\n" \
   "    \"name\":\"" + name + "\",\n" \
   "    \"sw_version\":\"" + firmware + "\",\n" \
-  "    \"manufacturer\":\"DHZL84\"\n" \
+  "    \"manufacturer\":\"dhzl84\"\n" \
   "  }\n" \
   "}";
 
