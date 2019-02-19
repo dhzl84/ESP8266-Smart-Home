@@ -770,6 +770,7 @@ void handleWebServerClient(void) {
     "Name: "+ String(myConfig.name) + "\n" \
     "FW version: "+ String(FW) + "\n" \
     "Reset Reason: "+ String(ESP.getResetReason()) + "\n" \
+    "Time since Reset: "+ String(millisFormatted()) + "\n" \
     "Flash Size: "+ String(ESP.getFlashChipRealSize()) + "\n" \
     "Sketch Size: "+ String(ESP.getSketchSize()) + "\n" \
     "Free for Sketch: "+ String(ESP.getFreeSketchSpace()) + "\n" \
