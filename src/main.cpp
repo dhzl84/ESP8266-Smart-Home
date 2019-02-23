@@ -134,7 +134,8 @@ void setup() {
   myMqttHelper.setup();                                                       /* build MQTT topics based on the defined device name */
   MQTT_CONNECT(); /* connect to MQTT host and build subscriptions, must be called after SPIFFS_INIT()*/
 
-  MDNS.begin(strlwr(myConfig.name));
+  ESPhttpUpdate.rebootOnUpdate(true);
+  MDNS.begin(myConfig.name);
   webServer.begin();
   webServer.on("/", handleWebServerClient);
 
@@ -265,7 +266,7 @@ void WIFI_CONNECT(void) {
 
     WiFi.mode(WIFI_STA);
     WiFi.setSleepMode(WIFI_NONE_SLEEP);
-    WiFi.hostname(strlwr(myConfig.name));
+    WiFi.hostname(myConfig.name);
     WiFi.begin(myConfig.ssid, myConfig.wifiPwd);
 
     /* try to connect to WiFi, proceed offline if not connecting here*/
@@ -589,6 +590,7 @@ void HANDLE_HTTP_UPDATE(void) {
     fetchUpdate = false;
     Serial.printf("Remote update started");
 
+    // t_httpUpdate_return ret = ESPhttpUpdate.update(myWiFiClient, myConfig.updServer);
     t_httpUpdate_return ret = ESPhttpUpdate.update(myConfig.updServer);
 
     switch (ret) {

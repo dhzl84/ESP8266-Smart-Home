@@ -1,7 +1,7 @@
 #ifndef VERSION_H_
 #define VERSION_H_
 
-#define VERSION "0.8.7d"
+#define VERSION "0.8.7f"
 
 #if defined CFG_DEBUG
 #define FW_PREFIX "d"
