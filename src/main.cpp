@@ -134,7 +134,6 @@ void setup() {
   myMqttHelper.setup();                                                       /* build MQTT topics based on the defined device name */
   MQTT_CONNECT(); /* connect to MQTT host and build subscriptions, must be called after SPIFFS_INIT()*/
 
-  ESPhttpUpdate.rebootOnUpdate(true);
   MDNS.begin(myConfig.name);
   webServer.begin();
   webServer.on("/", handleWebServerClient);
@@ -588,13 +587,13 @@ void HANDLE_HTTP_UPDATE(void) {
 
     DRAW_DISPLAY_MAIN();
     fetchUpdate = false;
-    Serial.printf("Remote update started");
-
-    t_httpUpdate_return ret = ESPhttpUpdate.update(myWiFiClient, myConfig.updServer);
+    Serial.println("Remote update started");
+    WiFiClient client;
+    t_httpUpdate_return ret = ESPhttpUpdate.update(client, myConfig.updServer, FW);
 
     switch (ret) {
     case HTTP_UPDATE_FAILED:
-      Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+      Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s \n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
       break;
 
     case HTTP_UPDATE_NO_UPDATES:
