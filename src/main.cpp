@@ -590,8 +590,7 @@ void HANDLE_HTTP_UPDATE(void) {
     fetchUpdate = false;
     Serial.printf("Remote update started");
 
-    // t_httpUpdate_return ret = ESPhttpUpdate.update(myWiFiClient, myConfig.updServer);
-    t_httpUpdate_return ret = ESPhttpUpdate.update(myConfig.updServer);
+    t_httpUpdate_return ret = ESPhttpUpdate.update(myWiFiClient, myConfig.updServer);
 
     switch (ret) {
     case HTTP_UPDATE_FAILED:
