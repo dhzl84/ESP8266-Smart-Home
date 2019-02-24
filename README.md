@@ -15,13 +15,18 @@ SW Built with PlatformIO in Visual Studio Code, some great [Arduino](https://www
 [Circuit and PCB](https://github.com/dhzl84/ESP8266_Thermostat_PCB.git) made with [Target 3001](https://ibfriedrich.com/de/index.html)
 
 ## 1. Build Status Master: [![Build Status](https://travis-ci.org/dhzl84/ESP8266-Smart-Home.svg?branch=master)](https://travis-ci.org/dhzl84/ESP8266-Smart-Home) Develop: [![Build Status](https://travis-ci.org/dhzl84/ESP8266-Smart-Home.svg?branch=develop)](https://travis-ci.org/dhzl84/ESP8266-Smart-Home)
-* Master branch
+* Master branch only provides (pre-)release SW
+* Develop may contain untested changes
+
+### Dependencies
+Platform:
 * ESP8266 Arduino 2.5.0 (Espressif8266 2.0.1)
-* custom libraries:
-  * DHT sensor library for ESPx
-  * ESP8266 and ESP32 Oled Driver for SSD1306 display
-  * ArduinoMQTT or PubSubClient
-  * ArduinoJSON
+
+Custom libraries:
+* DHT sensor library for ESPx
+* ESP8266 and ESP32 Oled Driver for SSD1306 display
+* ArduinoMQTT or PubSubClient
+* ArduinoJSON
 
 ## 2. General hints
 See [my Home Assistant configuration](https://github.com/dhzl84/Home-Assistant-Configuration) for the usage of this devices.
