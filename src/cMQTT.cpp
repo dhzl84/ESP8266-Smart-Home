@@ -71,8 +71,6 @@ String mqttHelper::buildHassDiscoveryClimate(String name, String firmware) {
   "  \"mode_cmd_t\":\"~" + mqttThermostatModeCmd + "\",\n" \
   "  \"mode_stat_t\":\"~" + mqttData + "\",\n" \
   "  \"mode_stat_tpl\":\"{{value_json.mode}}\",\n" \
-  "  \"stat_t\":\"~" + mqttData + "\",\n" \
-  "  \"stat_val_tpl\":\"{{value_json.state}}\",\n" \
   "  \"avty_t\":\"~" + mqttWill + "\",\n" \
   "  \"pl_avail\":\"online\",\n" \
   "  \"pl_not_avail\":\"offline\",\n" \
@@ -84,7 +82,6 @@ String mqttHelper::buildHassDiscoveryClimate(String name, String firmware) {
   "  \"min_temp\":\"15\",\n" \
   "  \"max_temp\":\"25\",\n" \
   "  \"temp_step\":\"0.5\",\n" \
-  "  \"unit_of_meas\":\"°C\",\n" \
   "  \"modes\":[\"heat\",\"off\"],\n" \
   "  \"uniq_id\":\"" + mqttNodeId + "_climate\",\n" \
   "  \"device\" : { \n" \
