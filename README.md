@@ -15,13 +15,18 @@ SW Built with PlatformIO in Visual Studio Code, some great [Arduino](https://www
 [Circuit and PCB](https://github.com/dhzl84/ESP8266_Thermostat_PCB.git) made with [Target 3001](https://ibfriedrich.com/de/index.html)
 
 ## 1. Build Status Master: [![Build Status](https://travis-ci.org/dhzl84/ESP8266-Smart-Home.svg?branch=master)](https://travis-ci.org/dhzl84/ESP8266-Smart-Home) Develop: [![Build Status](https://travis-ci.org/dhzl84/ESP8266-Smart-Home.svg?branch=develop)](https://travis-ci.org/dhzl84/ESP8266-Smart-Home)
-* Master branch
-* ESP8266 Arduino 2.4.2
-* custom libraries:
-  * DHT sensor library for ESPx
-  * ESP8266 and ESP32 Oled Driver for SSD1306 display
-  * MQTT
-  * ArduinoJSON
+* Master branch only provides (pre-)release SW
+* Develop may contain untested changes
+
+### Dependencies
+Platform:
+* ESP8266 Arduino 2.5.0 (Espressif8266 2.0.1)
+
+Custom libraries:
+* DHT sensor library for ESPx
+* ESP8266 and ESP32 Oled Driver for SSD1306 display
+* ArduinoMQTT or PubSubClient
+* ArduinoJSON
 
 ## 2. General hints
 See [my Home Assistant configuration](https://github.com/dhzl84/Home-Assistant-Configuration) for the usage of this devices.
@@ -41,6 +46,10 @@ My *config.h* for building a thermostat SW contains the following information:
 #define THERMOSTAT_HYSTERESIS  2       /* 0.2 °C */
 #define WIFI_RECONNECT_TIME    30      /* seconds */
 #define CFG_PUSH_BUTTONS       false
+
+#define cArduinoMQTT  0
+#define cPubSubClient 1
+#define CFG_MQTT_LIB                cPubSubClient
 ```
 
 For Travis CI compatibility there is the *config.sh* script which generates the above mentioned dummy code.

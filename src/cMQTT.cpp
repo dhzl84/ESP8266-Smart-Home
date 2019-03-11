@@ -1,5 +1,4 @@
 #include "cMQTT.h"
-
 // The Home Asistant discovery topic need to follow a specific format:
 //
 //     <discovery_prefix>/<component>/[<node_id>/]<object_id>/<>
@@ -61,7 +60,6 @@ String mqttHelper::buildStateJSON(String name, String temp, String humid, String
   "  \"fw\":\"" + firmware + "\",\n" \
   "  \"ip\":\"" + ip + "\"\n "\
   "}";
-
   return (JSON);
 }
 
@@ -73,8 +71,6 @@ String mqttHelper::buildHassDiscoveryClimate(String name, String firmware) {
   "  \"mode_cmd_t\":\"~" + mqttThermostatModeCmd + "\",\n" \
   "  \"mode_stat_t\":\"~" + mqttData + "\",\n" \
   "  \"mode_stat_tpl\":\"{{value_json.mode}}\",\n" \
-  "  \"stat_t\":\"~" + mqttData + "\",\n" \
-  "  \"stat_val_tpl\":\"{{value_json.state}}\",\n" \
   "  \"avty_t\":\"~" + mqttWill + "\",\n" \
   "  \"pl_avail\":\"online\",\n" \
   "  \"pl_not_avail\":\"offline\",\n" \
@@ -86,14 +82,13 @@ String mqttHelper::buildHassDiscoveryClimate(String name, String firmware) {
   "  \"min_temp\":\"15\",\n" \
   "  \"max_temp\":\"25\",\n" \
   "  \"temp_step\":\"0.5\",\n" \
-  "  \"unit_of_meas\":\"°C\",\n" \
   "  \"modes\":[\"heat\",\"off\"],\n" \
   "  \"uniq_id\":\"" + mqttNodeId + "_climate\",\n" \
   "  \"device\" : { \n" \
   "    \"identifiers\":[\"" + mqttNodeId + "\"],\n" \
   "    \"name\":\"" + name + "\",\n" \
   "    \"sw_version\":\"" + firmware + "\",\n" \
-  "    \"manufacturer\":\"DHZL84\"\n" \
+  "    \"manufacturer\":\"dhzl84\"\n" \
   "  }\n" \
   "}";
 

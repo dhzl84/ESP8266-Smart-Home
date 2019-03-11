@@ -15,5 +15,9 @@ cat > config.h << EOF
 #define WIFI_RECONNECT_TIME     30
 #define CFG_PUSH_BUTTONS        $1
 
+#define cArduinoMQTT  0
+#define cPubSubClient 1
+#define CFG_MQTT_LIB            $2
+
 #endif /* CONFIG_H_ */
 EOF
