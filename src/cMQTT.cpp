@@ -18,7 +18,7 @@ void mqttHelper::setup() {
   mqttPrefix              = "homeassistant/";
   mqttNodeId              = String(ESP.getChipId(), HEX);                     // to be set by SPIFFS_INIT before mqttHelper setup
   mqttObjectId            = "/sensor";
-  mqttCompClimate         = "sensor/";
+  mqttComp                = "sensor/";
   mqttCompBinarySensor    = "binary_sensor/";
   mqttCompSensor          = "sensor/";
   mqttCompSwitch          = "switch/";
@@ -27,7 +27,7 @@ void mqttHelper::setup() {
 }
 
 void mqttHelper::buildTopics(void) {
-  mqttGeneralBaseTopic =        mqttPrefix + mqttCompClimate + mqttNodeId + mqttObjectId;  // used for all topics except discovery of the non climate components
+  mqttGeneralBaseTopic =        mqttPrefix + mqttComp + mqttNodeId + mqttObjectId;  // used for all topics except discovery of the non climate components
 // sub
   mqttUpdateFirmware =          "/updateFirmware";
   mqttChangeName =              "/changeName";
@@ -59,13 +59,13 @@ String mqttHelper::buildStateJSON(String name, String temp, String humid, String
   return (JSON);
 }
 
-String mqttHelper::buildTopicHassDiscoveryDevice(String name, String firmware) {
+String mqttHelper::buildHassDiscoveryDevice(String name, String firmware) {
   String JSON = \
   "{\n" \
   "  \"~\":\"" + mqttGeneralBaseTopic + "\",\n" \
   "  \"name\":\"" + name + "\",\n" \
   "  \"stat_t\":\"~" + mqttData + "\",\n" \
-  "  \"stat_val_tpl\":\"{{value_json.current_temp}}\",\n" \
+  "  \"val_tpl\":\"{{value_json.current_temp}}\",\n" \
   "  \"unit_of_meas\":\"°C\",\n" \
   "  \"frc_upd\":\"true\",\n" \
   "  \"avty_t\":\"~" + mqttWill + "\",\n" \

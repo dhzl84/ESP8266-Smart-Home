@@ -492,7 +492,7 @@ void SPIFFS_MAIN(void) {
 /* Home Assistant discovery on connect; used to define entities in HA to communicate with*/
 void homeAssistantDiscovery(void) {
   #if CFG_MQTT_LIB == cArduinoMQTT
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryDevice(),                    myMqttHelper.buildTopicHassDiscoveryDevice(String(myConfig.name), String(FW)),     true, MQTT_QOS);       // make HA discover the climate component
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryDevice(),                    myMqttHelper.buildHassDiscoveryDevice(String(myConfig.name), String(FW)),          true, MQTT_QOS);       // make HA discover the climate component
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(bsSensFail),    myMqttHelper.buildHassDiscoveryBinarySensor(String(myConfig.name), bsSensFail),    true, MQTT_QOS);       // make HA discover the binary_sensor for sensor failure
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sTemp),               myMqttHelper.buildHassDiscoverySensor(String(myConfig.name), sTemp),               true, MQTT_QOS);       // make HA discover the temperature sensor
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sHum),                myMqttHelper.buildHassDiscoverySensor(String(myConfig.name), sHum),                true, MQTT_QOS);       // make HA discover the humidity sensor
@@ -503,6 +503,7 @@ void homeAssistantDiscovery(void) {
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swRestart),           myMqttHelper.buildHassDiscoverySwitch(String(myConfig.name), swRestart),           true, MQTT_QOS);       // make HA discover the reset switch
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swUpdate),            myMqttHelper.buildHassDiscoverySwitch(String(myConfig.name), swUpdate),            true, MQTT_QOS);       // make HA discover the update switch
   #else
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryDevice().c_str(),                    myMqttHelper.buildHassDiscoveryDevice(String(myConfig.name).c_str(), String(FW)).c_str(),          true);    // make HA discover the climate component
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(bsSensFail).c_str(),    myMqttHelper.buildHassDiscoveryBinarySensor(String(myConfig.name).c_str(), bsSensFail).c_str(),    true);    // make HA discover the binary_sensor for sensor failure
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sTemp).c_str(),               myMqttHelper.buildHassDiscoverySensor(String(myConfig.name).c_str(), sTemp).c_str(),               true);    // make HA discover the temperature sensor
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sHum).c_str(),                myMqttHelper.buildHassDiscoverySensor(String(myConfig.name).c_str(), sHum).c_str(),                true);    // make HA discover the humidity sensor

@@ -37,7 +37,7 @@ class Sensor {
  private:
   // heating
   bool newData;
- // sensor
+  // sensor
   bool sensorError;
   bool newCalib;
   int16_t currentTemperature;
