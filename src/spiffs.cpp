@@ -52,8 +52,6 @@ void loadConfiguration(configuration &config) { // NOLINT: pass by reference
   config.mqttPort =             root["mqttPort"]              | LOCAL_MQTT_PORT;
   strlcpy(config.mqttUser,      root["mqttUser"]              | LOCAL_MQTT_USER,   sizeof(config.mqttUser));
   strlcpy(config.mqttPwd,       root["mqttPwd"]               | LOCAL_MQTT_PWD,    sizeof(config.mqttPwd));
-  config.tTemp =                root["tTemp"]                 | 200;
-  config.tHyst =                root["tHyst"]                 | THERMOSTAT_HYSTERESIS;
   config.calibF =               root["calibF"]                | 100;
   config.calibO =               root["calibO"]                | 0;
   strlcpy(config.updServer,     root["updServer"]             | THERMOSTAT_BINARY, sizeof(config.updServer));
@@ -89,8 +87,6 @@ bool saveConfiguration(const configuration &config) {
     Serial.print((config.mqttPort ==             root["mqttPort"]) ? false : true);
     Serial.print((config.mqttUser ==             root["mqttUser"]) ? false : true);
     Serial.print((config.mqttPwd ==              root["mqttPwd"]) ? false : true);
-    Serial.print((config.tTemp ==                root["tTemp"]) ? false : true);
-    Serial.print((config.tHyst ==                root["tHyst"]) ? false : true);
     Serial.print((config.calibF ==               root["calibF"]) ? false : true);
     Serial.print((config.calibO ==               root["calibO"]) ? false : true);
     Serial.print((config.updServer ==            root["updServer"]) ? false : true);
@@ -107,8 +103,6 @@ bool saveConfiguration(const configuration &config) {
     writeFile |= (config.mqttPort ==             root["mqttPort"]) ? false : true;
     writeFile |= (config.mqttUser ==             root["mqttUser"]) ? false : true;
     writeFile |= (config.mqttPwd ==              root["mqttPwd"]) ? false : true;
-    writeFile |= (config.tTemp ==                root["tTemp"]) ? false : true;
-    writeFile |= (config.tHyst ==                root["tHyst"]) ? false : true;
     writeFile |= (config.calibF ==               root["calibF"]) ? false : true;
     writeFile |= (config.calibO ==               root["calibO"]) ? false : true;
     writeFile |= (config.updServer ==            root["updServer"]) ? false : true;
@@ -136,8 +130,6 @@ bool saveConfiguration(const configuration &config) {
     root["mqttPort"] =               config.mqttPort;
     root["mqttUser"] =               config.mqttUser;
     root["mqttPwd"] =                config.mqttPwd;
-    root["tTemp"] =                  config.tTemp;
-    root["tHyst"] =                  config.tHyst;
     root["calibF"] =                 config.calibF;
     root["calibO"] =                 config.calibO;
     root["updServer"] =              config.updServer;

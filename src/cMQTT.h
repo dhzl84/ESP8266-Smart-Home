@@ -13,9 +13,7 @@ typedef enum {
   sIP,
   sCalibF,
   sCalibO,
-  sFW,
-  sHysteresis,
-  sState
+  sFW
 }sensor_t;
 
 typedef enum {
@@ -44,12 +42,12 @@ class mqttHelper {
   String getTopicChangeHysteresis(void);
   String getTopicTargetTempCmd(void);
   String getTopicThermostatModeCmd(void);
-  String getTopicHassDiscoveryClimate(void);
+  String getTopicHassDiscoveryDevice(void);
   String getTopicHassDiscoveryBinarySensor(binarySensor_t binarySensor);
   String getTopicHassDiscoverySensor(sensor_t sensor);
   String getTopicHassDiscoverySwitch(switch_t switches);
-  String buildStateJSON(String name, String Temp, String humid, String hysteresis, String actState, String tarTemp, String sensError, String thermoMode, String calibF, String calibO, String ip, String firmware);
-  String buildHassDiscoveryClimate(String name, String firmware);
+  String buildStateJSON(String name, String temp, String humid, String sensError, String calibF, String calibO, String ip, String firmware);
+  String buildTopicHassDiscoveryDevice(String name, String firmware);
   String buildHassDiscoveryBinarySensor(String name, binarySensor_t binarySensor);
   String buildHassDiscoverySensor(String name, sensor_t sensor);
   String buildHassDiscoverySwitch(String name, switch_t switches);
