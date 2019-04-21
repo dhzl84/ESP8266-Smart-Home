@@ -1,5 +1,5 @@
 #ifndef CSENSOR_H_
-#define CSENSOR_H
+#define CSENSOR_H_
 
 #include "Arduino.h"
 
@@ -57,4 +57,4 @@ class Sensor {
   int16_t humidValueQueue[CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE];
 };
 
-#endif  // CSENSOR_H
+#endif  // CSENSOR_H_
