@@ -103,6 +103,7 @@ void setup() {
   mySwitch.setPulseLength(rfPulseLength);         // RF Pulse Length, varies per device.
 
   #ifdef CFG_DEBUG
+  Serial.println("ChipID (hex): " + String(ESP.getChipId(), HEX));
   Serial.println("Reset Reason: " + String(ESP.getResetReason()));
   Serial.println("Flash Size: " + String(ESP.getFlashChipRealSize()));
   Serial.println("Sketch Size: " + String(ESP.getSketchSize()));
@@ -263,6 +264,7 @@ void MQTT_CONNECT(void) {
       (void)myMqttClient.subscribe(myMqttHelper.getTopicUpdateFirmware().c_str(),        MQTT_QOS);
       (void)myMqttClient.subscribe(myMqttHelper.getTopicChangeName().c_str(),            MQTT_QOS);
       (void)myMqttClient.subscribe(myMqttHelper.getTopicSystemRestartRequest().c_str(),  MQTT_QOS);
+      mqttPubState();
     }
   }
 }
@@ -423,6 +425,7 @@ void mqttPubState(void) {
 void handleWebServerClient(void) {
   webServer.send(200, "text/plain", \
     "Name: "+ String(myConfig.name) + "\n" \
+    "ChipID (hex): "+ String(ESP.getChipId(), HEX) + "\n" \
     "FW version: "+ String(FW) + "\n" \
     "Reset Reason: "+ String(ESP.getResetReason()) + "\n" \
     "Time since Reset: "+ String(millisFormatted()) + "\n" \
