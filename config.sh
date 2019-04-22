@@ -11,7 +11,7 @@ cat > config.h << EOF
 #define LOCAL_MQTT_PORT         1883
 #define LOCAL_MQTT_USER         "xxx"
 #define LOCAL_MQTT_PWD          "xxx"
-#define THERMOSTAT_BINARY       "http://<domain or ip>/<name>.bin"
+#define DEVICE_BINARY           "http://<domain or ip>/<name>.bin"
 #define WIFI_RECONNECT_TIME     30
 
 #endif /* CONFIG_H_ */

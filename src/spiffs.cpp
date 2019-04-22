@@ -52,7 +52,7 @@ void loadConfiguration(configuration &config) { // NOLINT: pass by reference
   config.mqttPort =             root["mqttPort"]              | LOCAL_MQTT_PORT;
   strlcpy(config.mqttUser,      root["mqttUser"]              | LOCAL_MQTT_USER,   sizeof(config.mqttUser));
   strlcpy(config.mqttPwd,       root["mqttPwd"]               | LOCAL_MQTT_PWD,    sizeof(config.mqttPwd));
-  strlcpy(config.updServer,     root["updServer"]             | THERMOSTAT_BINARY, sizeof(config.updServer));
+  strlcpy(config.updServer,     root["updServer"]             | DEVICE_BINARY,     sizeof(config.updServer));
 }
 
 // Saves the configuration to a file
