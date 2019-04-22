@@ -107,3 +107,9 @@ char* millisFormatted(void) {
 
   return str;
 }
+
+void trc(String msg) {
+  if (TRACE == true) {
+    Serial.println(msg);
+  }
+}

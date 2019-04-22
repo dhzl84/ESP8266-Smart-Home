@@ -46,10 +46,6 @@ My *config.h* for building a thermostat SW contains the following information:
 #define THERMOSTAT_HYSTERESIS  2       /* 0.2 °C */
 #define WIFI_RECONNECT_TIME    30      /* seconds */
 #define CFG_PUSH_BUTTONS       false
-
-#define cArduinoMQTT  0
-#define cPubSubClient 1
-#define CFG_MQTT_LIB                cPubSubClient
 ```
 
 For Travis CI compatibility there is the *config.sh* script which generates the above mentioned dummy code.

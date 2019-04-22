@@ -13,8 +13,6 @@
   #define LOCAL_MQTT_PORT             1234
   #define LOCAL_MQTT_HOST             "123.456.789.012"
   #define THERMOSTAT_BINARY           "http://<domain or ip>/<name>.bin"
-  #define SENSOR_UPDATE_INTERVAL      20      // seconds
-  #define THERMOSTAT_HYSTERESIS       2       // seconds 
   #define WIFI_RECONNECT_TIME         30      // seconds
   #define CFG_PUSH_BUTTONS            false
 */
@@ -51,18 +49,12 @@ void MQTT_CONNECT(void);
 void OTA_INIT(void);
 /* loop */
 void HANDLE_SYSTEM_STATE(void);
-void SENSOR_MAIN(void);
-void DRAW_DISPLAY_MAIN(void);
 void MQTT_MAIN(void);
 void SPIFFS_MAIN(void);
 void HANDLE_HTTP_UPDATE(void);
 /* callback */
 void handleWebServerClient(void);
-#if CFG_MQTT_LIB == cArduinoMQTT
-void messageReceived(String &topic, String &payload);  // NOLINT: pass by reference
-#else
 void messageReceived(char* c_topic, byte* c_payload, unsigned int length);
-#endif
 void onOffButton(void);
 #if CFG_PUSH_BUTTONS
 void upButton(void);
@@ -92,5 +84,6 @@ bool TimeReached(uint32_t timer);
 void SetNextTimeInterval(uint32_t& timer, const uint32_t step);  // NOLINT: pass by reference
 bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor);
 char* millisFormatted(void);
+void trc(String msg);
 
 #endif  // MAIN_H_
