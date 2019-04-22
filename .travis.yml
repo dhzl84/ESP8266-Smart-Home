@@ -48,7 +48,7 @@ jobs:
     - stage: build
       script:
         - chmod a+x config.sh
-        - echo "generate config.h for rotary encoder input and ArduinoMQTT"
+        - echo "generate config.h"
         - ./config.sh
         - cat config.h
         - ls -l

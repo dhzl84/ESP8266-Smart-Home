@@ -192,6 +192,8 @@ String mqttHelper::getTopicSystemRestartRequest(void)             { return mqttG
 String mqttHelper::getTopicRfCommand(void)                        { return mqttGeneralBaseTopic + mqttRfCommand; }
 String mqttHelper::getTopicHassDiscoveryDevice(void)              { return mqttGeneralBaseTopic + mqttHassDiscoveryTopic; }
 String mqttHelper::getTopicData(void)                             { return mqttGeneralBaseTopic + mqttData; }
+bool   mqttHelper::getTriggerDiscovery(void)                      { return triggerDiscovery; }
+void   mqttHelper::setTriggerDiscovery(bool discover)             { triggerDiscovery = discover; }
 
 String mqttHelper::getTopicHassDiscoveryBinarySensor(binarySensor_t binarySensor) {
   String topic = "void";
@@ -234,3 +236,4 @@ String mqttHelper::getTopicHassDiscoverySwitch(switch_t switches) {
   }
   return topic;
 }
+

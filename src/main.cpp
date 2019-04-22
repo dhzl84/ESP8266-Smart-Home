@@ -340,10 +340,13 @@ void MQTT_MAIN(void) {
     } else {
       /* just wait */
     }
-  } else {  /* check if there is new data to publish and shift PubCycle if data is published on event, else publish every PubCycleInterval */
+  } else {  /* check if there is new data to publish */
     if (mySwitch.available()) {
       mqttPubState();
       mySwitch.resetAvailable();
+    }
+    if (myMqttHelper.getTriggerDiscovery()) {
+      homeAssistantDiscovery();  /* make HA discover/update necessary devices at runtime e.g. after name change */
     }
   }
 }
@@ -380,7 +383,7 @@ void SPIFFS_MAIN(void) {
       if (saveConfiguration(myConfig)) {
       /* write successful, restart to rebuild MQTT topics etc. */
       nameChanged = false;
-      // TODO: rediscover in HA
+      myMqttHelper.setTriggerDiscovery(true);
       } else {
       /* write failed, retry next loop */
     }

@@ -2,6 +2,8 @@ cat > config.h << EOF
 #ifndef CONFIG_H_
 #define CONFIG_H_
 
+#define TRACE false
+
 /* the config.h file contains your personal configuration of the parameters below: */
 #define WIFI_SSID               "xxx"
 #define WIFI_PWD                "xxx"

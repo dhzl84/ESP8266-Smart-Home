@@ -28,6 +28,8 @@ class mqttHelper {
   void   init(void);
   void   setup(void);
   void   buildTopics(void);
+  void   setTriggerDiscovery(bool discover);
+  bool   getTriggerDiscovery(void);
   String getTopicUpdateFirmware(void);
   String getTopicUpdateFirmwareAccepted(void);
   String getTopicChangeName(void);
@@ -47,6 +49,7 @@ class mqttHelper {
 
  private:
   bool   nameChanged;
+  bool   triggerDiscovery;
   String mqttData;
   String mqttUpdateFirmware;
   String mqttUpdateFirmwareAccepted;
