@@ -22,7 +22,7 @@
 /*===================================================================================================================*/
 ADC_MODE(ADC_VCC);             /* measure Vcc */
 #define RF_TX_PIN    13
-#define RF_RX_PIN    16
+#define RF_RX_PIN    14
 /*===================================================================================================================*/
 /* variables, constants, types, classes, etc. definitions */
 /*===================================================================================================================*/
@@ -298,6 +298,9 @@ void loop() {
   MQTT_MAIN();             /* handle MQTT */
 
   if (mqttRfCommand != "") {                          // check if command was received via mqtt
+    #ifdef CFG_DEBUG
+      Serial.println("Transmit RF signal: "+ String(mqttRfCommand));
+    #endif
     mySwitch.send(atol(mqttRfCommand.c_str()), 24);   // transmit
     mqttRfCommand = "";                               // reset command
   }
@@ -344,9 +347,6 @@ void MQTT_MAIN(void) {
     }
   } else {  /* check if there is new data to publish */
     if (mySwitch.available()) {
-      #ifdef CFG_DEBUG
-      Serial.println("RF signal available"+ String(mySwitch.getReceivedValue()));
-      #endif
       mqttPubState();
       mySwitch.resetAvailable();
     }
@@ -412,7 +412,7 @@ void homeAssistantDiscovery(void) {
 void mqttPubState(void) {
   String payload = myMqttHelper.buildStateJSON( /* build JSON payload */\
       String(myConfig.name), \
-      String(mySwitch.getReceivedValue(), 1), \
+      String(mySwitch.getReceivedValue()), \
       WiFi.localIP().toString(), \
       String(FW) );
 
@@ -454,9 +454,6 @@ void messageReceived(char* c_topic, byte* data, unsigned int data_len) {
   #endif
 
   if (topic == myMqttHelper.getTopicRfCommand()) {
-    #ifdef CFG_DEBUG
-    Serial.println("RfCommand received: " + payload);
-    #endif
     mqttRfCommand = payload;
   } else if (topic == myMqttHelper.getTopicSystemRestartRequest()) {
     #ifdef CFG_DEBUG
