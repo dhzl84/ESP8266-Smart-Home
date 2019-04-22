@@ -15,10 +15,11 @@ void mqttHelper::init() {
 }
 
 void mqttHelper::setup() {
+  mqttTriggerDiscovery    = false;
   mqttPrefix              = "homeassistant/";
   mqttNodeId              = String(ESP.getChipId(), HEX);                     // to be set by SPIFFS_INIT before mqttHelper setup
   mqttObjectId            = "/thermostat";
-  mqttCompClimate         = "climate/";
+  mqttcompDevice          = "climate/";
   mqttCompBinarySensor    = "binary_sensor/";
   mqttCompSensor          = "sensor/";
   mqttCompSwitch          = "switch/";
@@ -27,7 +28,7 @@ void mqttHelper::setup() {
 }
 
 void mqttHelper::buildTopics(void) {
-  mqttGeneralBaseTopic =        mqttPrefix + mqttCompClimate + mqttNodeId + mqttObjectId;  // used for all topics except discovery of the non climate components
+  mqttGeneralBaseTopic =        mqttPrefix + mqttcompDevice + mqttNodeId + mqttObjectId;  // used for all topics except discovery of the non climate components
 // sub
   mqttUpdateFirmware =          "/updateFirmware";
   mqttChangeName =              "/changeName";
@@ -354,6 +355,8 @@ String mqttHelper::getTopicTargetTempCmd(void)                    { return mqttG
 String mqttHelper::getTopicThermostatModeCmd(void)                { return mqttGeneralBaseTopic + mqttThermostatModeCmd; }
 String mqttHelper::getTopicHassDiscoveryClimate(void)             { return mqttGeneralBaseTopic + mqttHassDiscoveryTopic; }
 String mqttHelper::getTopicData(void)                             { return mqttGeneralBaseTopic + mqttData; }
+bool   mqttHelper::getTriggerDiscovery(void)                      { return mqttTriggerDiscovery; }
+void   mqttHelper::setTriggerDiscovery(bool discover)             { mqttTriggerDiscovery = discover; }
 
 String mqttHelper::getTopicHassDiscoveryBinarySensor(binarySensor_t binarySensor) {
   String topic = "void";
