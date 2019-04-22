@@ -17,7 +17,7 @@ void mqttHelper::init() {
 void mqttHelper::setup() {
   mqttPrefix              = "homeassistant/";
   mqttNodeId              = String(ESP.getChipId(), HEX);                     // to be set by SPIFFS_INIT before mqttHelper setup
-  mqttObjectId            = "/thermostat";
+  mqttObjectId            = "/rf2mqtt";
   mqttCompDevice          = "sensor/";
   mqttCompBinarySensor    = "binary_sensor/";
   mqttCompSensor          = "sensor/";
@@ -58,11 +58,11 @@ String mqttHelper::buildHassDiscoveryDevice(String name, String firmware) {
   "  \"~\":\"" + mqttGeneralBaseTopic + "\",\n" \
   "  \"name\":\"" + name + "\",\n" \
   "  \"stat_t\":\"~" + mqttData + "\",\n" \
-  "  \"val_t\":\"{{value_json.code}}\",\n" \
+  "  \"val_tpl\":\"{{value_json.code}}\",\n" \
   "  \"avty_t\":\"~" + mqttWill + "\",\n" \
   "  \"pl_avail\":\"online\",\n" \
   "  \"pl_not_avail\":\"offline\",\n" \
-  "  \"uniq_id\":\"" + mqttNodeId + "_climate\",\n" \
+  "  \"uniq_id\":\"" + mqttNodeId + "_rf2mqtt\",\n" \
   "  \"device\" : { \n" \
   "    \"ids\":[\"" + mqttNodeId + "\"],\n" \
   "    \"name\":\"" + name + "\",\n" \

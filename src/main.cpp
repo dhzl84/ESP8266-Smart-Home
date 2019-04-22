@@ -56,7 +56,7 @@ OtaUpdate_t OTA_UPDATE = TH_OTA_IDLE;
 
 #define rfPulseLength    189
 #define rfRepeatTxCount   10
-String rfCommand = "";
+String mqttRfCommand = "";
 RCSwitch          mySwitch;
 WiFiClient        myWiFiClient;
 mqttHelper        myMqttHelper;
@@ -295,9 +295,9 @@ void loop() {
   HANDLE_SYSTEM_STATE();   /* handle connectivity and trigger reconnects */
   MQTT_MAIN();             /* handle MQTT */
 
-  if (rfCommand != "") {                          // check if command was received via mqtt
-    mySwitch.send(atol(rfCommand.c_str()), 24);   // transmit
-    rfCommand = "";                               // reset command
+  if (mqttRfCommand != "") {                          // check if command was received via mqtt
+    mySwitch.send(atol(mqttRfCommand.c_str()), 24);   // transmit
+    mqttRfCommand = "";                               // reset command
   }
 
   webServer.handleClient();
@@ -342,6 +342,9 @@ void MQTT_MAIN(void) {
     }
   } else {  /* check if there is new data to publish */
     if (mySwitch.available()) {
+      #ifdef CFG_DEBUG
+      Serial.println("RF signal available"+ String(mySwitch.getReceivedValue()));
+      #endif
       mqttPubState();
       mySwitch.resetAvailable();
     }
@@ -451,7 +454,7 @@ void messageReceived(char* c_topic, byte* data, unsigned int data_len) {
     #ifdef CFG_DEBUG
     Serial.println("RfCommand received: " + payload);
     #endif
-    rfCommand = payload;
+    mqttRfCommand = payload;
   } else if (topic == myMqttHelper.getTopicSystemRestartRequest()) {
     #ifdef CFG_DEBUG
     Serial.println("Restart request received with value: " + payload);
