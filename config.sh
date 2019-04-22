@@ -10,11 +10,7 @@ cat > config.h << EOF
 #define LOCAL_MQTT_USER         "xxx"
 #define LOCAL_MQTT_PWD          "xxx"
 #define THERMOSTAT_BINARY       "http://<domain or ip>/<name>.bin"
-#define SENSOR_UPDATE_INTERVAL  20
-#define THERMOSTAT_HYSTERESIS   2
 #define WIFI_RECONNECT_TIME     30
-#define CFG_PUSH_BUTTONS        $1
-
 
 #endif /* CONFIG_H_ */
 EOF
