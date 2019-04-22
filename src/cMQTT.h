@@ -35,6 +35,8 @@ class mqttHelper {
   void   init(void);
   void   setup(void);
   void   buildTopics(void);
+  void   setTriggerDiscovery(bool discover);
+  bool   getTriggerDiscovery(void);
   String getTopicUpdateFirmware(void);
   String getTopicUpdateFirmwareAccepted(void);
   String getTopicChangeName(void);
@@ -56,7 +58,7 @@ class mqttHelper {
   String getTopicData(void);
 
  private:
-  bool   nameChanged;
+  bool   mqttTriggerDiscovery;
   String mqttData;
   String mqttUpdateFirmware;
   String mqttUpdateFirmwareAccepted;
@@ -67,7 +69,7 @@ class mqttHelper {
   String mqttPrefix;
   String mqttNodeId;
   String mqttDeviceName;
-  String mqttCompClimate;
+  String mqttcompDevice;
   String mqttCompSensor;
   String mqttCompSwitch;
   String mqttCompBinarySensor;

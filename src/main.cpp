@@ -5,16 +5,18 @@
 #include <ESP8266WiFi.h>
 #include "ESP8266WebServer.h"
 #include <ESP8266mDNS.h>
-#include <DHTesp.h>
-#include "UserFonts.h"
-#include <SSD1306.h>
 #include <ESP8266httpUpdate.h>
 #include <ArduinoOTA.h>
 
+#include <DHTesp.h>
+#include "UserFonts.h"
+#include <SSD1306.h>
+
 #include "main.h"
 #include "version.h"
-#include "cThermostat.h"
 #include "cMQTT.h"
+
+#include "cThermostat.h"
 
 #if CFG_MQTT_LIB == cPubSubClient
 #include "PubSubClient.h"
@@ -64,6 +66,8 @@ bool fetchUpdate = false;       /* global variable used to decide whether an upd
 /* OTA */
 typedef enum otaUpdate { TH_OTA_IDLE, TH_OTA_ACTIVE, TH_OTA_FINISHED, TH_OTA_ERROR } OtaUpdate_t;       /* global variable used to change display in case OTA update is initiated */
 OtaUpdate_t OTA_UPDATE = TH_OTA_IDLE;
+
+
 /* rotary encoder / push buttons */
 uint32_t  onOffButtonDebounceTime        = 0;
 #if CFG_PUSH_BUTTONS
@@ -79,7 +83,7 @@ volatile int16_t rotaryEncoderDirectionInts       = rotInit;     /* initialize r
 uint32_t buttonDebounceInterval         = 250;
 uint32_t onOffButtonSystemResetTime     = 0;
 uint32_t onOffButtonSystemResetInterval = 10000;
-
+/* thermostat */
 #define tempStep              5
 #define displayTemp           0
 #define displayHumid          1
@@ -92,8 +96,8 @@ uint32_t readSensorScheduled = 0;
 /* classes */
 DHTesp            myDHT;
 SSD1306           myDisplay(0x3c, SDA_PIN, SCL_PIN);
-WiFiClient        myWiFiClient;
 Thermostat        myThermostat;
+WiFiClient        myWiFiClient;
 mqttHelper        myMqttHelper;
 ESP8266WebServer  webServer(80);
 #if CFG_MQTT_LIB == cPubSubClient
@@ -106,9 +110,9 @@ bool     systemRestartRequest = false;
 bool     nameChanged = false;
 uint32_t wifiReconnectTimer = 30000;
 
-#define  SPIFFS_MQTT_ID_FILE        String("/itsme")
-#define  SPIFFS_SENSOR_CALIB_FILE   String("/sensor")
-#define  SPIFFS_TARGET_TEMP_FILE    String("/targetTemp")
+#define  SPIFFS_MQTT_ID_FILE        String("/itsme")       // for migration only
+#define  SPIFFS_SENSOR_CALIB_FILE   String("/sensor")      // for migration only
+#define  SPIFFS_TARGET_TEMP_FILE    String("/targetTemp")  // for migration only
 #define  SPIFFS_WRITE_DEBOUNCE      20000 /* write target temperature to spiffs if it wasn't changed for 20 s (time in ms) */
 boolean  SPIFFS_WRITTEN =           true;
 uint32_t SPIFFS_REFERENCE_TIME;
@@ -572,6 +576,9 @@ void MQTT_MAIN(void) {
         mqttPubState();
         myThermostat.resetNewData();
     }
+    if (myMqttHelper.getTriggerDiscovery()) {
+      homeAssistantDiscovery();  /* make HA discover/update necessary devices at runtime e.g. after name change */
+    }
   }
 }
 
@@ -612,6 +619,7 @@ void SPIFFS_MAIN(void) {
       if (saveConfiguration(myConfig)) {
       /* write successful, restart to rebuild MQTT topics etc. */
       nameChanged = false;
+      myMqttHelper.setTriggerDiscovery(true);
       } else {
       /* write failed, retry next loop */
     }
