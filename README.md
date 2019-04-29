@@ -1,3 +1,4 @@
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 # ESP8266 Smart Home Playground
 
 This is my ESP8266 smart home playground for:  
