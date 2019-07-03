@@ -617,7 +617,6 @@ void HANDLE_HTTP_UPDATE(void) {
 void SPIFFS_MAIN(void) {
   if (nameChanged == true) {
       if (saveConfiguration(myConfig)) {
-      /* write successful, restart to rebuild MQTT topics etc. */
       nameChanged = false;
       myMqttHelper.setTriggerDiscovery(true);
       } else {
@@ -632,22 +631,30 @@ void SPIFFS_MAIN(void) {
     myConfig.calibF = myThermostat.getSensorCalibFactor();
     myConfig.calibO = myThermostat.getSensorCalibOffset();
     myConfig.tHyst  = myThermostat.getThermostatHysteresis();
+    myConfig.mode   = myThermostat.getThermostatMode();
     myThermostat.resetNewCalib();
     SPIFFS_WRITTEN = false;
-  } else { /* target temperature not changed this loop */
-    if (SPIFFS_WRITTEN == true) {
-      /* do nothing, last change was already stored in SPIFFS */
-    } else { /* latest change not stored in SPIFFS */
-      if (SPIFFS_REFERENCE_TIME + SPIFFS_WRITE_DEBOUNCE < millis()) { /* check debounce */
-        /* debounce expired -> write */
-        if (saveConfiguration(myConfig)) {
-          SPIFFS_WRITTEN = true;
-        } else {
-          /* SPIFFS not written, retry next loop */
-        }
+    #if defined CFG_DEBUG
+    Serial.println("SPIFFS to be stored after debounce time: " + String(SPIFFS_WRITE_DEBOUNCE));
+    #endif /* CFG_DEBUG */
+  } else {
+    /* no spiffs data changed this loop */
+  }
+  if (SPIFFS_WRITTEN == true) {
+    /* do nothing, last change was already stored in SPIFFS */
+  } else { /* latest change not stored in SPIFFS */
+    if (SPIFFS_REFERENCE_TIME + SPIFFS_WRITE_DEBOUNCE < millis()) { /* check debounce */
+      /* debounce expired -> write */
+      if (saveConfiguration(myConfig)) {
+        SPIFFS_WRITTEN = true;
       } else {
-        /* debounce SPIFFS write */
+        /* SPIFFS not written, retry next loop */
+        #if defined CFG_DEBUG
+        Serial.println("SPIFFS write failed");
+        #endif /* CFG_DEBUG */
       }
+    } else {
+      /* debounce SPIFFS write */
     }
   }
 }

@@ -47,7 +47,7 @@ void loadConfiguration(configuration &config) { // NOLINT: pass by reference
 
   // Copy values from the JsonObject to the Config, if the key doesn't exist, load the default config
   strlcpy(config.name,          root["name"]                  | "unknown",         sizeof(config.name));
-  config.mode,                  root["mode"]                  | true;
+  config.mode =                 root["mode"]                  | true;
   strlcpy(config.ssid,          root["ssid"]                  | WIFI_SSID,         sizeof(config.ssid));
   strlcpy(config.wifiPwd,       root["wifiPwd"]               | WIFI_PWD ,         sizeof(config.wifiPwd));
   strlcpy(config.mqttHost,      root["mqttHost"]              | LOCAL_MQTT_HOST,   sizeof(config.mqttHost));
