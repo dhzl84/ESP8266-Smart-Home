@@ -54,7 +54,7 @@ void loadConfiguration(configuration &config) { // NOLINT: pass by reference
   strlcpy(config.mqttPwd,       root["mqttPwd"]               | LOCAL_MQTT_PWD,    sizeof(config.mqttPwd));
   config.calibF =               root["calibF"]                | 100;
   config.calibO =               root["calibO"]                | 0;
-  strlcpy(config.updServer,     root["updServer"]             | THERMOSTAT_BINARY, sizeof(config.updServer));
+  strlcpy(config.updServer,     root["updServer"]             | DEVICE_BINARY, sizeof(config.updServer));
   config.sensUpdInterval =      root["sensUpdInterval"]       | SENSOR_UPDATE_INTERVAL;
   config.mqttPubCycleInterval = root["mqttPubCycleInterval"]  | 5;
 
