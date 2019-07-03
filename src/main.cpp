@@ -130,7 +130,7 @@ void setup() {
 
   SPIFFS_INIT();                                                                                   /* read stuff from SPIFFS */
   GPIO_CONFIG();                                                                                   /* configure GPIOs */
-  myThermostat.setup(RELAY_PIN, myConfig.tTemp, myConfig.calibF, myConfig.calibO, myConfig.tHyst); /* GPIO to switch the connected relay, initial target temperature, sensor calbigration and thermostat hysteresis */
+  myThermostat.setup(RELAY_PIN, myConfig.tTemp, myConfig.calibF, myConfig.calibO, myConfig.tHyst, myConfig.mode); /* GPIO to switch the connected relay, initial target temperature, sensor calbigration, thermostat hysteresis and last mode */
   myDHT.setup(DHT_PIN, DHTesp::DHT22);                                                             /* init DHT sensor */
   DISPLAY_INIT();                                                                                  /* init Display */
   WIFI_CONNECT();                                                                                  /* connect to WiFi */
@@ -626,7 +626,7 @@ void SPIFFS_MAIN(void) {
   }
 
   /* avoid extensive writing to SPIFFS, therefore check if the target temperature didn't change for a certain time before writing. */
-  if ( (myThermostat.getNewCalib()) || (myThermostat.getTargetTemperature() != myConfig.tTemp) || (myThermostat.getThermostatHysteresis() != myConfig.tHyst) ) {
+  if ( (myThermostat.getNewCalib()) || (myThermostat.getTargetTemperature() != myConfig.tTemp) || (myThermostat.getThermostatHysteresis() != myConfig.tHyst) || (myThermostat.getThermostatMode() != myConfig.mode) ) {
     SPIFFS_REFERENCE_TIME = millis();  // ToDo: handle wrap around
     myConfig.tTemp  = myThermostat.getTargetTemperature();
     myConfig.calibF = myThermostat.getSensorCalibFactor();
