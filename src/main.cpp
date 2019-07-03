@@ -74,7 +74,7 @@ uint32_t  onOffButtonDebounceTime        = 0;
 uint32_t  upButtonDebounceTime           = 0;
 uint32_t  downButtonDebounceTime         = 0;
 #else
-#define rotLeft                                 -1
+#define rotLeft                                -1
 #define rotRight                                1
 #define rotInit                                 0
 volatile int16_t lastEncoded                      = 0b11;        /* initial state of the rotary encoders gray code */

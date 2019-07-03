@@ -21,7 +21,7 @@ SW Built with PlatformIO in Visual Studio Code, some great [Arduino](https://www
 
 ### Dependencies
 Platform:
-* ESP8266 Arduino 2.5.0 (Espressif8266 2.0.1)
+* ESP8266 Arduino 2.5.2 (Espressif8266 2.2.2)
 
 Custom libraries:
 * DHT sensor library for ESPx
