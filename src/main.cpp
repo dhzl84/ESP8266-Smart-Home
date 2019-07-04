@@ -74,7 +74,7 @@ uint32_t  onOffButtonDebounceTime        = 0;
 uint32_t  upButtonDebounceTime           = 0;
 uint32_t  downButtonDebounceTime         = 0;
 #else
-#define rotLeft                                 -1
+#define rotLeft                                -1
 #define rotRight                                1
 #define rotInit                                 0
 volatile int16_t lastEncoded                      = 0b11;        /* initial state of the rotary encoders gray code */
@@ -128,7 +128,7 @@ void setup() {
 
   SPIFFS_INIT();                                                                                   /* read stuff from SPIFFS */
   GPIO_CONFIG();                                                                                   /* configure GPIOs */
-  myThermostat.setup(RELAY_PIN, myConfig.tTemp, myConfig.calibF, myConfig.calibO, myConfig.tHyst); /* GPIO to switch the connected relay, initial target temperature, sensor calbigration and thermostat hysteresis */
+  myThermostat.setup(RELAY_PIN, myConfig.tTemp, myConfig.calibF, myConfig.calibO, myConfig.tHyst, myConfig.mode); /* GPIO to switch the connected relay, initial target temperature, sensor calbigration, thermostat hysteresis and last mode */
   myDHT.setup(DHT_PIN, DHTesp::DHT22);                                                             /* init DHT sensor */
   DISPLAY_INIT();                                                                                  /* init Display */
   WIFI_CONNECT();                                                                                  /* connect to WiFi */
@@ -616,7 +616,6 @@ void HANDLE_HTTP_UPDATE(void) {
 void SPIFFS_MAIN(void) {
   if (nameChanged == true) {
       if (saveConfiguration(myConfig)) {
-      /* write successful, restart to rebuild MQTT topics etc. */
       nameChanged = false;
       myMqttHelper.setTriggerDiscovery(true);
       } else {
@@ -624,28 +623,36 @@ void SPIFFS_MAIN(void) {
     }
   }
   /* avoid extensive writing to SPIFFS, therefore check if the target temperature didn't change for a certain time before writing. */
-  if ( (myThermostat.getNewCalib()) || (myThermostat.getTargetTemperature() != myConfig.tTemp) || (myThermostat.getThermostatHysteresis() != myConfig.tHyst) ) {
+  if ( (myThermostat.getNewCalib()) || (myThermostat.getTargetTemperature() != myConfig.tTemp) || (myThermostat.getThermostatHysteresis() != myConfig.tHyst) || (myThermostat.getThermostatMode() != myConfig.mode) ) {
     SPIFFS_REFERENCE_TIME = millis();  // ToDo: handle wrap around
     myConfig.tTemp  = myThermostat.getTargetTemperature();
     myConfig.calibF = myThermostat.getSensorCalibFactor();
     myConfig.calibO = myThermostat.getSensorCalibOffset();
     myConfig.tHyst  = myThermostat.getThermostatHysteresis();
+    myConfig.mode   = myThermostat.getThermostatMode();
     myThermostat.resetNewCalib();
     SPIFFS_WRITTEN = false;
-  } else { /* target temperature not changed this loop */
-    if (SPIFFS_WRITTEN == true) {
-      /* do nothing, last change was already stored in SPIFFS */
-    } else { /* latest change not stored in SPIFFS */
-      if (SPIFFS_REFERENCE_TIME + SPIFFS_WRITE_DEBOUNCE < millis()) { /* check debounce */
-        /* debounce expired -> write */
-        if (saveConfiguration(myConfig)) {
-          SPIFFS_WRITTEN = true;
-        } else {
-          /* SPIFFS not written, retry next loop */
-        }
+    #if defined CFG_DEBUG
+    Serial.println("SPIFFS to be stored after debounce time: " + String(SPIFFS_WRITE_DEBOUNCE));
+    #endif /* CFG_DEBUG */
+  } else {
+    /* no spiffs data changed this loop */
+  }
+  if (SPIFFS_WRITTEN == true) {
+    /* do nothing, last change was already stored in SPIFFS */
+  } else { /* latest change not stored in SPIFFS */
+    if (SPIFFS_REFERENCE_TIME + SPIFFS_WRITE_DEBOUNCE < millis()) { /* check debounce */
+      /* debounce expired -> write */
+      if (saveConfiguration(myConfig)) {
+        SPIFFS_WRITTEN = true;
       } else {
-        /* debounce SPIFFS write */
+        /* SPIFFS not written, retry next loop */
+        #if defined CFG_DEBUG
+        Serial.println("SPIFFS write failed");
+        #endif /* CFG_DEBUG */
       }
+    } else {
+      /* debounce SPIFFS write */
     }
   }
 }

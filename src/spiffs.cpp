@@ -4,6 +4,7 @@
 /*
 {
   "name":"ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+  "state":"true",
   "tTemp":"200",
   "tHyst":"4",
   "calibF":"95",
@@ -46,6 +47,7 @@ void loadConfiguration(configuration &config) { // NOLINT: pass by reference
 
   // Copy values from the JsonObject to the Config, if the key doesn't exist, load the default config
   strlcpy(config.name,          root["name"]                  | "unknown",         sizeof(config.name));
+  config.mode =                 root["mode"]                  | true;
   strlcpy(config.ssid,          root["ssid"]                  | WIFI_SSID,         sizeof(config.ssid));
   strlcpy(config.wifiPwd,       root["wifiPwd"]               | WIFI_PWD ,         sizeof(config.wifiPwd));
   strlcpy(config.mqttHost,      root["mqttHost"]              | LOCAL_MQTT_HOST,   sizeof(config.mqttHost));
@@ -83,6 +85,7 @@ bool saveConfiguration(const configuration &config) {
     Serial.println();
     Serial.println("Check SPIFFS vs. current config, 0 is equal, 1 is diff.");
     Serial.print((config.name ==                 root["name"]) ? false : true);
+    Serial.print((config.mode ==                 root["mode"]) ? false : true);
     Serial.print((config.ssid ==                 root["ssid"]) ? false : true);
     Serial.print((config.wifiPwd ==              root["wifiPwd"]) ? false : true);
     Serial.print((config.mqttHost ==             root["mqttHost"]) ? false : true);
@@ -101,6 +104,7 @@ bool saveConfiguration(const configuration &config) {
 
     /* check if SPIFFS content is equal to avoid delete and write */
     writeFile |= (config.name ==                 root["name"]) ? false : true;
+    writeFile |= (config.mode ==                 root["mode"]) ? false : true;
     writeFile |= (config.ssid ==                 root["ssid"]) ? false : true;
     writeFile |= (config.wifiPwd ==              root["wifiPwd"]) ? false : true;
     writeFile |= (config.mqttHost ==             root["mqttHost"]) ? false : true;
@@ -130,6 +134,7 @@ bool saveConfiguration(const configuration &config) {
     JsonObject &root = jsonBuffer.createObject();
 
     root["name"] =                   config.name;
+    root["mode"] =                   config.mode;
     root["ssid"] =                   config.ssid;
     root["wifiPwd"] =                config.wifiPwd;
     root["mqttHost"] =               config.mqttHost;

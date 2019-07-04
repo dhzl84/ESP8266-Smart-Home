@@ -24,6 +24,7 @@
 /*===================================================================================================================*/
 struct configuration {
   char    name[64];
+  boolean mode;   /* 0 = TH_OFF, 1 = TH_HEAT */
   int16_t tTemp;  /* persistent target temperature */
   int16_t tHyst;  /* thermostat hysteresis */
   int16_t calibF;
