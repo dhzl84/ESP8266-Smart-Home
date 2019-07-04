@@ -3,7 +3,7 @@
 /*===================================================================================================================*/
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
-#include "ESP8266WebServer.h"
+#include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <ESP8266httpUpdate.h>
 #include <ArduinoOTA.h>
@@ -117,8 +117,6 @@ uint32_t wifiReconnectTimer = 30000;
 boolean  SPIFFS_WRITTEN =           true;
 uint32_t SPIFFS_REFERENCE_TIME;
 
-
-
 /*===================================================================================================================*/
 /* The setup function is called once at startup of the sketch */
 /*===================================================================================================================*/
@@ -139,6 +137,7 @@ void setup() {
   MQTT_CONNECT(); /* connect to MQTT host and build subscriptions, must be called after SPIFFS_INIT()*/
 
   MDNS.begin(myConfig.name);
+
   webServer.begin();
   webServer.on("/", handleWebServerClient);
 
@@ -288,7 +287,7 @@ void WIFI_CONNECT(void) {
 }
 
 void OTA_INIT(void) {
-  ArduinoOTA.setHostname(strlwr(myConfig.name));
+  ArduinoOTA.setHostname(myConfig.name);
 
   ArduinoOTA.onStart([]() {
     myMqttClient.disconnect();
@@ -623,7 +622,6 @@ void SPIFFS_MAIN(void) {
       /* write failed, retry next loop */
     }
   }
-
   /* avoid extensive writing to SPIFFS, therefore check if the target temperature didn't change for a certain time before writing. */
   if ( (myThermostat.getNewCalib()) || (myThermostat.getTargetTemperature() != myConfig.tTemp) || (myThermostat.getThermostatHysteresis() != myConfig.tHyst) || (myThermostat.getThermostatMode() != myConfig.mode) ) {
     SPIFFS_REFERENCE_TIME = millis();  // ToDo: handle wrap around
@@ -781,21 +779,70 @@ void mqttPubState(void) {
 }
 
 void handleWebServerClient(void) {
-  webServer.send(200, "text/plain", \
-    "Name: "+ String(myConfig.name) + "\n" \
-    "FW version: "+ String(FW) + "\n" \
-    "Reset Reason: "+ String(ESP.getResetReason()) + "\n" \
-    "Time since Reset: "+ String(millisFormatted()) + "\n" \
-    "Flash Size: "+ String(ESP.getFlashChipRealSize()) + "\n" \
-    "Sketch Size: "+ String(ESP.getSketchSize()) + "\n" \
-    "Free for Sketch: "+ String(ESP.getFreeSketchSpace()) + "\n" \
-    "Free Heap: "+ String(ESP.getFreeHeap()) + "\n" \
-    "Vcc: "+ String(ESP.getVcc()/1000.0) + "\n" \
-    "WiFi Status: " + String(WiFi.status()) + "\n" \
-    "WiFi RSSI: " + String(WiFi.RSSI()) + "\n" \
-    "WiFi connects: " + String(WiFiConnectCounter) + "\n" \
-    "MQTT connection: " + String((myMqttClient.connected()) == true ? "connected" : "disconnected") + "\n" \
-    "MQTT connects: " + String(MQTTConnectCounter));
+  String IPaddress = WiFi.localIP().toString();
+  String webpage = "<!DOCTYPE html> <html>\n";
+  webpage +="<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
+  webpage +="<title> "+ String(myConfig.name) + "</title>\n";
+  webpage +="<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: left;}\n";
+  webpage +="body{margin-top: 50px;} h1 {color: #444444;margin: 50px auto 30px;} h3 {color: #444444;margin-bottom: 50px;}\n";
+  webpage +=".button {display: block;width: 80px;background-color: #1abc9c;border: none;color: white;padding: 13px 30px;text-decoration: none;font-size: 25px;margin: 0px auto 35px;cursor: pointer;border-radius: 4px;}\n";
+  webpage +=".button-on {background-color: #1abc9c;}\n";
+  webpage +=".button-on:active {background-color: #16a085;}\n";
+  webpage +=".button-off {background-color: #34495e;}\n";
+  webpage +=".button-off:active {background-color: #2c3e50;}\n";
+  webpage +="p {font-size: 14px;color: #888;margin-bottom: 10px;}\n";
+  webpage +="</style>\n";
+  webpage +="</head>\n";
+  webpage +="<body>\n";
+  webpage +="<p><b>System information</b></p>";
+  webpage +="<table>";
+  webpage +="<tr><td>Name:</td><td>" + String(myConfig.name) + "</td></tr>";
+  webpage +="<tr><td>Chip ID:</td><td>" + String(ESP.getChipId(), HEX) + "</td></tr>";
+  webpage +="<tr><td>IP:</td><td>"+ IPaddress + "</td></tr>";
+  webpage +="<tr><td>FW version:</td><td>"+ String(FW) + "</td></tr>";
+  webpage +="<tr><td>Arduino Core:</td><td>"+ ESP.getCoreVersion() + "</td></tr>";
+  webpage +="<tr><td>Reset Reason:</td><td>"+ ESP.getResetReason() + "</td></tr>";
+  webpage +="<tr><td>Time since Reset:</td><td>"+ String(millisFormatted()) + "</td></tr>";
+  webpage +="<tr><td>Flash Size:</td><td>"+ String(ESP.getFlashChipRealSize()) + "</td></tr>";
+  webpage +="<tr><td>Sketch Size:</td><td>"+ String(ESP.getSketchSize()) + "</td></tr>";
+  webpage +="<tr><td>Free for Sketch:</td><td>"+ String(ESP.getFreeSketchSpace()) + "</td></tr>";
+  webpage +="<tr><td>Free Heap:</td><td>"+ String(ESP.getFreeHeap()) + "</td></tr>";
+  webpage +="<tr><td>Vcc:</td><td>"+ String(ESP.getVcc()/1000.0) + "</td></tr>";
+  webpage +="<tr><td>WiFi Status:</td><td>" + wifiStatusToString(WiFi.status()) + "</td></tr>";
+  webpage +="<tr><td>WiFi RSSI:</td><td>" + String(WiFi.RSSI()) + "</td></tr>";
+  webpage +="<tr><td>WiFi connects:</td><td>" + String(WiFiConnectCounter) + "</td></tr>";
+  webpage +="<tr><td>MQTT connection:</td><td>" + String((myMqttClient.connected()) == true ? "connected" : "disconnected") + "</td></tr>";
+  webpage +="<tr><td>MQTT connects:</td><td>" + String(MQTTConnectCounter) + "</td></tr>";
+  webpage +="</table>";
+  webpage +="<p><b>Change Name</b></p>";
+  webpage +="<form action='http://"+IPaddress+"' method='POST'>";
+  webpage +="<input type='text' name='newName'>&nbsp;<input type='submit' value='Submit'>";
+  webpage +="</form>";
+  webpage +="</body>\n";
+  webpage +="</html>\n";
+
+  webServer.send(200, "text/html", webpage);  /* Send a response to the client asking for input */
+
+  if (webServer.args() > 0) {  /* Arguments were received */
+    for ( uint8_t i = 0; i < webServer.args(); i++ ) {
+      #ifdef CFG_DEBUG
+      Serial.println("Argument reveived from Webpage: " + webServer.argName(i));  /* Display each argument */
+      #endif /* CFG_DEBUG */
+
+      if (webServer.argName(i) == "newName") {  /* heck for dedicated arguments */
+        #ifdef CFG_DEBUG
+        Serial.println("New name received via Webpage: " + webServer.arg(i));
+        #endif /* CFG_DEBUG */
+        if (webServer.arg(i) != myConfig.name) {  /* change name if it differs from the current one */
+          #ifdef CFG_DEBUG
+          Serial.println("Old name was: " + String(myConfig.name));
+          #endif
+          strlcpy(myConfig.name, webServer.arg(i).c_str(), sizeof(myConfig.name));
+          nameChanged = true;
+        }
+      }
+    }
+  }
 }
 
 /* MQTT callback if a message was received */
