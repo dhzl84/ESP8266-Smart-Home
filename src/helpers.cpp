@@ -107,3 +107,39 @@ char* millisFormatted(void) {
 
   return str;
 }
+
+String wifiStatusToString(wl_status_t status) {
+
+  String ret;
+
+  switch (status) {
+    case WL_IDLE_STATUS:
+      ret = "WL_IDLE_STATUS";
+      break;
+    case WL_NO_SSID_AVAIL:
+      ret = "WL_NO_SSID_AVAIL";
+      break;
+    case WL_SCAN_COMPLETED:
+      ret = "WL_SCAN_COMPLETED";
+      break;
+    case WL_CONNECTED:
+      ret = "WL_CONNECTED";
+      break;
+    case WL_CONNECT_FAILED:
+      ret = "WL_CONNECT_FAILED";
+      break;
+    case WL_CONNECTION_LOST:
+      ret = "WL_CONNECTION_LOST";
+      break;
+    case WL_DISCONNECTED:
+      ret = "WL_DISCONNECTED";
+      break;
+    case WL_NO_SHIELD:
+      ret = "WL_NO_SHIELD";
+      break;
+    default:
+      ret = "value unknown";
+      break;
+  }
+  return ret;
+}
