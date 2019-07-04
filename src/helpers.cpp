@@ -109,7 +109,6 @@ char* millisFormatted(void) {
 }
 
 String wifiStatusToString(wl_status_t status) {
-
   String ret;
 
   switch (status) {
