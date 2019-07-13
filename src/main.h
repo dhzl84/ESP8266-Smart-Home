@@ -59,6 +59,7 @@ void SPIFFS_MAIN(void);
 void HANDLE_HTTP_UPDATE(void);
 /* callback */
 void handleWebServerClient(void);
+void handleHttpReset(void);
 
 #if CFG_MQTT_LIB == cArduinoMQTT
 void messageReceived(String &topic, String &payload);  // NOLINT: pass by reference

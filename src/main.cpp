@@ -140,6 +140,8 @@ void setup() {
 
   webServer.begin();
   webServer.on("/", handleWebServerClient);
+  webServer.on("/restart", handleHttpReset);
+
 
   #if CFG_PUSH_BUTTONS
   attachInterrupt(PHYS_INPUT_1_PIN, upButton,   FALLING);
@@ -780,19 +782,20 @@ void mqttPubState(void) {
 
 void handleWebServerClient(void) {
   String IPaddress = WiFi.localIP().toString();
+  float rssiInPercent = WiFi.RSSI();
+  rssiInPercent = isnan(rssiInPercent) ? -100.0 : min(max(2 * (rssiInPercent + 100.0), 0.0), 100.0);
+
   String webpage = "<!DOCTYPE html> <html>\n";
+  /* HEAD */
   webpage +="<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
   webpage +="<title> "+ String(myConfig.name) + "</title>\n";
   webpage +="<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: left;}\n";
-  webpage +="body{margin-top: 50px;} h1 {color: #444444;margin: 50px auto 30px;} h3 {color: #444444;margin-bottom: 50px;}\n";
-  webpage +=".button {display: block;width: 80px;background-color: #1abc9c;border: none;color: white;padding: 13px 30px;text-decoration: none;font-size: 25px;margin: 0px auto 35px;cursor: pointer;border-radius: 4px;}\n";
-  webpage +=".button-on {background-color: #1abc9c;}\n";
-  webpage +=".button-on:active {background-color: #16a085;}\n";
-  webpage +=".button-off {background-color: #34495e;}\n";
-  webpage +=".button-off:active {background-color: #2c3e50;}\n";
-  webpage +="p {font-size: 14px;color: #888;margin-bottom: 10px;}\n";
+  webpage +="body {background-color: #202226; color: #A0A2A8}\n";
+  webpage +="p {color: #2686c1; margin-bottom: 10px;}\n";
+  webpage +="table {color: #A0A2A8;}\n";
   webpage +="</style>\n";
   webpage +="</head>\n";
+  /* BODY */
   webpage +="<body>\n";
   webpage +="<p><b>System information</b></p>";
   webpage +="<table>";
@@ -809,15 +812,21 @@ void handleWebServerClient(void) {
   webpage +="<tr><td>Free Heap:</td><td>"+ String(ESP.getFreeHeap()) + "</td></tr>";
   webpage +="<tr><td>Vcc:</td><td>"+ String(ESP.getVcc()/1000.0) + "</td></tr>";
   webpage +="<tr><td>WiFi Status:</td><td>" + wifiStatusToString(WiFi.status()) + "</td></tr>";
-  webpage +="<tr><td>WiFi RSSI:</td><td>" + String(WiFi.RSSI()) + "</td></tr>";
-  webpage +="<tr><td>WiFi connects:</td><td>" + String(WiFiConnectCounter) + "</td></tr>";
-  webpage +="<tr><td>MQTT connection:</td><td>" + String((myMqttClient.connected()) == true ? "connected" : "disconnected") + "</td></tr>";
-  webpage +="<tr><td>MQTT connects:</td><td>" + String(MQTTConnectCounter) + "</td></tr>";
+  webpage +="<tr><td>WiFi Strength:</td><td>" + String(rssiInPercent, 0) + " % </td></tr>";
+  webpage +="<tr><td>WiFi Connects:</td><td>" + String(WiFiConnectCounter) + "</td></tr>";
+  webpage +="<tr><td>MQTT Status:</td><td>" + String((myMqttClient.connected()) == true ? "connected" : "disconnected") + "</td></tr>";
+  webpage +="<tr><td>MQTT Connects:</td><td>" + String(MQTTConnectCounter) + "</td></tr>";
   webpage +="</table>";
   webpage +="<p><b>Change Name</b></p>";
-  webpage +="<form action='http://"+IPaddress+"' method='POST'>";
-  webpage +="<input type='text' name='newName'>&nbsp;<input type='submit' value='Submit'>";
+  webpage +="<form method='POST' autocomplete='off'>";
+  webpage +="<input type='text' name='newName' value="+ String(myConfig.name) + ">&nbsp;<input type='submit' value='Submit'>";
   webpage +="</form>";
+  webpage +="<p><b>Restart Device</b></p>";
+  if (systemRestartRequest == false) {
+    webpage +="<button onclick=\"window.location.href='/restart'\"> Restart </button>";
+  } else {
+    webpage +="<button onclick=\"window.location.href='/'\"> Restarting, reload site </button>";
+  }
   webpage +="</body>\n";
   webpage +="</html>\n";
 
@@ -826,16 +835,14 @@ void handleWebServerClient(void) {
   if (webServer.args() > 0) {  /* Arguments were received */
     for ( uint8_t i = 0; i < webServer.args(); i++ ) {
       #ifdef CFG_DEBUG
-      Serial.println("Argument reveived from Webpage: " + webServer.argName(i));  /* Display each argument */
+      Serial.println("HTTP arg(" + String(i) + "): " + webServer.argName(i) + "=" + webServer.arg(i));  /* Display each argument */
       #endif /* CFG_DEBUG */
 
       if (webServer.argName(i) == "newName") {  /* heck for dedicated arguments */
-        #ifdef CFG_DEBUG
-        Serial.println("New name received via Webpage: " + webServer.arg(i));
-        #endif /* CFG_DEBUG */
         if (webServer.arg(i) != myConfig.name) {  /* change name if it differs from the current one */
           #ifdef CFG_DEBUG
           Serial.println("Old name was: " + String(myConfig.name));
+          Serial.println("New name is:  " + webServer.arg(i));
           #endif
           strlcpy(myConfig.name, webServer.arg(i).c_str(), sizeof(myConfig.name));
           nameChanged = true;
@@ -843,6 +850,11 @@ void handleWebServerClient(void) {
       }
     }
   }
+}
+
+void handleHttpReset(void) {
+  systemRestartRequest = true;
+  handleWebServerClient();
 }
 
 /* MQTT callback if a message was received */
