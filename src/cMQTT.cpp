@@ -48,7 +48,7 @@ String mqttHelper::buildStateJSON(String name, String temp, String humid, String
   String JSON = \
   "{\n" \
   "  \"name\":\"" + name + "\",\n" \
-  "  \"device\":\"" + mqttNodeId + "\",\n" \
+  "  \"dev\":\"" + mqttNodeId + "\",\n" \
   "  \"mode\":\"" + thermoMode + "\",\n" \
   "  \"state\":\"" + actState + "\",\n" \
   "  \"target_temp\":\"" + tarTemp + "\",\n" \
@@ -79,17 +79,19 @@ String mqttHelper::buildHassDiscoveryClimate(String name, String firmware) {
   "  \"temp_stat_t\":\"~" + mqttData + "\",\n" \
   "  \"temp_stat_tpl\":\"{{value_json.target_temp}}\",\n" \
   "  \"curr_temp_t\":\"~" + mqttData + "\",\n" \
-  "  \"current_temperature_template\":\"{{value_json.current_temp}}\",\n" \
+  "  \"curr_temp_tpl\":\"{{value_json.current_temp}}\",\n" \
   "  \"min_temp\":\"15\",\n" \
   "  \"max_temp\":\"25\",\n" \
   "  \"temp_step\":\"0.5\",\n" \
   "  \"modes\":[\"heat\",\"off\"],\n" \
+  "  \"json_attr_t\":\"~" + mqttData + "\",\n" \
   "  \"uniq_id\":\"" + mqttNodeId + "_climate\",\n" \
-  "  \"device\" : { \n" \
-  "    \"identifiers\":[\"" + mqttNodeId + "\"],\n" \
+  "  \"dev\" : { \n" \
+  "    \"ids\":[\"" + mqttNodeId + "\"],\n" \
+  "    \"mdl\":\"ESP8266 Thermostat\",\n" \
   "    \"name\":\"" + name + "\",\n" \
-  "    \"sw_version\":\"" + firmware + "\",\n" \
-  "    \"manufacturer\":\"dhzl84\"\n" \
+  "    \"sw\":\"" + firmware + "\",\n" \
+  "    \"mf\":\"dhzl84\"\n" \
   "  }\n" \
   "}";
 
@@ -115,8 +117,8 @@ String mqttHelper::buildHassDiscoveryBinarySensor(String name, binarySensor_t bi
       "  \"pl_avail\":\"online\",\n" \
       "  \"pl_not_avail\":\"offline\",\n" \
       "  \"uniq_id\":\"" + mqttNodeId + "_sensStatus\",\n" \
-      "  \"device\" : { \n" \
-      "    \"identifiers\":[\"" + mqttNodeId + "\"]\n" \
+      "  \"dev\" : { \n" \
+      "    \"ids\":[\"" + mqttNodeId + "\"]\n" \
       "  }\n" \
       "}";
     }
@@ -137,8 +139,8 @@ String mqttHelper::buildHassDiscoveryBinarySensor(String name, binarySensor_t bi
       "  \"pl_avail\":\"online\",\n" \
       "  \"pl_not_avail\":\"offline\",\n" \
       "  \"uniq_id\":\"" + mqttNodeId + "_state\",\n" \
-      "  \"device\" : { \n" \
-      "    \"identifiers\":[\"" + mqttNodeId + "\"]\n" \
+      "  \"dev\" : { \n" \
+      "    \"ids\":[\"" + mqttNodeId + "\"]\n" \
       "  }\n" \
       "}";
     }
@@ -164,9 +166,10 @@ String mqttHelper::buildHassDiscoverySensor(String name, sensor_t sensor) {
       "  \"avty_t\":\"~" + mqttWill + "\",\n" \
       "  \"pl_avail\":\"online\",\n" \
       "  \"pl_not_avail\":\"offline\",\n" \
+      "  \"json_attr_t\":\"~" + mqttData + "\",\n" \
       "  \"uniq_id\":\"" + mqttNodeId + "_sensTemp\",\n" \
-      "  \"device\" : { \n" \
-      "    \"identifiers\":[\"" + mqttNodeId + "\"]\n" \
+      "  \"dev\" : { \n" \
+      "    \"ids\":[\"" + mqttNodeId + "\"]\n" \
       "  }\n" \
       "}";
     }
@@ -185,8 +188,8 @@ String mqttHelper::buildHassDiscoverySensor(String name, sensor_t sensor) {
       "  \"pl_avail\":\"online\",\n" \
       "  \"pl_not_avail\":\"offline\",\n" \
       "  \"uniq_id\":\"" + mqttNodeId + "_sensHum\",\n" \
-      "  \"device\" : { \n" \
-      "    \"identifiers\":[\"" + mqttNodeId + "\"]\n" \
+      "  \"dev\" : { \n" \
+      "    \"ids\":[\"" + mqttNodeId + "\"]\n" \
       "  }\n" \
       "}";
     }
@@ -203,8 +206,8 @@ String mqttHelper::buildHassDiscoverySensor(String name, sensor_t sensor) {
       "  \"pl_avail\":\"online\",\n" \
       "  \"pl_not_avail\":\"offline\",\n" \
       "  \"uniq_id\":\"" + mqttNodeId + "_ip\",\n" \
-      "  \"device\" : { \n" \
-      "    \"identifiers\":[\"" + mqttNodeId + "\"]\n" \
+      "  \"dev\" : { \n" \
+      "    \"ids\":[\"" + mqttNodeId + "\"]\n" \
       "  }\n" \
       "}";
     }
@@ -222,8 +225,8 @@ String mqttHelper::buildHassDiscoverySensor(String name, sensor_t sensor) {
       "  \"pl_avail\":\"online\",\n" \
       "  \"pl_not_avail\":\"offline\",\n" \
       "  \"uniq_id\":\"" + mqttNodeId + "_calibF\",\n" \
-      "  \"device\" : { \n" \
-      "    \"identifiers\":[\"" + mqttNodeId + "\"]\n" \
+      "  \"dev\" : { \n" \
+      "    \"ids\":[\"" + mqttNodeId + "\"]\n" \
       "  }\n" \
       "}";
     }
@@ -241,8 +244,8 @@ String mqttHelper::buildHassDiscoverySensor(String name, sensor_t sensor) {
       "  \"pl_avail\":\"online\",\n" \
       "  \"pl_not_avail\":\"offline\",\n" \
       "  \"uniq_id\":\"" + mqttNodeId + "_calibO\",\n" \
-      "  \"device\" : { \n" \
-      "    \"identifiers\":[\"" + mqttNodeId + "\"]\n" \
+      "  \"dev\" : { \n" \
+      "    \"ids\":[\"" + mqttNodeId + "\"]\n" \
       "  }\n" \
       "}";
     }
@@ -259,8 +262,8 @@ String mqttHelper::buildHassDiscoverySensor(String name, sensor_t sensor) {
       "  \"pl_avail\":\"online\",\n" \
       "  \"pl_not_avail\":\"offline\",\n" \
       "  \"uniq_id\":\"" + mqttNodeId + "_fw\",\n" \
-      "  \"device\" : { \n" \
-      "    \"identifiers\":[\"" + mqttNodeId + "\"]\n" \
+      "  \"dev\" : { \n" \
+      "    \"ids\":[\"" + mqttNodeId + "\"]\n" \
       "  }\n" \
       "}";
     }
@@ -278,8 +281,8 @@ String mqttHelper::buildHassDiscoverySensor(String name, sensor_t sensor) {
       "  \"pl_avail\":\"online\",\n" \
       "  \"pl_not_avail\":\"offline\",\n" \
       "  \"uniq_id\":\"" + mqttNodeId + "_hyst\",\n" \
-      "  \"device\" : { \n" \
-      "    \"identifiers\":[\"" + mqttNodeId + "\"]\n" \
+      "  \"dev\" : { \n" \
+      "    \"ids\":[\"" + mqttNodeId + "\"]\n" \
       "  }\n" \
       "}";
     }
@@ -310,8 +313,8 @@ String mqttHelper::buildHassDiscoverySwitch(String name, switch_t switches) {
       "  \"pl_not_avail\":\"offline\",\n" \
       "  \"qos\":\"1\",\n" \
       "  \"uniq_id\":\"" + mqttNodeId + "_swRestart\",\n" \
-      "  \"device\" : { \n" \
-      "    \"identifiers\":[\"" + mqttNodeId + "\"]\n" \
+      "  \"dev\" : { \n" \
+      "    \"ids\":[\"" + mqttNodeId + "\"]\n" \
       "  }\n" \
       "}";
     }
@@ -331,8 +334,8 @@ String mqttHelper::buildHassDiscoverySwitch(String name, switch_t switches) {
       "  \"pl_not_avail\":\"offline\",\n" \
       "  \"qos\":\"1\",\n" \
       "  \"uniq_id\":\"" + mqttNodeId + "_swUpdate\",\n" \
-      "  \"device\" : { \n" \
-      "    \"identifiers\":[\"" + mqttNodeId + "\"]\n" \
+      "  \"dev\" : { \n" \
+      "    \"ids\":[\"" + mqttNodeId + "\"]\n" \
       "  }\n" \
       "}";
     }

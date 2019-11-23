@@ -4,6 +4,7 @@
 #include <FS.h>  // SPIFFS
 #include "config.h"
 #include <ESP8266WiFi.h>
+#include <DHTesp.h>
 
 /* the config.h file contains your personal configuration of the parameters below: 
   #define WIFI_SSID                   "xxx"
@@ -96,5 +97,6 @@ void SetNextTimeInterval(uint32_t& timer, const uint32_t step);  // NOLINT: pass
 bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor);
 char* millisFormatted(void);
 String wifiStatusToString(wl_status_t status);
+String comfortStateToString(ComfortState state);
 
 #endif  // MAIN_H_
