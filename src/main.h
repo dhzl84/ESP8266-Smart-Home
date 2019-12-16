@@ -74,6 +74,9 @@ void downButton(void);
 void updateEncoder(void);
 #endif /* CFG_PUSH_BUTTONS */
 
+/* MACRO to append another line of the webpage table */
+#define webpageTableAppend(key,value) (webpage +="<tr><td>" + key + ":</td><td>"+ value + "</td></tr>");
+
 /*===================================================================================================================*/
 /* global scope functions */
 /*===================================================================================================================*/
@@ -82,6 +85,7 @@ void mqttPubState(void);
 void loadConfiguration(configuration &config);  // NOLINT: pass by reference
 bool saveConfiguration(const configuration &config);
 String readSpiffs(String file);
+
 /*===================================================================================================================*/
 /* library functions */
 /*===================================================================================================================*/
