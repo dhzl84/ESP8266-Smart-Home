@@ -1,5 +1,5 @@
-#ifndef MAIN_H
-#define MAIN_H
+#ifndef MAIN_H_
+#define MAIN_H_
 #include "Arduino.h"
 #include <FS.h>  // SPIFFS
 #include "config.h"
@@ -101,4 +101,4 @@ bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor)
 char* millisFormatted(void);
 String wifiStatusToString(wl_status_t status);
 
-#endif  // MAIN_H
+#endif  // MAIN_H_
