@@ -1,3 +1,4 @@
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 # ESP8266 Smart Home Playground
 
 This is my ESP8266 smart home playground for:  
@@ -20,7 +21,7 @@ SW Built with PlatformIO in Visual Studio Code, some great [Arduino](https://www
 
 ### Dependencies
 Platform:
-* ESP8266 Arduino 2.5.0 (Espressif8266 2.0.1)
+* ESP8266 Arduino 2.5.2 (Espressif8266 2.2.2)
 
 Custom libraries:
 * DHT sensor library for ESPx

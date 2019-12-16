@@ -3,7 +3,7 @@
 /*===================================================================================================================*/
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
-#include "ESP8266WebServer.h"
+#include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <ESP8266httpUpdate.h>
 #include <ArduinoOTA.h>
@@ -74,7 +74,7 @@ uint32_t  onOffButtonDebounceTime        = 0;
 uint32_t  upButtonDebounceTime           = 0;
 uint32_t  downButtonDebounceTime         = 0;
 #else
-#define rotLeft                                 -1
+#define rotLeft                                -1
 #define rotRight                                1
 #define rotInit                                 0
 volatile int16_t lastEncoded                      = 0b11;        /* initial state of the rotary encoders gray code */
@@ -117,8 +117,6 @@ uint32_t wifiReconnectTimer = 30000;
 boolean  SPIFFS_WRITTEN =           true;
 uint32_t SPIFFS_REFERENCE_TIME;
 
-
-
 /*===================================================================================================================*/
 /* The setup function is called once at startup of the sketch */
 /*===================================================================================================================*/
@@ -130,7 +128,7 @@ void setup() {
 
   SPIFFS_INIT();                                                                                   /* read stuff from SPIFFS */
   GPIO_CONFIG();                                                                                   /* configure GPIOs */
-  myThermostat.setup(RELAY_PIN, myConfig.tTemp, myConfig.calibF, myConfig.calibO, myConfig.tHyst); /* GPIO to switch the connected relay, initial target temperature, sensor calbigration and thermostat hysteresis */
+  myThermostat.setup(RELAY_PIN, myConfig.tTemp, myConfig.calibF, myConfig.calibO, myConfig.tHyst, myConfig.mode); /* GPIO to switch the connected relay, initial target temperature, sensor calbigration, thermostat hysteresis and last mode */
   myDHT.setup(DHT_PIN, DHTesp::DHT22);                                                             /* init DHT sensor */
   DISPLAY_INIT();                                                                                  /* init Display */
   WIFI_CONNECT();                                                                                  /* connect to WiFi */
@@ -139,8 +137,11 @@ void setup() {
   MQTT_CONNECT(); /* connect to MQTT host and build subscriptions, must be called after SPIFFS_INIT()*/
 
   MDNS.begin(myConfig.name);
+
   webServer.begin();
   webServer.on("/", handleWebServerClient);
+  webServer.on("/restart", handleHttpReset);
+
 
   #if CFG_PUSH_BUTTONS
   attachInterrupt(PHYS_INPUT_1_PIN, upButton,   FALLING);
@@ -288,7 +289,7 @@ void WIFI_CONNECT(void) {
 }
 
 void OTA_INIT(void) {
-  ArduinoOTA.setHostname(strlwr(myConfig.name));
+  ArduinoOTA.setHostname(myConfig.name);
 
   ArduinoOTA.onStart([]() {
     myMqttClient.disconnect();
@@ -617,37 +618,43 @@ void HANDLE_HTTP_UPDATE(void) {
 void SPIFFS_MAIN(void) {
   if (nameChanged == true) {
       if (saveConfiguration(myConfig)) {
-      /* write successful, restart to rebuild MQTT topics etc. */
       nameChanged = false;
       myMqttHelper.setTriggerDiscovery(true);
       } else {
       /* write failed, retry next loop */
     }
   }
-
   /* avoid extensive writing to SPIFFS, therefore check if the target temperature didn't change for a certain time before writing. */
-  if ( (myThermostat.getNewCalib()) || (myThermostat.getTargetTemperature() != myConfig.tTemp) || (myThermostat.getThermostatHysteresis() != myConfig.tHyst) ) {
+  if ( (myThermostat.getNewCalib()) || (myThermostat.getTargetTemperature() != myConfig.tTemp) || (myThermostat.getThermostatHysteresis() != myConfig.tHyst) || (myThermostat.getThermostatMode() != myConfig.mode) ) {
     SPIFFS_REFERENCE_TIME = millis();  // ToDo: handle wrap around
     myConfig.tTemp  = myThermostat.getTargetTemperature();
     myConfig.calibF = myThermostat.getSensorCalibFactor();
     myConfig.calibO = myThermostat.getSensorCalibOffset();
     myConfig.tHyst  = myThermostat.getThermostatHysteresis();
+    myConfig.mode   = myThermostat.getThermostatMode();
     myThermostat.resetNewCalib();
     SPIFFS_WRITTEN = false;
-  } else { /* target temperature not changed this loop */
-    if (SPIFFS_WRITTEN == true) {
-      /* do nothing, last change was already stored in SPIFFS */
-    } else { /* latest change not stored in SPIFFS */
-      if (SPIFFS_REFERENCE_TIME + SPIFFS_WRITE_DEBOUNCE < millis()) { /* check debounce */
-        /* debounce expired -> write */
-        if (saveConfiguration(myConfig)) {
-          SPIFFS_WRITTEN = true;
-        } else {
-          /* SPIFFS not written, retry next loop */
-        }
+    #if defined CFG_DEBUG
+    Serial.println("SPIFFS to be stored after debounce time: " + String(SPIFFS_WRITE_DEBOUNCE));
+    #endif /* CFG_DEBUG */
+  } else {
+    /* no spiffs data changed this loop */
+  }
+  if (SPIFFS_WRITTEN == true) {
+    /* do nothing, last change was already stored in SPIFFS */
+  } else { /* latest change not stored in SPIFFS */
+    if (SPIFFS_REFERENCE_TIME + SPIFFS_WRITE_DEBOUNCE < millis()) { /* check debounce */
+      /* debounce expired -> write */
+      if (saveConfiguration(myConfig)) {
+        SPIFFS_WRITTEN = true;
       } else {
-        /* debounce SPIFFS write */
+        /* SPIFFS not written, retry next loop */
+        #if defined CFG_DEBUG
+        Serial.println("SPIFFS write failed");
+        #endif /* CFG_DEBUG */
       }
+    } else {
+      /* debounce SPIFFS write */
     }
   }
 }
@@ -774,21 +781,80 @@ void mqttPubState(void) {
 }
 
 void handleWebServerClient(void) {
-  webServer.send(200, "text/plain", \
-    "Name: "+ String(myConfig.name) + "\n" \
-    "FW version: "+ String(FW) + "\n" \
-    "Reset Reason: "+ String(ESP.getResetReason()) + "\n" \
-    "Time since Reset: "+ String(millisFormatted()) + "\n" \
-    "Flash Size: "+ String(ESP.getFlashChipRealSize()) + "\n" \
-    "Sketch Size: "+ String(ESP.getSketchSize()) + "\n" \
-    "Free for Sketch: "+ String(ESP.getFreeSketchSpace()) + "\n" \
-    "Free Heap: "+ String(ESP.getFreeHeap()) + "\n" \
-    "Vcc: "+ String(ESP.getVcc()/1000.0) + "\n" \
-    "WiFi Status: " + String(WiFi.status()) + "\n" \
-    "WiFi RSSI: " + String(WiFi.RSSI()) + "\n" \
-    "WiFi connects: " + String(WiFiConnectCounter) + "\n" \
-    "MQTT connection: " + String((myMqttClient.connected()) == true ? "connected" : "disconnected") + "\n" \
-    "MQTT connects: " + String(MQTTConnectCounter));
+  String IPaddress = WiFi.localIP().toString();
+  float rssiInPercent = WiFi.RSSI();
+  rssiInPercent = isnan(rssiInPercent) ? -100.0 : min(max(2 * (rssiInPercent + 100.0), 0.0), 100.0);
+
+  String webpage = "<!DOCTYPE html> <html>\n";
+  /* HEAD */
+  webpage +="<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
+  webpage +="<title> "+ String(myConfig.name) + "</title>\n";
+  webpage +="<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: left;}\n";
+  webpage +="body {background-color: #202226; color: #A0A2A8}\n";
+  webpage +="p {color: #2686c1; margin-bottom: 10px;}\n";
+  webpage +="table {color: #A0A2A8;}\n";
+  webpage +="</style>\n";
+  webpage +="</head>\n";
+  /* BODY */
+  webpage +="<body>\n";
+  webpage +="<p><b>System information</b></p>";
+  webpage +="<table>";
+  webpage +="<tr><td>Name:</td><td>" + String(myConfig.name) + "</td></tr>";
+  webpage +="<tr><td>Chip ID:</td><td>" + String(ESP.getChipId(), HEX) + "</td></tr>";
+  webpage +="<tr><td>IP:</td><td>"+ IPaddress + "</td></tr>";
+  webpage +="<tr><td>FW version:</td><td>"+ String(FW) + "</td></tr>";
+  webpage +="<tr><td>Arduino Core:</td><td>"+ ESP.getCoreVersion() + "</td></tr>";
+  webpage +="<tr><td>Reset Reason:</td><td>"+ ESP.getResetReason() + "</td></tr>";
+  webpage +="<tr><td>Time since Reset:</td><td>"+ String(millisFormatted()) + "</td></tr>";
+  webpage +="<tr><td>Flash Size:</td><td>"+ String(ESP.getFlashChipRealSize()) + "</td></tr>";
+  webpage +="<tr><td>Sketch Size:</td><td>"+ String(ESP.getSketchSize()) + "</td></tr>";
+  webpage +="<tr><td>Free for Sketch:</td><td>"+ String(ESP.getFreeSketchSpace()) + "</td></tr>";
+  webpage +="<tr><td>Free Heap:</td><td>"+ String(ESP.getFreeHeap()) + "</td></tr>";
+  webpage +="<tr><td>Vcc:</td><td>"+ String(ESP.getVcc()/1000.0) + "</td></tr>";
+  webpage +="<tr><td>WiFi Status:</td><td>" + wifiStatusToString(WiFi.status()) + "</td></tr>";
+  webpage +="<tr><td>WiFi Strength:</td><td>" + String(rssiInPercent, 0) + " % </td></tr>";
+  webpage +="<tr><td>WiFi Connects:</td><td>" + String(WiFiConnectCounter) + "</td></tr>";
+  webpage +="<tr><td>MQTT Status:</td><td>" + String((myMqttClient.connected()) == true ? "connected" : "disconnected") + "</td></tr>";
+  webpage +="<tr><td>MQTT Connects:</td><td>" + String(MQTTConnectCounter) + "</td></tr>";
+  webpage +="</table>";
+  webpage +="<p><b>Change Name</b></p>";
+  webpage +="<form method='POST' autocomplete='off'>";
+  webpage +="<input type='text' name='newName' value="+ String(myConfig.name) + ">&nbsp;<input type='submit' value='Submit'>";
+  webpage +="</form>";
+  webpage +="<p><b>Restart Device</b></p>";
+  if (systemRestartRequest == false) {
+    webpage +="<button onclick=\"window.location.href='/restart'\"> Restart </button>";
+  } else {
+    webpage +="<button onclick=\"window.location.href='/'\"> Restarting, reload site </button>";
+  }
+  webpage +="</body>\n";
+  webpage +="</html>\n";
+
+  webServer.send(200, "text/html", webpage);  /* Send a response to the client asking for input */
+
+  if (webServer.args() > 0) {  /* Arguments were received */
+    for ( uint8_t i = 0; i < webServer.args(); i++ ) {
+      #ifdef CFG_DEBUG
+      Serial.println("HTTP arg(" + String(i) + "): " + webServer.argName(i) + "=" + webServer.arg(i));  /* Display each argument */
+      #endif /* CFG_DEBUG */
+
+      if (webServer.argName(i) == "newName") {  /* heck for dedicated arguments */
+        if (webServer.arg(i) != myConfig.name) {  /* change name if it differs from the current one */
+          #ifdef CFG_DEBUG
+          Serial.println("Old name was: " + String(myConfig.name));
+          Serial.println("New name is:  " + webServer.arg(i));
+          #endif
+          strlcpy(myConfig.name, webServer.arg(i).c_str(), sizeof(myConfig.name));
+          nameChanged = true;
+        }
+      }
+    }
+  }
+}
+
+void handleHttpReset(void) {
+  systemRestartRequest = true;
+  handleWebServerClient();
 }
 
 /* MQTT callback if a message was received */

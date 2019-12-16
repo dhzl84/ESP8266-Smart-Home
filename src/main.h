@@ -24,6 +24,7 @@
 /*===================================================================================================================*/
 struct configuration {
   char    name[64];
+  boolean mode;   /* 0 = TH_OFF, 1 = TH_HEAT */
   int16_t tTemp;  /* persistent target temperature */
   int16_t tHyst;  /* thermostat hysteresis */
   int16_t calibF;
@@ -58,6 +59,8 @@ void SPIFFS_MAIN(void);
 void HANDLE_HTTP_UPDATE(void);
 /* callback */
 void handleWebServerClient(void);
+void handleHttpReset(void);
+
 #if CFG_MQTT_LIB == cArduinoMQTT
 void messageReceived(String &topic, String &payload);  // NOLINT: pass by reference
 #else
@@ -92,5 +95,6 @@ bool TimeReached(uint32_t timer);
 void SetNextTimeInterval(uint32_t& timer, const uint32_t step);  // NOLINT: pass by reference
 bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor);
 char* millisFormatted(void);
+String wifiStatusToString(wl_status_t status);
 
 #endif  // MAIN_H_
