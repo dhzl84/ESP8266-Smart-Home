@@ -1,5 +1,5 @@
-#ifndef USERFONTS_H_
-#define USERFONTS_H_
+#ifndef SRC_USERFONTS_H_
+#define SRC_USERFONTS_H_
 
 #include "Arduino.h"
 
@@ -948,4 +948,4 @@ const uint8_t Roboto_Condensed_16[] PROGMEM = {
 
 
 
-#endif  // USERFONTS_H_
+#endif  // SRC_USERFONTS_H_

@@ -1,6 +1,6 @@
 cat > config.h << EOF
-#ifndef CONFIG_H_
-#define CONFIG_H_
+#ifndef SRC_CONFIG_H_
+#define SRC_CONFIG_H_
 
 #define TRACE false
 

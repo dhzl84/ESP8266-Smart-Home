@@ -1,5 +1,5 @@
-#ifndef CTHERMOSTAT_H_
-#define CTHERMOSTAT_H_
+#ifndef SRC_CTHERMOSTAT_H_
+#define SRC_CTHERMOSTAT_H_
 
 #include "Arduino.h"
 
@@ -97,4 +97,4 @@ class Thermostat {
   int16_t humidValueQueue[CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE];
 };
 
-#endif  // CTHERMOSTAT_H_
+#endif  // SRC_CTHERMOSTAT_H_

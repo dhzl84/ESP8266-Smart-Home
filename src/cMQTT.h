@@ -1,5 +1,5 @@
-#ifndef CMQTT_H_
-#define CMQTT_H_
+#ifndef SRC_CMQTT_H_
+#define SRC_CMQTT_H_
 
 #include "Arduino.h"
 
@@ -82,4 +82,4 @@ class mqttHelper {
   String mqttTargetTempCmd;
 };
 
-#endif  // CMQTT_H_
+#endif  // SRC_CMQTT_H_

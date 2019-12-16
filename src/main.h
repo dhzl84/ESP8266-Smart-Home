@@ -1,5 +1,5 @@
-#ifndef MAIN_H_
-#define MAIN_H_
+#ifndef SRC_MAIN_H
+#define SRC_MAIN_H
 #include "Arduino.h"
 #include <FS.h>  // SPIFFS
 #include "config.h"
@@ -75,7 +75,7 @@ void updateEncoder(void);
 #endif /* CFG_PUSH_BUTTONS */
 
 /* MACRO to append another line of the webpage table */
-#define webpageTableAppend(key,value) (webpage +="<tr><td>" + key + ":</td><td>"+ value + "</td></tr>");
+#define webpageTableAppend(key, value) (webpage +="<tr><td>" + key + ":</td><td>"+ value + "</td></tr>");
 
 /*===================================================================================================================*/
 /* global scope functions */
@@ -101,4 +101,4 @@ bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor)
 char* millisFormatted(void);
 String wifiStatusToString(wl_status_t status);
 
-#endif  // MAIN_H_
+#endif  // SRC_MAIN_H

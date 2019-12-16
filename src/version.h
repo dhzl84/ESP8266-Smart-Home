@@ -1,5 +1,5 @@
-#ifndef VERSION_H_
-#define VERSION_H_
+#ifndef SRC_VERSION_H_
+#define SRC_VERSION_H_
 
 #define VERSION "0.11.1"
 
@@ -11,4 +11,4 @@
 
 #define FW (FW_PREFIX VERSION)
 
-#endif  // VERSION_H_
+#endif  // SRC_VERSION_H_
