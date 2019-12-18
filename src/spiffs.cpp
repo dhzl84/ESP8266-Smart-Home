@@ -17,7 +17,7 @@
   "mqttPwd":"xxxxxxxxxxxxx",
   "updServer":"http://192.168.178.12:88/firmware/thermostat/firmware.bin",
   "sensUpdInterval":"20",
-  "mqttPubCycleInterval":"5"
+  "mqttPubCycle":"5"
 }
 */
 
@@ -31,93 +31,105 @@ void loadConfiguration(configuration &config) { // NOLINT: pass by reference
   // Allocate the memory pool on the stack.
   // Don't forget to change the capacity to match your JSON document.
   // Use arduinojson.org/assistant to compute the capacity.
-  StaticJsonBuffer<768> jsonBuffer;
-  // Parse the root object
-  JsonObject &root = jsonBuffer.parseObject(file);
+  StaticJsonDocument<768> jsonDoc;
+
+  DeserializationError error = deserializeJson(jsonDoc, file);
+  if (error) {
+      Serial.print(F("deserializeJson() failed with code "));
+      Serial.println(error.c_str());
+      return;
+  } else {
+      #ifdef CFG_DEBUG
+      serializeJsonPretty(jsonDoc, Serial);
+      Serial.println();
+      #endif /* CFG_DEBUG */
+  }
+
   file.close();
 
-  if (root.success()) {
+  if (jsonDoc.isNull()) {
     #ifdef CFG_DEBUG
-    root.prettyPrintTo(Serial);
-    Serial.println();
-    #endif /* CFG_DEBUG */
-  } else {
     Serial.println("Failed to read file, using default configuration");
+    #endif /* CFG_DEBUG */
   }
 
-  // Copy values from the JsonObject to the Config, if the key doesn't exist, load the default config
-  strlcpy(config.name,          root["name"]                  | "unknown",         sizeof(config.name));
-  config.mode =                 root["mode"]                  | true;
-  strlcpy(config.ssid,          root["ssid"]                  | WIFI_SSID,         sizeof(config.ssid));
-  strlcpy(config.wifiPwd,       root["wifiPwd"]               | WIFI_PWD ,         sizeof(config.wifiPwd));
-  strlcpy(config.mqttHost,      root["mqttHost"]              | LOCAL_MQTT_HOST,   sizeof(config.mqttHost));
-  config.mqttPort =             root["mqttPort"]              | LOCAL_MQTT_PORT;
-  strlcpy(config.mqttUser,      root["mqttUser"]              | LOCAL_MQTT_USER,   sizeof(config.mqttUser));
-  strlcpy(config.mqttPwd,       root["mqttPwd"]               | LOCAL_MQTT_PWD,    sizeof(config.mqttPwd));
-  config.tTemp =                root["tTemp"]                 | 200;
-  config.tHyst =                root["tHyst"]                 | THERMOSTAT_HYSTERESIS;
-  config.calibF =               root["calibF"]                | 100;
-  config.calibO =               root["calibO"]                | 0;
-  strlcpy(config.updServer,     root["updServer"]             | DEVICE_BINARY, sizeof(config.updServer));
-  config.sensUpdInterval =      root["sensUpdInterval"]       | SENSOR_UPDATE_INTERVAL;
-  config.mqttPubCycleInterval = root["mqttPubCycleInterval"]  | 5;
-
-  /* sensUpdInterval is now seconds instead of millisesconds, these line are only here for migration */
-  if (config.sensUpdInterval == 20000) {
-    config.sensUpdInterval = SENSOR_UPDATE_INTERVAL;
-  }
+  // Copy values from the jsonDoc  to the Config, if the key doesn't exist, load the default config
+  strlcpy(config.name,          jsonDoc["name"]                  | "unknown",         sizeof(config.name));
+  config.mode =                 jsonDoc["mode"]                  | true;
+  strlcpy(config.ssid,          jsonDoc["ssid"]                  | WIFI_SSID,         sizeof(config.ssid));
+  strlcpy(config.wifiPwd,       jsonDoc["wifiPwd"]               | WIFI_PWD ,         sizeof(config.wifiPwd));
+  strlcpy(config.mqttHost,      jsonDoc["mqttHost"]              | LOCAL_MQTT_HOST,   sizeof(config.mqttHost));
+  config.mqttPort =             jsonDoc["mqttPort"]              | LOCAL_MQTT_PORT;
+  strlcpy(config.mqttUser,      jsonDoc["mqttUser"]              | LOCAL_MQTT_USER,   sizeof(config.mqttUser));
+  strlcpy(config.mqttPwd,       jsonDoc["mqttPwd"]               | LOCAL_MQTT_PWD,    sizeof(config.mqttPwd));
+  config.tTemp =                jsonDoc["tTemp"]                 | 200;
+  config.tHyst =                jsonDoc["tHyst"]                 | THERMOSTAT_HYSTERESIS;
+  config.calibF =               jsonDoc["calibF"]                | 100;
+  config.calibO =               jsonDoc["calibO"]                | 0;
+  strlcpy(config.updServer,     jsonDoc["updServer"]             | DEVICE_BINARY, sizeof(config.updServer));
+  config.sensUpdInterval =      jsonDoc["sensUpdInterval"]       | SENSOR_UPDATE_INTERVAL;
+  config.mqttPubCycle =         jsonDoc["mqttPubCycle"]          | 5;
+  config.inputMethod =          jsonDoc["inputMethod"]           | false;
 }
 
 // Saves the configuration to a file
 bool saveConfiguration(const configuration &config) {
   bool ret = true;
   bool writeFile = false;
-  StaticJsonBuffer<768> jsonBuffer;
+  StaticJsonDocument<768> jsonDoc;
+  StaticJsonDocument<768> jsonDocNew;
 
   if (SPIFFS.exists(filename)) {
     // Delete existing file, otherwise the configuration is appended to the file
     File file = SPIFFS.open(filename, "r");
-    JsonObject &root = jsonBuffer.parseObject(file);
+
+    DeserializationError error = deserializeJson(jsonDoc, file);
+    if (error) {
+        Serial.print(F("deserializeJson() failed with code "));
+        Serial.println(error.c_str());
+    }
 
     #ifdef CFG_DEBUG
     Serial.println("SPIFFS content:");
-    root.prettyPrintTo(Serial);
+    serializeJsonPretty(jsonDoc, Serial);
     Serial.println();
     Serial.println("Check SPIFFS vs. current config, 0 is equal, 1 is diff.");
-    Serial.print((config.name ==                 root["name"]) ? false : true);
-    Serial.print((config.mode ==                 root["mode"]) ? false : true);
-    Serial.print((config.ssid ==                 root["ssid"]) ? false : true);
-    Serial.print((config.wifiPwd ==              root["wifiPwd"]) ? false : true);
-    Serial.print((config.mqttHost ==             root["mqttHost"]) ? false : true);
-    Serial.print((config.mqttPort ==             root["mqttPort"]) ? false : true);
-    Serial.print((config.mqttUser ==             root["mqttUser"]) ? false : true);
-    Serial.print((config.mqttPwd ==              root["mqttPwd"]) ? false : true);
-    Serial.print((config.tTemp ==                root["tTemp"]) ? false : true);
-    Serial.print((config.tHyst ==                root["tHyst"]) ? false : true);
-    Serial.print((config.calibF ==               root["calibF"]) ? false : true);
-    Serial.print((config.calibO ==               root["calibO"]) ? false : true);
-    Serial.print((config.updServer ==            root["updServer"]) ? false : true);
-    Serial.print((config.sensUpdInterval ==      root["sensUpdInterval"]) ? false : true);
-    Serial.print((config.mqttPubCycleInterval == root["mqttPubCycleInterval"]) ? false : true);
+    Serial.print((config.name ==                 jsonDoc["name"]) ? false : true);
+    Serial.print((config.mode ==                 jsonDoc["mode"]) ? false : true);
+    Serial.print((config.ssid ==                 jsonDoc["ssid"]) ? false : true);
+    Serial.print((config.wifiPwd ==              jsonDoc["wifiPwd"]) ? false : true);
+    Serial.print((config.mqttHost ==             jsonDoc["mqttHost"]) ? false : true);
+    Serial.print((config.mqttPort ==             jsonDoc["mqttPort"]) ? false : true);
+    Serial.print((config.mqttUser ==             jsonDoc["mqttUser"]) ? false : true);
+    Serial.print((config.mqttPwd ==              jsonDoc["mqttPwd"]) ? false : true);
+    Serial.print((config.tTemp ==                jsonDoc["tTemp"]) ? false : true);
+    Serial.print((config.tHyst ==                jsonDoc["tHyst"]) ? false : true);
+    Serial.print((config.calibF ==               jsonDoc["calibF"]) ? false : true);
+    Serial.print((config.calibO ==               jsonDoc["calibO"]) ? false : true);
+    Serial.print((config.updServer ==            jsonDoc["updServer"]) ? false : true);
+    Serial.print((config.sensUpdInterval ==      jsonDoc["sensUpdInterval"]) ? false : true);
+    Serial.print((config.mqttPubCycle ==         jsonDoc["mqttPubCycle"]) ? false : true);
+    Serial.print((config.inputMethod ==          jsonDoc["inputMethod"]) ? false : true);
     Serial.println();
     #endif /* CFG_DEBUG */
 
     /* check if SPIFFS content is equal to avoid delete and write */
-    writeFile |= (config.name ==                 root["name"]) ? false : true;
-    writeFile |= (config.mode ==                 root["mode"]) ? false : true;
-    writeFile |= (config.ssid ==                 root["ssid"]) ? false : true;
-    writeFile |= (config.wifiPwd ==              root["wifiPwd"]) ? false : true;
-    writeFile |= (config.mqttHost ==             root["mqttHost"]) ? false : true;
-    writeFile |= (config.mqttPort ==             root["mqttPort"]) ? false : true;
-    writeFile |= (config.mqttUser ==             root["mqttUser"]) ? false : true;
-    writeFile |= (config.mqttPwd ==              root["mqttPwd"]) ? false : true;
-    writeFile |= (config.tTemp ==                root["tTemp"]) ? false : true;
-    writeFile |= (config.tHyst ==                root["tHyst"]) ? false : true;
-    writeFile |= (config.calibF ==               root["calibF"]) ? false : true;
-    writeFile |= (config.calibO ==               root["calibO"]) ? false : true;
-    writeFile |= (config.updServer ==            root["updServer"]) ? false : true;
-    writeFile |= (config.sensUpdInterval ==      root["sensUpdInterval"]) ? false : true;
-    writeFile |= (config.mqttPubCycleInterval == root["mqttPubCycleInterval"]) ? false : true;
+    writeFile |= (config.name ==                 jsonDoc["name"]) ? false : true;
+    writeFile |= (config.mode ==                 jsonDoc["mode"]) ? false : true;
+    writeFile |= (config.ssid ==                 jsonDoc["ssid"]) ? false : true;
+    writeFile |= (config.wifiPwd ==              jsonDoc["wifiPwd"]) ? false : true;
+    writeFile |= (config.mqttHost ==             jsonDoc["mqttHost"]) ? false : true;
+    writeFile |= (config.mqttPort ==             jsonDoc["mqttPort"]) ? false : true;
+    writeFile |= (config.mqttUser ==             jsonDoc["mqttUser"]) ? false : true;
+    writeFile |= (config.mqttPwd ==              jsonDoc["mqttPwd"]) ? false : true;
+    writeFile |= (config.tTemp ==                jsonDoc["tTemp"]) ? false : true;
+    writeFile |= (config.tHyst ==                jsonDoc["tHyst"]) ? false : true;
+    writeFile |= (config.calibF ==               jsonDoc["calibF"]) ? false : true;
+    writeFile |= (config.calibO ==               jsonDoc["calibO"]) ? false : true;
+    writeFile |= (config.updServer ==            jsonDoc["updServer"]) ? false : true;
+    writeFile |= (config.sensUpdInterval ==      jsonDoc["sensUpdInterval"]) ? false : true;
+    writeFile |= (config.mqttPubCycle ==         jsonDoc["mqttPubCycle"]) ? false : true;
+    writeFile |= (config.inputMethod ==          jsonDoc["inputMethod"]) ? false : true;
 
     file.close();
   } else {
@@ -127,30 +139,37 @@ bool saveConfiguration(const configuration &config) {
 
   /* if SPIFFS content differs current configuration, delete SPIFFS and write new content*/
   if (writeFile == true) {
-    SPIFFS.remove(filename);
+    if (SPIFFS.remove(filename)) {
+      #ifdef CFG_DEBUG
+      Serial.println("Removing SPIFFS file succeeded");
+      #endif /* CFG_DEBUG */
+    } else {
+      #ifdef CFG_DEBUG
+      Serial.println("Removing SPIFFS file failed");
+      #endif /* CFG_DEBUG */
+    }
 
     File file = SPIFFS.open(filename, "w");
 
-    JsonObject &root = jsonBuffer.createObject();
-
-    root["name"] =                   config.name;
-    root["mode"] =                   config.mode;
-    root["ssid"] =                   config.ssid;
-    root["wifiPwd"] =                config.wifiPwd;
-    root["mqttHost"] =               config.mqttHost;
-    root["mqttPort"] =               config.mqttPort;
-    root["mqttUser"] =               config.mqttUser;
-    root["mqttPwd"] =                config.mqttPwd;
-    root["tTemp"] =                  config.tTemp;
-    root["tHyst"] =                  config.tHyst;
-    root["calibF"] =                 config.calibF;
-    root["calibO"] =                 config.calibO;
-    root["updServer"] =              config.updServer;
-    root["sensUpdInterval"] =        config.sensUpdInterval;
-    root["mqttPubCycleInterval"] =   config.mqttPubCycleInterval;
+    jsonDocNew["name"] =                   config.name;
+    jsonDocNew["mode"] =                   config.mode;
+    jsonDocNew["ssid"] =                   config.ssid;
+    jsonDocNew["wifiPwd"] =                config.wifiPwd;
+    jsonDocNew["mqttHost"] =               config.mqttHost;
+    jsonDocNew["mqttPort"] =               config.mqttPort;
+    jsonDocNew["mqttUser"] =               config.mqttUser;
+    jsonDocNew["mqttPwd"] =                config.mqttPwd;
+    jsonDocNew["tTemp"] =                  config.tTemp;
+    jsonDocNew["tHyst"] =                  config.tHyst;
+    jsonDocNew["calibF"] =                 config.calibF;
+    jsonDocNew["calibO"] =                 config.calibO;
+    jsonDocNew["updServer"] =              config.updServer;
+    jsonDocNew["sensUpdInterval"] =        config.sensUpdInterval;
+    jsonDocNew["mqttPubCycle"] =           config.mqttPubCycle;
+    jsonDocNew["inputMethod"] =            config.inputMethod;
 
     // Serialize JSON to file
-    if (root.printTo(file) == 0) {
+    if (serializeJson(jsonDocNew, file) == 0) {
       ret = false;
       #ifdef CFG_DEBUG
       Serial.println("Failed to write to file");
@@ -158,7 +177,7 @@ bool saveConfiguration(const configuration &config) {
     } else {
       #ifdef CFG_DEBUG
       Serial.println("new SPIFFS content:");
-      root.prettyPrintTo(Serial);
+      serializeJsonPretty(jsonDocNew, Serial);
       Serial.println();
       #endif /* CFG_DEBUG */
     }

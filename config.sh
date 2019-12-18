@@ -15,7 +15,6 @@ cat > config.h << EOF
 #define SENSOR_UPDATE_INTERVAL  20
 #define THERMOSTAT_HYSTERESIS   2
 #define WIFI_RECONNECT_TIME     30
-#define CFG_PUSH_BUTTONS        $1
 
 #define cArduinoMQTT  0
 #define cPubSubClient 1
