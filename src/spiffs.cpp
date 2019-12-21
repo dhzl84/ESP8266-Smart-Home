@@ -114,6 +114,7 @@ bool saveConfiguration(const configuration &config) {
     #endif /* CFG_DEBUG */
 
     /* check if SPIFFS content is equal to avoid delete and write */
+
     writeFile |= (config.name ==                 jsonDoc["name"]) ? false : true;
     writeFile |= (config.mode ==                 jsonDoc["mode"]) ? false : true;
     writeFile |= (config.ssid ==                 jsonDoc["ssid"]) ? false : true;

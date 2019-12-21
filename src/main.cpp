@@ -788,6 +788,7 @@ void handleWebServerClient(void) {
   webpage +="<body>\n";
   webpage +="<p><b>System information</b></p>";
   webpage +="<table>";
+
   /*= KEY ======================================||= VALUE ================================*/
   webpageTableAppend(String("Name"),              String(myConfig.name));
   webpageTableAppend(String("Chip ID"),           String(ESP.getChipId(), HEX));
