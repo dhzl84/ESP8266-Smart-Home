@@ -21,9 +21,9 @@ SW Built with PlatformIO in Visual Studio Code, some great [Arduino](https://www
 
 ### Dependencies
 Platform:
-* ESP8266 Arduino 2.5.2 (Espressif8266 2.2.2)
+* ESP8266 Core for Arduino
 
-Custom libraries:
+Arduino Libraries:
 * DHT sensor library for ESPx
 * ESP8266 and ESP32 Oled Driver for SSD1306 display
 * ArduinoMQTT or PubSubClient
@@ -46,7 +46,6 @@ My *config.h* for building a thermostat SW contains the following information:
 #define SENSOR_UPDATE_INTERVAL 20      /* seconds */
 #define THERMOSTAT_HYSTERESIS  2       /* 0.2 °C */
 #define WIFI_RECONNECT_TIME    30      /* seconds */
-#define CFG_PUSH_BUTTONS       false
 
 #define cArduinoMQTT  0
 #define cPubSubClient 1

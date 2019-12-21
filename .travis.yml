@@ -26,7 +26,7 @@
 
 language: python
 python:
-  - "2.7"
+  - "3.8"
 
 sudo: false
 cache:
@@ -49,7 +49,7 @@ jobs:
       script:
         - chmod a+x config.sh
         - echo "generate config.h for rotary encoder input and ArduinoMQTT"
-        - ./config.sh false false
+        - ./config.sh false
         - cat config.h
         - ls -l
         - mv config.h src/config.h
@@ -57,23 +57,7 @@ jobs:
     - script:
         - chmod a+x config.sh
         - echo "generate config.h for rotary encoder input and PubSubClient"
-        - ./config.sh false true
-        - cat config.h
-        - ls -l
-        - mv config.h src/config.h
-        - platformio run
-    - script:
-        - chmod a+x config.sh
-        - echo "generate config.h for push button input and ArduinoMQTT"
-        - ./config.sh true false
-        - cat config.h
-        - ls -l
-        - mv config.h src/config.h
-        - platformio run
-    - script:
-        - chmod a+x config.sh
-        - echo "generate config.h for push button input and PubSubClient"
-        - ./config.sh true true
+        - ./config.sh true
         - cat config.h
         - ls -l
         - mv config.h src/config.h

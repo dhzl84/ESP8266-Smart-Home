@@ -3,6 +3,7 @@
 #include "Arduino.h"
 #include <FS.h>  // SPIFFS
 #include "config.h"
+#include "version.h"
 #include <ESP8266WiFi.h>
 
 /* the config.h file contains your personal configuration of the parameters below: 
@@ -16,17 +17,21 @@
   #define SENSOR_UPDATE_INTERVAL      20      // seconds
   #define THERMOSTAT_HYSTERESIS       2       // seconds 
   #define WIFI_RECONNECT_TIME         30      // seconds
-  #define CFG_PUSH_BUTTONS            false
 */
+
+/* inputMethod */
+#define cROTARY_ENCODER 0
+#define cPUSH_BUTTONS   1
 
 /*===================================================================================================================*/
 /* variable declarations */
 /*===================================================================================================================*/
 struct configuration {
   char    name[64];
-  boolean mode;   /* 0 = TH_OFF, 1 = TH_HEAT */
-  int16_t tTemp;  /* persistent target temperature */
-  int16_t tHyst;  /* thermostat hysteresis */
+  boolean mode;         /* 0 = TH_OFF, 1 = TH_HEAT */
+  boolean inputMethod;  /* 0 = rotary encoder , 1 = three push buttons */
+  int16_t tTemp;        /* persistent target temperature */
+  int16_t tHyst;        /* thermostat hysteresis */
   int16_t calibF;
   int16_t calibO;
   char    ssid[64];
@@ -37,7 +42,7 @@ struct configuration {
   char    mqttPwd[64];
   char    updServer[256];
   int16_t sensUpdInterval;
-  int16_t mqttPubCycleInterval;
+  int16_t mqttPubCycle;
 };
 
 /*===================================================================================================================*/
@@ -67,12 +72,12 @@ void messageReceived(String &topic, String &payload);  // NOLINT: pass by refere
 void messageReceived(char* c_topic, byte* c_payload, unsigned int length);
 #endif
 void onOffButton(void);
-#if CFG_PUSH_BUTTONS
 void upButton(void);
 void downButton(void);
-#else
 void updateEncoder(void);
-#endif /* CFG_PUSH_BUTTONS */
+
+/* MACRO to append another line of the webpage table */
+#define webpageTableAppend(key, value) (webpage +="<tr><td>" + key + ":</td><td>"+ value + "</td></tr>");
 
 /*===================================================================================================================*/
 /* global scope functions */
@@ -82,6 +87,7 @@ void mqttPubState(void);
 void loadConfiguration(configuration &config);  // NOLINT: pass by reference
 bool saveConfiguration(const configuration &config);
 String readSpiffs(String file);
+
 /*===================================================================================================================*/
 /* library functions */
 /*===================================================================================================================*/
