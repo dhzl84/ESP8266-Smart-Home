@@ -1,7 +1,7 @@
-#ifndef SRC_VERSION_H_
-#define SRC_VERSION_H_
+#ifndef VERSION_H_
+#define VERSION_H_
 
-#define VERSION "0.11.1"
+#define VERSION "0.12.0"
 
 #if defined CFG_DEBUG
 #define FW_PREFIX "d"
@@ -11,4 +11,4 @@
 
 #define FW (FW_PREFIX VERSION)
 
-#endif  // SRC_VERSION_H_
+#endif  // VERSION_H_
