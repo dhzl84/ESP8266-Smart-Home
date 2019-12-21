@@ -18,7 +18,7 @@ cat > config.h << EOF
 
 #define cArduinoMQTT  0
 #define cPubSubClient 1
-#define CFG_MQTT_LIB            $2
+#define CFG_MQTT_LIB            $1
 
 #endif /* CONFIG_H_ */
 EOF
