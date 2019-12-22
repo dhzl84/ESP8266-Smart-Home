@@ -1,6 +1,9 @@
 name: CI
 
-on: [push, pull_request]
+on: 
+  [push, pull_request]
+  schedule:
+    - cron:  '* 3 * * 5'  # * is a special character in YAML so you have to quote this string
 
 jobs:
   build_var1:
