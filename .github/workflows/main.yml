@@ -18,7 +18,7 @@ jobs:
         platformio update
         platformio lib -g install 1
         pip install cpplint
-    - name: build variant 1
+    - name: Build
       run: |
         chmod a+x config.sh
         echo "generate config.h for rotary encoder input and ArduinoMQTT"
@@ -44,7 +44,7 @@ jobs:
         platformio lib -g install 1
         pip install cpplint
 
-    - name: build variant 2
+    - name: Build
       run: |
         chmod a+x config.sh
         echo "generate config.h for rotary encoder input and PubSubClient"
