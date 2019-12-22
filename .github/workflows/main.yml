@@ -16,6 +16,7 @@ jobs:
         pip install -U platformio
         platformio update
         platformio lib -g install 1
+        pip install cpplint
     - name: Build
       run: |
         chmod a+x config.sh
@@ -25,6 +26,8 @@ jobs:
         ls -l
         mv config.h src/config.h
         platformio run
+    - name: lint
+      run: cpplint --root=src --repository=src --verbose=0 $(find src -name \*.cpp -or -name \*.h)
 
   build_var2:
     runs-on: ubuntu-latest
@@ -39,6 +42,7 @@ jobs:
         pip install -U platformio
         platformio update
         platformio lib -g install 1
+        pip install cpplint
     - name: Build
       run: |
         chmod a+x config.sh
@@ -48,21 +52,5 @@ jobs:
         ls -l
         mv config.h src/config.h
         platformio run
-
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v1
-    - uses: actions/setup-python@v1
-      with:
-        python-version: '3.8' # Version range or exact version of a Python version to use, using semvers version range syntax.
-        architecture: 'x64' # optional x64 or x86. Defaults to x64 if not specified
-    - name: install packages
-      run: |
-        pip install -U platformio
-        platformio update
-        platformio lib -g install 1
-        pip install cpplint
     - name: lint
       run: cpplint --root=src --repository=src --verbose=0 $(find src -name \*.cpp -or -name \*.h)
-
