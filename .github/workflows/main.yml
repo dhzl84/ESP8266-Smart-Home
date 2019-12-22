@@ -1,0 +1,37 @@
+name: CI
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: install packages
+      run: |
+        pip install -U platformio
+        platformio update
+        platformio lib -g install 1
+        pip install cpplint
+    - name: build variant 1
+      run: |
+        chmod a+x config.sh
+        echo "generate config.h for rotary encoder input and ArduinoMQTT"
+        ./config.sh false
+        cat config.h
+        ls -l
+        mv config.h src/config.h
+        platformio run
+    - name: build variant 2
+      run: |
+        chmod a+x config.sh
+        echo "generate config.h for rotary encoder input and PubSubClient"
+        ./config.sh true
+        cat config.h
+        ls -l
+        mv config.h src/config.h
+        platformio run
+    - name: lint
+      run: cpplint --root=src --repository=src --verbose=0 $(find src -name \*.cpp -or -name \*.h)
+
