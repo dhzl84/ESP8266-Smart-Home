@@ -64,21 +64,26 @@ uint32_t loop1000msMillis = 66; /* start loops with some offset to avoid calling
 /* HTTP Update */
 bool fetchUpdate = false;       /* global variable used to decide whether an update shall be fetched from server or not */
 /* OTA */
-typedef enum otaUpdate { TH_OTA_IDLE, TH_OTA_ACTIVE, TH_OTA_FINISHED, TH_OTA_ERROR } OtaUpdate_t;       /* global variable used to change display in case OTA update is initiated */
+typedef enum otaUpdate {
+  TH_OTA_IDLE,
+  TH_OTA_ACTIVE,
+  TH_OTA_FINISHED,
+  TH_OTA_ERROR
+} OtaUpdate_t; /* global variable used to change display in case OTA update is initiated */
 OtaUpdate_t OTA_UPDATE = TH_OTA_IDLE;
 
 /* 3 PushButtons */
-uint32_t  upButtonDebounceTime           = 0;
-uint32_t  downButtonDebounceTime         = 0;
+uint32_t upButtonDebounceTime = 0;
+uint32_t downButtonDebounceTime = 0;
 /* rotary encoder */
-uint32_t  onOffButtonDebounceTime        = 0;
-#define rotLeft                                -1
-#define rotRight                                1
-#define rotInit                                 0
-volatile int16_t lastEncoded                      = 0b11;        /* initial state of the rotary encoders gray code */
-volatile int16_t rotaryEncoderDirectionInts       = rotInit;     /* initialize rotary encoder with no direction */
-uint32_t buttonDebounceInterval         = 250;
-uint32_t onOffButtonSystemResetTime     = 0;
+uint32_t onOffButtonDebounceTime = 0;
+#define rotLeft -1
+#define rotRight 1
+#define rotInit  0
+volatile int16_t lastEncoded = 0b11;                   /* initial state of the rotary encoders gray code */
+volatile int16_t rotaryEncoderDirectionInts = rotInit; /* initialize rotary encoder with no direction */
+uint32_t buttonDebounceInterval = 250;
+uint32_t onOffButtonSystemResetTime = 0;
 uint32_t onOffButtonSystemResetInterval = 10000;
 
 /* thermostat */
@@ -89,7 +94,7 @@ uint32_t onOffButtonSystemResetInterval = 10000;
 uint32_t readSensorScheduled = 0;
 /* Display */
 #define drawTempYOffset       16
-#define drawTargetTempYOffset 0
+#define drawTargetTempYOffset  0
 #define drawHeating drawXbm(0, drawTempYOffset, myThermo_width, myThermo_height, myThermo)
 /* classes */
 DHTesp            myDHT;
@@ -184,12 +189,16 @@ void SPIFFS_INIT(void) {  // initializes the SPIFFS when first used and loads th
     #endif
     File f = SPIFFS.open("/formatted", "w");
     if (!f) {
+      #ifdef CFG_DEBUG
       Serial.println("file open failed");
+      #endif
     } else {
       f.close();
       delay(5000);
       if (!SPIFFS.exists("/formatted")) {
+        #ifdef CFG_DEBUG
         Serial.println("That didn't work!");
+        #endif
       } else {
         #ifdef CFG_DEBUG
         Serial.println("Cool, working!");
@@ -216,7 +225,9 @@ void SPIFFS_INIT(void) {  // initializes the SPIFFS when first used and loads th
 
   loadConfiguration(myConfig);  // load config
 
+  #ifdef CFG_DEBUG
   Serial.println("My name is: " + String(myConfig.name));
+  #endif
 }
 
 void GPIO_CONFIG(void) {  /* initialize encoder / push button pins */
@@ -275,28 +286,36 @@ void OTA_INIT(void) {
     myMqttClient.disconnect();
     OTA_UPDATE = TH_OTA_ACTIVE;
     DRAW_DISPLAY_MAIN();
+    #ifdef CFG_DEBUG
     Serial.println("Start");
+    #endif
   });
 
   ArduinoOTA.onEnd([]() {
     OTA_UPDATE = TH_OTA_FINISHED;
     DRAW_DISPLAY_MAIN();
+    #ifdef CFG_DEBUG
     Serial.println("\nEnd");
+    #endif
   });
 
   ArduinoOTA.onProgress([](uint16_t progress, uint16_t total) {
+    #ifdef CFG_DEBUG
     Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+    #endif
   });
 
   ArduinoOTA.onError([](ota_error_t error) {
     OTA_UPDATE = TH_OTA_ERROR;
     DRAW_DISPLAY_MAIN();
+    #ifdef CFG_DEBUG
     Serial.printf("Error[%u]: ", error);
     if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
     else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
     else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
     else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
     else if (error == OTA_END_ERROR) Serial.println("End Failed");
+    #endif
     systemRestartRequest = true;
   });
   ArduinoOTA.begin();
@@ -419,7 +438,9 @@ void HANDLE_SYSTEM_STATE(void) {
   if (systemRestartRequest == true) {
     DRAW_DISPLAY_MAIN();
     systemRestartRequest = false;
+    #ifdef CFG_DEBUG
     Serial.println("Restarting in 3 seconds");
+    #endif
     myMqttClient.disconnect();
     delay(3000);
     ESP.restart();
@@ -575,21 +596,29 @@ void HANDLE_HTTP_UPDATE(void) {
 
     DRAW_DISPLAY_MAIN();
     fetchUpdate = false;
+    #ifdef CFG_DEBUG
     Serial.println("Remote update started");
+    #endif
     WiFiClient client;
     t_httpUpdate_return ret = ESPhttpUpdate.update(client, myConfig.updServer, FW);
 
     switch (ret) {
     case HTTP_UPDATE_FAILED:
+      #ifdef CFG_DEBUG
       Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s \n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+      #endif
       break;
 
     case HTTP_UPDATE_NO_UPDATES:
+      #ifdef CFG_DEBUG
       Serial.println("HTTP_UPDATE_NO_UPDATES");
+      #endif
       break;
 
     case HTTP_UPDATE_OK:
+      #ifdef CFG_DEBUG
       Serial.println("HTTP_UPDATE_OK");
+      #endif
       break;
     }
   }
@@ -624,7 +653,7 @@ void SPIFFS_MAIN(void) {
     myConfig.mode   = myThermostat.getThermostatMode();
     myThermostat.resetNewCalib();
     SPIFFS_WRITTEN = false;
-    #if defined CFG_DEBUG
+    #ifdef CFG_DEBUG
     Serial.println("SPIFFS to be stored after debounce time: " + String(SPIFFS_WRITE_DEBOUNCE));
     #endif /* CFG_DEBUG */
   } else {
@@ -639,7 +668,7 @@ void SPIFFS_MAIN(void) {
         SPIFFS_WRITTEN = true;
       } else {
         /* SPIFFS not written, retry next loop */
-        #if defined CFG_DEBUG
+        #ifdef CFG_DEBUG
         Serial.println("SPIFFS write failed");
         #endif /* CFG_DEBUG */
       }

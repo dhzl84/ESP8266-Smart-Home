@@ -34,15 +34,16 @@ void loadConfiguration(configuration &config) { // NOLINT: pass by reference
   StaticJsonDocument<768> jsonDoc;
 
   DeserializationError error = deserializeJson(jsonDoc, file);
-  if (error) {
+
+    if (error) {
+      #ifdef CFG_DEBUG
       Serial.print(F("deserializeJson() failed with code "));
       Serial.println(error.c_str());
+      #endif /* CFG_DEBUG */
       return;
   } else {
-      #ifdef CFG_DEBUG
       serializeJsonPretty(jsonDoc, Serial);
       Serial.println();
-      #endif /* CFG_DEBUG */
   }
 
   file.close();
@@ -84,9 +85,12 @@ bool saveConfiguration(const configuration &config) {
     File file = SPIFFS.open(filename, "r");
 
     DeserializationError error = deserializeJson(jsonDoc, file);
+
     if (error) {
+        #ifdef CFG_DEBUG
         Serial.print(F("deserializeJson() failed with code "));
         Serial.println(error.c_str());
+        #endif
     }
 
     #ifdef CFG_DEBUG
@@ -198,15 +202,19 @@ String readSpiffs(String file) {
   if (SPIFFS.exists(file)) {
     File f = SPIFFS.open(file, "r");
     if (!f) {
+      #ifdef CFG_DEBUG
       Serial.println("oh no, failed to open file: " + file);
+      #endif
       /* TODO: Error handling */
     } else {
       fileContent = f.readStringUntil('\n');
       f.close();
 
+      #ifdef CFG_DEBUG
       if (fileContent == "") {
         Serial.println("File " + file + " is empty");
       }
+      #endif
     }
   }
   return fileContent;
