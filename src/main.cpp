@@ -9,6 +9,9 @@
 #include <ArduinoOTA.h>
 
 #include <DHTesp.h>
+#include <Wire.h> /* for BME280 */
+#include <SPI.h>  /* for BME280 */
+#include <BME280I2C.h>
 #include "UserFonts.h"
 #include <SSD1306.h>
 
@@ -96,8 +99,21 @@ uint32_t readSensorScheduled = 0;
 #define drawTempYOffset       16
 #define drawTargetTempYOffset  0
 #define drawHeating drawXbm(0, drawTempYOffset, myThermo_width, myThermo_height, myThermo)
+/* BME 280 settings */
+BME280I2C::Settings settings(
+  BME280::OSR_X1,
+  BME280::OSR_X1,
+  BME280::OSR_X1,
+  BME280::Mode_Forced,
+  BME280::StandbyTime_1000ms,
+  BME280::Filter_Off,
+  BME280::SpiEnable_False,
+  BME280I2C::I2CAddr_0x76
+);
+
 /* classes */
-DHTesp            myDHT;
+DHTesp            myDHT22;
+BME280I2C myBME280(settings);
 SSD1306           myDisplay(0x3c, SDA_PIN, SCL_PIN);
 Thermostat        myThermostat;
 WiFiClient        myWiFiClient;
@@ -129,11 +145,28 @@ void setup() {
   Serial.begin(115200);
   Serial.println("Serial connection established");
   #endif
-
+  Wire.begin();   /* needed for I²C communication with display and BME280 */
   SPIFFS_INIT();                                                                                   /* read stuff from SPIFFS */
   GPIO_CONFIG();                                                                                   /* configure GPIOs */
+
   myThermostat.setup(RELAY_PIN, myConfig.tTemp, myConfig.calibF, myConfig.calibO, myConfig.tHyst, myConfig.mode); /* GPIO to switch the connected relay, initial target temperature, sensor calbigration, thermostat hysteresis and last mode */
-  myDHT.setup(DHT_PIN, DHTesp::DHT22);                                                             /* init DHT sensor */
+
+  if (myConfig.sensor == cBME280) {
+    if (!myBME280.begin()) { /* init BMP sensor */
+      #ifdef CFG_DEBUG
+      Serial.println("Could not find a valid BME sensor!");
+      #endif
+    } else {
+      myBME280.setSettings(settings);
+    }
+  } else if (myConfig.sensor == cDHT22) {
+      myDHT22.setup(DHT_PIN, DHTesp::DHT22); /* init DHT sensor */
+  } else {
+      #ifdef CFG_DEBUG
+      Serial.println("Sensor misconfiguration!");
+      #endif
+  }
+
   DISPLAY_INIT();                                                                                  /* init Display */
   WIFI_CONNECT();                                                                                  /* connect to WiFi */
   OTA_INIT();
@@ -240,7 +273,6 @@ void DISPLAY_INIT(void) {
   #ifdef CFG_DEBUG
   Serial.println("Initialize display");
   #endif
-  Wire.begin();   /* needed for I²C communication with display */
   myDisplay.init();
   myDisplay.flipScreenVertically();
   myDisplay.clear();
@@ -448,28 +480,32 @@ void HANDLE_SYSTEM_STATE(void) {
 }
 
 void SENSOR_MAIN() {
-  float dhtTemp;
-  float dhtHumid;
+  float sensTemp(NAN), sensHumid(NAN), sensPres(NAN);
 
   /* schedule routine for sensor read */
   if (TimeReached(readSensorScheduled)) {
     SetNextTimeInterval(readSensorScheduled, (myConfig.sensUpdInterval * secondsToMillisecondsFactor));
 
-    /* Reading temperature or humidity takes about 250 milliseconds! */
-    /* Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor) */
-    dhtHumid = myDHT.getHumidity();
-    dhtTemp  = myDHT.getTemperature();
+    if (myConfig.sensor == cDHT22) {
+      sensHumid = myDHT22.getHumidity();
+      sensTemp  = myDHT22.getTemperature();
+    } else {  /* BME280 */
+      BME280::TempUnit tempUnit(BME280::TempUnit_Celsius);
+      BME280::PresUnit presUnit(BME280::PresUnit_hPa);
+
+      myBME280.read(sensPres, sensTemp, sensHumid, tempUnit, presUnit);
+    }
 
     /* Check if any reads failed */
-    if (isnan(dhtHumid) || isnan(dhtTemp)) {
+    if (isnan(sensHumid) || isnan(sensTemp)) {
       myThermostat.setLastSensorReadFailed(true);   /* set failure flag and exit SENSOR_MAIN() */
       #ifdef CFG_DEBUG
       Serial.println("Failed to read from DHT sensor! Failure counter: " + String(myThermostat.getSensorFailureCounter()));
       #endif
     } else {
       myThermostat.setLastSensorReadFailed(false);   /* set no failure during read sensor */
-      myThermostat.setCurrentHumidity((int16_t)(10* dhtHumid));     /* read value and convert to one decimal precision integer */
-      myThermostat.setCurrentTemperature((int16_t)(10* dhtTemp));   /* read value and convert to one decimal precision integer */
+      myThermostat.setCurrentHumidity((int16_t)(10* sensHumid));     /* read value and convert to one decimal precision integer */
+      myThermostat.setCurrentTemperature((int16_t)(10* sensTemp));   /* read value and convert to one decimal precision integer */
 
       #ifdef CFG_DEBUG
       Serial.print("Temperature: ");
@@ -823,10 +859,10 @@ void handleWebServerClient(void) {
   webpageTableAppend(String("Chip ID"),           String(ESP.getChipId(), HEX));
   webpageTableAppend(String("IPv4"),              IPaddress);
   webpageTableAppend(String("FW version"),        String(FW));
-  if (myConfig.inputMethod == cPUSH_BUTTONS) {
-    webpageTableAppend(String("Input Method"),      String("Push Buttons"));
-  } else {
+  if (myConfig.inputMethod == cROTARY_ENCODER) {
     webpageTableAppend(String("Input Method"),      String("Rotary Encoder"));
+  } else {
+    webpageTableAppend(String("Input Method"),      String("Push Buttons"));
   }
   webpageTableAppend(String("Arduino Core"),      ESP.getCoreVersion());
   webpageTableAppend(String("Reset Reason"),      ESP.getResetReason());
@@ -842,22 +878,39 @@ void handleWebServerClient(void) {
   webpageTableAppend(String("MQTT Status"),       String((myMqttClient.connected()) == true ? "connected" : "disconnected"));
   webpageTableAppend(String("MQTT Connects"),     String(MQTTConnectCounter));
   webpage +="</table>";
-
+  /* Change Name */
   webpage +="<p><b>Change Name</b></p>";
   webpage +="<form method='POST' autocomplete='off'>";
   webpage +="<input type='text' name='newName' value="+ String(myConfig.name) + ">&nbsp;<input type='submit' value='Submit'>";
   webpage +="</form>";
-
+  /* Change Update Server */
   webpage +="<p><b>Change Update Server</b></p>";
   webpage +="<form method='POST' autocomplete='off'>";
   webpage +="<input type='text' name='updServer' value="+ String(myConfig.updServer) + ">&nbsp;<input type='submit' value='Submit'>";
   webpage +="</form>";
-
+  /* Change Input Method */
   webpage +="<p><b>Change Input Method</b></p>";
   webpage +="<form method='POST' autocomplete='off'>";
-  webpage +="<select name='InputMethod'> <option value='0'>Rotary Encoder </option> <option value='1'> Push Buttons </option> </select>&nbsp;<input type='submit' value='Submit'>";
+  webpage +="<select name='InputMethod'> ";
+  if (myConfig.inputMethod == cROTARY_ENCODER) {  /* select currently configured input method */
+  webpage +="<option value='0' selected >Rotary Encoder </option> <option value='1'> Push Buttons </option>";
+  } else {
+  webpage +="<option value='0'>Rotary Encoder </option> <option value='1' selected > Push Buttons </option>";
+  }
+  webpage +="</select>&nbsp;<input type='submit' value='Submit'>";
   webpage +="</form>";
-
+  /* Change sensor */
+  webpage +="<p><b>Change Sensor</b></p>";
+  webpage +="<form method='POST' autocomplete='off'>";
+  webpage +="<select name='Sensor'> ";
+  if (myConfig.sensor == cDHT22) {  /* select currently configured input method */
+  webpage +="<option value='0' selected >DHT22 </option> <option value='1'> BME280 </option>";
+  } else {
+  webpage +="<option value='0'>DHT22 </option> <option value='1' selected > BME280 </option>";
+  }
+  webpage +="</select>&nbsp;<input type='submit' value='Submit'>";
+  webpage +="</form>";
+  /* Restart Device */
   webpage +="<p><b>Restart Device</b></p>";
   if (systemRestartRequest == false) {
     webpage +="<button onclick=\"window.location.href='/restart'\"> Restart </button>";
@@ -869,6 +922,7 @@ void handleWebServerClient(void) {
 
   webServer.send(200, "text/html", webpage);  /* Send a response to the client asking for input */
 
+  /* Evaluate Received Arguments */
   if (webServer.args() > 0) {  /* Arguments were received */
     for ( uint8_t i = 0; i < webServer.args(); i++ ) {
       #ifdef CFG_DEBUG
@@ -889,11 +943,24 @@ void handleWebServerClient(void) {
         }
       }
       if (webServer.argName(i) == "InputMethod") {  /* check for dedicated arguments */
-        if (webServer.arg(i) != String(myConfig.inputMethod)) {
+        if (webServer.arg(i) != String(myConfig.inputMethod) && (webServer.arg(i).toInt() >= 0) && (webServer.arg(i).toInt() < 2)) { /* check range and if changed at all */
           #ifdef CFG_DEBUG
           Serial.println("Request SPIFFS write with restart.");
           #endif
           myConfig.inputMethod = boolean(webServer.arg(i).toInt());
+          requestSaveToSpiffsWithRestart = true;
+        } else {
+          #ifdef CFG_DEBUG
+          Serial.println("Configuration unchanged, do nothing");
+          #endif
+        }
+      }
+      if (webServer.argName(i) == "Sensor") {  /* check for dedicated arguments */
+        if (webServer.arg(i) != String(myConfig.sensor) && (webServer.arg(i).toInt() >= 0) && (webServer.arg(i).toInt() < 2)) { /* check range and if changed at all */
+          #ifdef CFG_DEBUG
+          Serial.println("Request SPIFFS write with restart.");
+          #endif
+          myConfig.sensor = webServer.arg(i).toInt();
           requestSaveToSpiffsWithRestart = true;
         } else {
           #ifdef CFG_DEBUG

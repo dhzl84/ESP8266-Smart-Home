@@ -23,26 +23,31 @@
 #define cROTARY_ENCODER 0
 #define cPUSH_BUTTONS   1
 
+/* sensor */
+#define cDHT22 0
+#define cBME280 1
+
 /*===================================================================================================================*/
 /* variable declarations */
 /*===================================================================================================================*/
 struct configuration {
-  char    name[64];
-  boolean mode;         /* 0 = TH_OFF, 1 = TH_HEAT */
-  boolean inputMethod;  /* 0 = rotary encoder , 1 = three push buttons */
-  int16_t tTemp;        /* persistent target temperature */
-  int16_t tHyst;        /* thermostat hysteresis */
-  int16_t calibF;
-  int16_t calibO;
-  char    ssid[64];
-  char    wifiPwd[64];
-  char    mqttHost[64];
-  int16_t mqttPort;
-  char    mqttUser[64];
-  char    mqttPwd[64];
-  char    updServer[256];
-  int16_t sensUpdInterval;
-  int16_t mqttPubCycle;
+  char          name[64];
+  boolean       mode;         /* 0 = TH_OFF, 1 = TH_HEAT */
+  boolean       inputMethod;  /* 0 = rotary encoder , 1 = three push buttons */
+  int16_t       tTemp;        /* persistent target temperature */
+  int16_t       tHyst;        /* thermostat hysteresis */
+  int16_t       calibF;
+  int16_t       calibO;
+  char          ssid[64];
+  char          wifiPwd[64];
+  char          mqttHost[64];
+  int16_t       mqttPort;
+  char          mqttUser[64];
+  char          mqttPwd[64];
+  char          updServer[256];
+  uint8_t       sensUpdInterval;
+  uint8_t       mqttPubCycle;
+  uint8_t       sensor;
 };
 
 /*===================================================================================================================*/
