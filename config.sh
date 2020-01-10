@@ -16,9 +16,5 @@ cat > config.h << EOF
 #define THERMOSTAT_HYSTERESIS   2
 #define WIFI_RECONNECT_TIME     30
 
-#define cArduinoMQTT  0
-#define cPubSubClient 1
-#define CFG_MQTT_LIB            $1
-
 #endif /* CONFIG_H_ */
 EOF
