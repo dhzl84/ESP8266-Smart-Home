@@ -56,8 +56,8 @@ void loadConfiguration(configuration &config) { // NOLINT: pass by reference
     #endif /* CFG_DEBUG */
   }
 
-  // Copy values from the jsonDoc  to the Config, if the key doesn't exist, load the default config
-  strlcpy(config.name,          jsonDoc["name"]                  | "unknown",         sizeof(config.name));
+  // Copy values from the jsonDoc to the Config, if the key doesn't exist, load the default config
+  strlcpy(config.name,          jsonDoc["name"]                  | String(ESP.getChipId(), HEX).c_str(),         sizeof(config.name));
   config.mode =                 jsonDoc["mode"]                  | true;
   strlcpy(config.ssid,          jsonDoc["ssid"]                  | WIFI_SSID,         sizeof(config.ssid));
   strlcpy(config.wifiPwd,       jsonDoc["wifiPwd"]               | WIFI_PWD ,         sizeof(config.wifiPwd));

@@ -85,7 +85,7 @@ uint32_t onOffButtonDebounceTime = 0;
 #define rotInit  0
 volatile int16_t lastEncoded = 0b11;                   /* initial state of the rotary encoders gray code */
 volatile int16_t rotaryEncoderDirectionInts = rotInit; /* initialize rotary encoder with no direction */
-uint32_t buttonDebounceInterval = 250;
+uint32_t buttonDebounceInterval = 500;
 uint32_t onOffButtonSystemResetTime = 0;
 uint32_t onOffButtonSystemResetInterval = 10000;
 

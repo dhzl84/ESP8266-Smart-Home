@@ -10,37 +10,37 @@ Thermostat::~Thermostat() {
 
 void Thermostat::init() {
   // heating
-  thermostatMode             = TH_HEAT;
-  actualState                = TH_OFF;
-  targetTemperature          = 200;      // initial value if setup() is not called; resolution is 0.1 °C
-  newData                    = true;     // flag to indicate new data to be displayed and transmitted vai MQTT
-  relayGpio                  = 16;       // relay GPIO if setup() is not called
-  thermostatHysteresis       = 2;        // hysteresis initialized to 0.2 °C
-  thermostatHysteresisHigh   = 1;
-  thermostatHysteresisLow    = 1;
+  this->thermostatMode             = TH_HEAT;
+  this->actualState                = TH_OFF;
+  this->targetTemperature          = 200;      // initial value if setup() is not called; resolution is 0.1 °C
+  this->newData                    = true;     // flag to indicate new data to be displayed and transmitted vai MQTT
+  this->relayGpio                  = 16;       // relay GPIO if setup() is not called
+  this->thermostatHysteresis       = 2;        // hysteresis initialized to 0.2 °C
+  this->thermostatHysteresisHigh   = 1;
+  this->thermostatHysteresisLow    = 1;
   // sensor
-  sensorError                = false;    // filtered sensor error
-  currentTemperature         = 0;        // current sensor temperature
-  currentHumidity            = 0;        // current sensor humidity
-  filteredTemperature        = 0;        // filtered sensor temperature; mean value of CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE samples
-  filteredHumidity           = 0;        // filtered sensor humidity; mean value of CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE samples
-  sensorFailureCounter       = 0;        // count sensor failures during read
-  tempOffset                 = 0;        // offset in 0.1 *C
-  tempFactor                 = 100;      // factor in percent
+  this->sensorError                = false;    // filtered sensor error
+  this->currentTemperature         = 0;        // current sensor temperature
+  this->currentHumidity            = 0;        // current sensor humidity
+  this->filteredTemperature        = 0;        // filtered sensor temperature; mean value of CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE samples
+  this->filteredHumidity           = 0;        // filtered sensor humidity; mean value of CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE samples
+  this->sensorFailureCounter       = 0;        // count sensor failures during read
+  this->tempOffset                 = 0;        // offset in 0.1 *C
+  this->tempFactor                 = 100;      // factor in percent
   // temperture filter
-  tempValueQueueFilled       = false;
-  tempValueSampleID          = 0;
+  this->tempValueQueueFilled       = false;
+  this->tempValueSampleID          = 0;
 
   for (int16_t i=0; i < CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE; i++) {
-    tempValueQueue[i] = (int16_t)0;
+    this->tempValueQueue[i] = (int16_t)0;
   }
 
   // humidity filter
-  humidValueQueueFilled      = false;
-  humidValueSampleID         = 0;
+  this->humidValueQueueFilled      = false;
+  this->humidValueSampleID         = 0;
 
   for (int16_t i=0; i < CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE; i++) {
-    humidValueQueue[i] = (int16_t)0;
+    this->humidValueQueue[i] = (int16_t)0;
   }
 }
 
@@ -51,16 +51,16 @@ void Thermostat::setup(uint8_t gpio, uint8_t tarTemp, int16_t calibFactor, int16
 
   /* limit target temperature range */
   if (tarTemp < minTargetTemp) {
-    targetTemperature = minTargetTemp;
+    this->targetTemperature = minTargetTemp;
   } else if (tarTemp > maxTargetTemp) {
-    targetTemperature = maxTargetTemp;
+    this->targetTemperature = maxTargetTemp;
   } else {
-    targetTemperature = tarTemp;
+    this->targetTemperature = tarTemp;
   }
 
-  relayGpio = gpio;    /* assign GPIO */
-  pinMode(relayGpio, OUTPUT);   /* configure GPIO */
-  digitalWrite(relayGpio, HIGH); /* switch relay OFF */
+  this->relayGpio = gpio;    /* assign GPIO */
+  pinMode(this->relayGpio, OUTPUT);   /* configure GPIO */
+  digitalWrite(this->relayGpio, HIGH); /* switch relay OFF */
 }
 
 void Thermostat::loop(void) {
@@ -98,22 +98,22 @@ void Thermostat::loop(void) {
   }
 }
 
-bool    Thermostat::getActualState(void)              { return actualState; }
-int16_t Thermostat::getTargetTemperature(void)        { return targetTemperature; }
-bool    Thermostat::getNewData()                      { return newData; }
-bool    Thermostat::getThermostatMode()               { return thermostatMode; }
-int16_t Thermostat::getSensorFailureCounter(void)     { return sensorFailureCounter; }
-int16_t Thermostat::getCurrentTemperature(void)       { return currentTemperature; }
-int16_t Thermostat::getCurrentHumidity(void)          { return currentHumidity; }
-int16_t Thermostat::getFilteredTemperature(void)      { return filteredTemperature; }
-int16_t Thermostat::getFilteredHumidity(void)         { return filteredHumidity; }
-bool    Thermostat::getSensorError(void)              { return sensorError; }
-bool    Thermostat::getNewCalib(void)                 { return newCalib; }
-int16_t Thermostat::getSensorCalibOffset(void)        { return tempOffset; }
-int16_t Thermostat::getSensorCalibFactor(void)        { return tempFactor; }
-int16_t Thermostat::getThermostatHysteresis(void)     { return thermostatHysteresis; }
-int16_t Thermostat::getThermostatHysteresisHigh(void) { return thermostatHysteresisHigh; }
-int16_t Thermostat::getThermostatHysteresisLow(void)  { return thermostatHysteresisLow; }
+bool    Thermostat::getActualState(void)              { return this->actualState; }
+int16_t Thermostat::getTargetTemperature(void)        { return this->targetTemperature; }
+bool    Thermostat::getNewData()                      { return this->newData; }
+bool    Thermostat::getThermostatMode()               { return this->thermostatMode; }
+int16_t Thermostat::getSensorFailureCounter(void)     { return this->sensorFailureCounter; }
+int16_t Thermostat::getCurrentTemperature(void)       { return this->currentTemperature; }
+int16_t Thermostat::getCurrentHumidity(void)          { return this->currentHumidity; }
+int16_t Thermostat::getFilteredTemperature(void)      { return this->filteredTemperature; }
+int16_t Thermostat::getFilteredHumidity(void)         { return this->filteredHumidity; }
+bool    Thermostat::getSensorError(void)              { return this->sensorError; }
+bool    Thermostat::getNewCalib(void)                 { return this->newCalib; }
+int16_t Thermostat::getSensorCalibOffset(void)        { return this->tempOffset; }
+int16_t Thermostat::getSensorCalibFactor(void)        { return this->tempFactor; }
+int16_t Thermostat::getThermostatHysteresis(void)     { return this->thermostatHysteresis; }
+int16_t Thermostat::getThermostatHysteresisHigh(void) { return this->thermostatHysteresisHigh; }
+int16_t Thermostat::getThermostatHysteresisLow(void)  { return this->thermostatHysteresisLow; }
 
 void Thermostat::setThermostatHysteresis(int16_t hysteresis) {
   /*
@@ -130,49 +130,49 @@ void Thermostat::setThermostatHysteresis(int16_t hysteresis) {
   if (hysteresis < minHysteresis) {
     hysteresis = minHysteresis;
   }
-  if (hysteresis != thermostatHysteresis) {
-    newData = true;
-    thermostatHysteresis = hysteresis;
+  if (hysteresis != this->thermostatHysteresis) {
+    this->newData = true;
+    this->thermostatHysteresis = hysteresis;
 
     if (hysteresis % 2 == 0) {
-      thermostatHysteresisLow  = (hysteresis / 2);
-      thermostatHysteresisHigh = (hysteresis / 2);
+      this->thermostatHysteresisLow  = (hysteresis / 2);
+      this->thermostatHysteresisHigh = (hysteresis / 2);
     } else {
-      thermostatHysteresisLow  = ( (int16_t)(floorf( static_cast<float> (hysteresis) / 2) ) );
-      thermostatHysteresisHigh = ( (int16_t)(ceilf( static_cast<float> (hysteresis) / 2) ) );
+      this->thermostatHysteresisLow  = ( (int16_t)(floorf( static_cast<float> (hysteresis) / 2) ) );
+      this->thermostatHysteresisHigh = ( (int16_t)(ceilf( static_cast<float> (hysteresis) / 2) ) );
     }
   }
 }
 
-void Thermostat::resetNewCalib() { newCalib  = false; }
+void Thermostat::resetNewCalib() { this->newCalib  = false; }
 
 void Thermostat::setActualState(bool value) {
-  if (value != actualState) {
-    newData = true;
+  if (value != this->actualState) {
+    this->newData = true;
     if (value == TH_HEAT) {
-        digitalWrite(relayGpio, LOW); /* switch relay ON */
+        digitalWrite(this->relayGpio, LOW); /* switch relay ON */
     } else {
-        digitalWrite(relayGpio, HIGH); /* switch relay OFF */
+        digitalWrite(this->relayGpio, HIGH); /* switch relay OFF */
     }
   }
-  actualState  = value;
+  this->actualState  = value;
 }
 
 void Thermostat::resetNewData() {
-  newData  = false;
+  this->newData  = false;
 }
 
 void Thermostat::increaseTargetTemperature(uint16_t value) {
-  if ((targetTemperature + value) <= maxTargetTemp) {
-    targetTemperature += value;
-    newData = true;
+  if ((this->targetTemperature + value) <= maxTargetTemp) {
+    this->targetTemperature += value;
+    this->newData = true;
   }
 }
 
 void Thermostat::decreaseTargetTemperature(uint16_t value) {
-  if ((targetTemperature - value) >= minTargetTemp) {
-    targetTemperature -= value;
-    newData = true;
+  if ((this->targetTemperature - value) >= minTargetTemp) {
+    this->targetTemperature -= value;
+    this->newData = true;
   }
 }
 
@@ -183,124 +183,124 @@ void Thermostat::setTargetTemperature(int16_t value) {
   if (value < minTargetTemp) {
     value = minTargetTemp;
   }
-  if (value != targetTemperature) {
-    targetTemperature  = value;
-    newData = true;
+  if (value != this->targetTemperature) {
+    this->targetTemperature  = value;
+    this->newData = true;
   }
 }
 
 void Thermostat::setThermostatMode(bool value) {
-  if (value != thermostatMode) {
-    newData = true;
+  if (value != this->thermostatMode) {
+    this->newData = true;
+    this->thermostatMode = value;
   }
-  thermostatMode = value;
 }
 
 void Thermostat::toggleThermostatMode() {
-  if (thermostatMode == TH_OFF) {
-    thermostatMode  = TH_HEAT;
+  if (this->thermostatMode == TH_OFF) {
+    this->thermostatMode  = TH_HEAT;
   } else {
-    thermostatMode = TH_OFF;
+    this->thermostatMode = TH_OFF;
   }
-  newData = true;
+  this->newData = true;
 }
 
 // Sensor ===============================================================
 
 void Thermostat::setCurrentTemperature(int16_t value) {
-  currentTemperature = ((int16_t)( static_cast<float> (value) * (static_cast<float> (tempFactor) / 100)) + tempOffset);
+  this->currentTemperature = ((int16_t)( static_cast<float> (value) * (static_cast<float> (this->tempFactor) / 100)) + this->tempOffset);
 
   // add new temperature to filter
-  tempValueQueue[tempValueSampleID] = currentTemperature;
-  tempValueSampleID++;
-  if (tempValueSampleID == CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE) {
-    tempValueSampleID = 0;
-    if (tempValueQueueFilled == false) {
-      tempValueQueueFilled = true;
+  this->tempValueQueue[this->tempValueSampleID] = this->currentTemperature;
+  this->tempValueSampleID++;
+  if (this->tempValueSampleID == CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE) {
+    this->tempValueSampleID = 0;
+    if (this->tempValueQueueFilled == false) {
+      this->tempValueQueueFilled = true;
     }
   }
 
-  // calculate new filtered temeprature
+  // calculate new filtered temperature
   float tempValue = (int16_t) 0;
-  if (tempValueQueueFilled == true) {
+  if (this->tempValueQueueFilled == true) {
     for (int16_t i=0; i < CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE; i++) {
-      tempValue += (tempValueQueue[i]);
+      tempValue += (this->tempValueQueue[i]);
     }
     tempValue = (tempValue / (int16_t) (CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE));
   } else {  /* return partially filtered value until queue is filled */
-    if (tempValueSampleID > 0) {
-      for (int16_t i=0; i < tempValueSampleID; i++) {
-        tempValue += (tempValueQueue[i]);
+    if (this->tempValueSampleID > 0) {
+      for (int16_t i=0; i < this->tempValueSampleID; i++) {
+        tempValue += (this->tempValueQueue[i]);
       }
-      tempValue = (tempValue / tempValueSampleID);
+      tempValue = (tempValue / this->tempValueSampleID);
     }
   }
-  filteredTemperature = tempValue;
+  this->filteredTemperature = tempValue;
 }
 
 void Thermostat::setCurrentHumidity(int16_t value) {
-  currentHumidity = value;
+  this->currentHumidity = value;
 
   // add new humdity to filter
-  humidValueQueue[humidValueSampleID] = value;
-  humidValueSampleID++;
-  if (humidValueSampleID == CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE) {
-    humidValueSampleID = 0;
-    if (humidValueQueueFilled == false) {
-      humidValueQueueFilled = true;
+  this->humidValueQueue[this->humidValueSampleID] = value;
+  this->humidValueSampleID++;
+  if (this->humidValueSampleID == CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE) {
+    this->humidValueSampleID = 0;
+    if (this->humidValueQueueFilled == false) {
+      this->humidValueQueueFilled = true;
     }
   }
 
   // calculate new filtered temeprature
   float humidValue = (int16_t) 0;
-  if (humidValueQueueFilled == true) {
+  if (this->humidValueQueueFilled == true) {
     for (int16_t i=0; i < CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE; i++) {
-      humidValue += (humidValueQueue[i]);
+      humidValue += (this->humidValueQueue[i]);
     }
     humidValue = (humidValue / (int16_t) (CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE));
   } else {  /* return partially filtered value until queue is filled */
-    if (humidValueSampleID > 0) {
-      for (int16_t i=0; i < humidValueSampleID; i++) {
-        humidValue += (humidValueQueue[i]);
+    if (this->humidValueSampleID > 0) {
+      for (int16_t i=0; i < this->humidValueSampleID; i++) {
+        humidValue += (this->humidValueQueue[i]);
       }
-      humidValue = (humidValue / humidValueSampleID);
+      humidValue = (humidValue / this->humidValueSampleID);
     }
   }
-  filteredHumidity = humidValue;
+  this->filteredHumidity = humidValue;
 }
 
 void Thermostat::setLastSensorReadFailed(bool value) {
   /* filter sensor read failure here to avoid switching back and forth for single failure events */
   if (value == true) {
-    sensorFailureCounter++;
+    this->sensorFailureCounter++;
   } else {
-    if (sensorFailureCounter > 0) {
-      sensorFailureCounter--;
+    if (this->sensorFailureCounter > 0) {
+      this->sensorFailureCounter--;
     }
   }
 
-  if (sensorError == false) {
-    if (sensorFailureCounter >= sensorErrorThreshold) {
-      newData = true;
-      sensorError = true;
+  if (this->sensorError == false) {
+    if (this->sensorFailureCounter >= this->sensorErrorThreshold) {
+      this->newData = true;
+      this->sensorError = true;
     }
   } else {
-    if (sensorFailureCounter == 0) {
-      newData = true;
-      sensorError = false;
+    if (this->sensorFailureCounter == 0) {
+      this->newData = true;
+      this->sensorError = false;
     }
   }
 }
 
 void Thermostat::setSensorCalibData(int16_t factor, int16_t offset, bool calib) {
-  if (tempOffset != offset) {
-    tempOffset = offset;
-    newCalib   = calib;
+  if (this->tempOffset != offset) {
+    this->tempOffset = offset;
+    this->newCalib   = calib;
   }
-  if (tempFactor != factor) {
+  if (this->tempFactor != factor) {
     if (factor != 0) {
-      tempFactor = factor;
-      newCalib   = calib;
+      this->tempFactor = factor;
+      this->newCalib   = calib;
     }
   }
 }

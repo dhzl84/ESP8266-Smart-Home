@@ -107,5 +107,4 @@ void SetNextTimeInterval(uint32_t& timer, const uint32_t step);  // NOLINT: pass
 bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor);
 char* millisFormatted(void);
 String wifiStatusToString(wl_status_t status);
-
 #endif  // MAIN_H_

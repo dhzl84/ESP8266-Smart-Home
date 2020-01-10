@@ -8,11 +8,8 @@
 // <object_id>: The ID of the device. This is only to allow for separate topics for each device and is not used for the entity_id.
 
 
-mqttHelper::mqttHelper()  { mqttHelper::init(); }
+mqttHelper::mqttHelper()  {}
 mqttHelper::~mqttHelper() {}
-
-void mqttHelper::init() {
-}
 
 void mqttHelper::setup() {
   mqttTriggerDiscovery    = false;
