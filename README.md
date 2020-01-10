@@ -15,7 +15,7 @@ SW Built with PlatformIO in Visual Studio Code, some great [Arduino](https://www
 
 [Circuit and PCB](https://github.com/dhzl84/ESP8266_Thermostat_PCB.git) made with [Target 3001](https://ibfriedrich.com/de/index.html)
 
-## 1. Build Status Master: [![Build Status](https://github.com/dhzl84/ESP8266-Smart-Home/workflows/CI/badge.svg?branch=master)](https://github.com/dhzl84/ESP8266-Smart-Home/actions) Develop: [![Build Status](https://github.com/dhzl84/ESP8266-Smart-Home/workflows/CI/badge.svg?branch=develop)](https://github.com/dhzl84/ESP8266-Smart-Home/actions)
+## 1. Build Status Master: [![Build Status](https://github.com/dhzl84/ESP8266-Smart-Home/workflows/CI/badge.svg?branch=master)](https://github.com/dhzl84/ESP8266-Smart-Home/actions?query=branch%3Amaster) Develop: [![Build Status](https://github.com/dhzl84/ESP8266-Smart-Home/workflows/CI/badge.svg?branch=develop)](https://github.com/dhzl84/ESP8266-Smart-Home/actions?query=branch%3Adevelop)
 * Master branch only provides (pre-)release SW
 * Develop may contain untested changes
 
