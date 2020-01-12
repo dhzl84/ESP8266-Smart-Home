@@ -51,7 +51,7 @@ My *config.h* for building a thermostat SW contains the following information:
 For Travis CI compatibility there is the *config.sh* script which generates the above mentioned dummy code.
 
 
-## 3 Inwall thermostat
+## 3 Inwall Thermostat
 I started to think about new thermostats for my floor heating system while trying to find a good setting for each room with the analog thermostats only giving the range ice cold (0) to 6, whatever temperature that should be.
 So I thought about buying them but they were either expensive as hell or just didn't have the functionalities I wanted, thus I decided to build them on my own.
 
