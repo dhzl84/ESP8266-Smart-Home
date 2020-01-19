@@ -231,6 +231,7 @@ void DISPLAY_INIT(void) {
   Wire.begin();   /* needed for I²C communication with display */
   myDisplay.init();
   myDisplay.flipScreenVertically();
+  myDisplay.setBrightness(myConfig.dispBrightn);
   myDisplay.clear();
   myDisplay.setFont(Roboto_Condensed_16);
   myDisplay.setTextAlignment(TEXT_ALIGN_CENTER);
@@ -477,7 +478,6 @@ void SENSOR_MAIN() {
 
 void DRAW_DISPLAY_MAIN(void) {
   myDisplay.clear();
-  myDisplay.setContrast(80);
 
   if (systemRestartRequest == true) {
     myDisplay.setFont(Roboto_Condensed_16);
@@ -768,11 +768,6 @@ void handleWebServerClient(void) {
   webpageTableAppend(String("Chip ID"),           String(ESP.getChipId(), HEX));
   webpageTableAppend(String("IPv4"),              IPaddress);
   webpageTableAppend(String("FW version"),        String(FW));
-  if (myConfig.inputMethod == cPUSH_BUTTONS) {
-    webpageTableAppend(String("Input Method"),      String("Push Buttons"));
-  } else {
-    webpageTableAppend(String("Input Method"),      String("Rotary Encoder"));
-  }
   webpageTableAppend(String("Arduino Core"),      ESP.getCoreVersion());
   webpageTableAppend(String("Reset Reason"),      ESP.getResetReason());
   webpageTableAppend(String("Time since Reset"),  String(millisFormatted()));
@@ -800,7 +795,27 @@ void handleWebServerClient(void) {
 
   webpage +="<p><b>Change Input Method</b></p>";
   webpage +="<form method='POST' autocomplete='off'>";
-  webpage +="<select name='InputMethod'> <option value='0'>Rotary Encoder </option> <option value='1'> Push Buttons </option> </select>&nbsp;<input type='submit' value='Submit'>";
+  if (myConfig.inputMethod == cPUSH_BUTTONS) {
+    webpage +="<select name='InputMethod'> <option value='0'>Rotary Encoder </option> <option value='1' selected> Push Buttons </option> </select>&nbsp;<input type='submit' value='Submit'>";
+  } else {
+    webpage +="<select name='InputMethod'> <option value='0' selected> Rotary Encoder </option> <option value='1'> Push Buttons </option> </select>&nbsp;<input type='submit' value='Submit'>";
+  }
+
+  webpage +="</form>";
+
+  webpage +="<p><b>Change Display Brightness</b></p>";
+  webpage +="<form method='POST' autocomplete='off'>";
+  webpage +="<input type='number' name='dispBrightn' min='1' max='255' value="+ String(myConfig.dispBrightn) + ">&nbsp;<input type='submit' value='Submit'>";
+  webpage +="</form>";
+
+  webpage +="<p><b>Change Sensor Calibration Offset (Resolution 0.1 deg Celsius)</b></p>";
+  webpage +="<form method='POST' autocomplete='off'>";
+  webpage +="<input type='number' name='calibO' min='-50' max='+50' value="+ String(myConfig.calibO) + ">&nbsp;<input type='submit' value='Submit'>";
+  webpage +="</form>";
+
+  webpage +="<p><b>Change Sensor Calibration Factor (in %)</b></p>";
+  webpage +="<form method='POST' autocomplete='off'>";
+  webpage +="<input type='number' name='dispBrightn' min='1' max='200' value="+ String(myConfig.calibF) + ">&nbsp;<input type='submit' value='Submit'>";
   webpage +="</form>";
 
   webpage +="<p><b>Restart Device</b></p>";
@@ -852,6 +867,45 @@ void handleWebServerClient(void) {
           Serial.println("Request SPIFFS write.");
           #endif
           strlcpy(myConfig.updServer, webServer.arg(i).c_str(), sizeof(myConfig.updServer));
+          requestSaveToSpiffs = true;
+        } else {
+          #ifdef CFG_DEBUG
+          Serial.println("Configuration unchanged, do nothing");
+          #endif
+        }
+      }
+      if (webServer.argName(i) == "dispBrightn") {  /* check for dedicated arguments */
+        if (webServer.arg(i).toInt() != myConfig.dispBrightn) {
+          #ifdef CFG_DEBUG
+          Serial.println("Request SPIFFS write.");
+          #endif
+          myConfig.dispBrightn = uint8_t(webServer.arg(i).toInt());
+          requestSaveToSpiffsWithRestart = true;
+        } else {
+          #ifdef CFG_DEBUG
+          Serial.println("Configuration unchanged, do nothing");
+          #endif
+        }
+      }
+      if (webServer.argName(i) == "calibF") {  /* check for dedicated arguments */
+        if (webServer.arg(i).toInt() != myConfig.calibF) {
+          #ifdef CFG_DEBUG
+          Serial.println("Request SPIFFS write.");
+          #endif
+          myConfig.calibF = int16_t(webServer.arg(i).toInt());
+          requestSaveToSpiffs = true;
+        } else {
+          #ifdef CFG_DEBUG
+          Serial.println("Configuration unchanged, do nothing");
+          #endif
+        }
+      }
+      if (webServer.argName(i) == "calibO") {  /* check for dedicated arguments */
+        if (webServer.arg(i).toInt() != myConfig.calibO) {
+          #ifdef CFG_DEBUG
+          Serial.println("Request SPIFFS write.");
+          #endif
+          myConfig.calibO = int16_t(webServer.arg(i).toInt());
           requestSaveToSpiffs = true;
         } else {
           #ifdef CFG_DEBUG

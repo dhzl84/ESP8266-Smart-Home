@@ -43,6 +43,7 @@ struct configuration {
   char    updServer[256];
   int16_t sensUpdInterval;
   int16_t mqttPubCycle;
+  uint8_t dispBrightn;
 };
 
 /*===================================================================================================================*/

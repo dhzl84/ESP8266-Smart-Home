@@ -7,8 +7,8 @@
   "state":"true",
   "tTemp":"200",
   "tHyst":"4",
-  "calibF":"95",
-  "calibO":"20",
+  "calibF":"100",                           // factor in percent
+  "calibO":"0",                             // offset in 0.1 *C    
   "ssid":"xxxxxxxxxxxxxxxx",
   "wifiPwd":"xxxxxxxxxxxxxxxxx",
   "mqttHost":"123.456.789.012",
@@ -17,7 +17,8 @@
   "mqttPwd":"xxxxxxxxxxxxx",
   "updServer":"http://192.168.178.12:88/firmware/thermostat/firmware.bin",
   "sensUpdInterval":"20",
-  "mqttPubCycle":"5"
+  "mqttPubCycle":"5",
+  "dispBrightn":"50"
 }
 */
 
@@ -71,6 +72,7 @@ void loadConfiguration(configuration &config) { // NOLINT: pass by reference
   config.sensUpdInterval =      jsonDoc["sensUpdInterval"]       | SENSOR_UPDATE_INTERVAL;
   config.mqttPubCycle =         jsonDoc["mqttPubCycle"]          | 5;
   config.inputMethod =          jsonDoc["inputMethod"]           | false;
+  config.dispBrightn =          jsonDoc["dispBrightn"]           | 100;
 }
 
 // Saves the configuration to a file
@@ -114,6 +116,7 @@ bool saveConfiguration(const configuration &config) {
     Serial.print((config.sensUpdInterval ==      jsonDoc["sensUpdInterval"]) ? false : true);
     Serial.print((config.mqttPubCycle ==         jsonDoc["mqttPubCycle"]) ? false : true);
     Serial.print((config.inputMethod ==          jsonDoc["inputMethod"]) ? false : true);
+    Serial.print((config.dispBrightn ==          jsonDoc["dispBrightn"]) ? false : true);
     Serial.println();
     #endif /* CFG_DEBUG */
 
@@ -135,6 +138,7 @@ bool saveConfiguration(const configuration &config) {
     writeFile |= (config.sensUpdInterval ==      jsonDoc["sensUpdInterval"]) ? false : true;
     writeFile |= (config.mqttPubCycle ==         jsonDoc["mqttPubCycle"]) ? false : true;
     writeFile |= (config.inputMethod ==          jsonDoc["inputMethod"]) ? false : true;
+    writeFile |= (config.dispBrightn ==          jsonDoc["dispBrightn"]) ? false : true;
 
     file.close();
   } else {
@@ -172,6 +176,7 @@ bool saveConfiguration(const configuration &config) {
     jsonDocNew["sensUpdInterval"] =        config.sensUpdInterval;
     jsonDocNew["mqttPubCycle"] =           config.mqttPubCycle;
     jsonDocNew["inputMethod"] =            config.inputMethod;
+    jsonDocNew["dispBrightn"] =            config.dispBrightn;
 
     // Serialize JSON to file
     if (serializeJson(jsonDocNew, file) == 0) {
