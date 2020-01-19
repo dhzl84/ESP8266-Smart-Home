@@ -1,10 +1,10 @@
 #ifndef MAIN_H_
 #define MAIN_H_
 #include "Arduino.h"
-#include <FS.h>  // SPIFFS
+#include <ESP8266WiFi.h>  /* for wl_status_t */
 #include "config.h"
 #include "version.h"
-#include <ESP8266WiFi.h>
+
 
 /* the config.h file contains your personal configuration of the parameters below: 
   #define WIFI_SSID                   "xxx"
@@ -43,6 +43,7 @@ struct configuration {
   char    updServer[256];
   int16_t sensUpdInterval;
   int16_t mqttPubCycle;
+  uint8_t dispBrightn;
 };
 
 /*===================================================================================================================*/
@@ -65,12 +66,8 @@ void HANDLE_HTTP_UPDATE(void);
 /* callback */
 void handleWebServerClient(void);
 void handleHttpReset(void);
-
-#if CFG_MQTT_LIB == cArduinoMQTT
 void messageReceived(String &topic, String &payload);  // NOLINT: pass by reference
-#else
-void messageReceived(char* c_topic, byte* c_payload, unsigned int length);
-#endif
+
 void onOffButton(void);
 void upButton(void);
 void downButton(void);

@@ -1,5 +1,5 @@
 #include "main.h"
-#include "config.h"
+
 #include "ArduinoJson.h"
 /*
 {
@@ -7,8 +7,8 @@
   "state":"true",
   "tTemp":"200",
   "tHyst":"4",
-  "calibF":"95",
-  "calibO":"20",
+  "calibF":"100",                           // factor in percent
+  "calibO":"0",                             // offset in 0.1 *C    
   "ssid":"xxxxxxxxxxxxxxxx",
   "wifiPwd":"xxxxxxxxxxxxxxxxx",
   "mqttHost":"123.456.789.012",
@@ -17,7 +17,8 @@
   "mqttPwd":"xxxxxxxxxxxxx",
   "updServer":"http://192.168.178.12:88/firmware/thermostat/firmware.bin",
   "sensUpdInterval":"20",
-  "mqttPubCycle":"5"
+  "mqttPubCycle":"5",
+  "dispBrightn":"50"
 }
 */
 
@@ -34,15 +35,16 @@ void loadConfiguration(configuration &config) { // NOLINT: pass by reference
   StaticJsonDocument<768> jsonDoc;
 
   DeserializationError error = deserializeJson(jsonDoc, file);
-  if (error) {
+
+    if (error) {
+      #ifdef CFG_DEBUG
       Serial.print(F("deserializeJson() failed with code "));
       Serial.println(error.c_str());
+      #endif /* CFG_DEBUG */
       return;
   } else {
-      #ifdef CFG_DEBUG
       serializeJsonPretty(jsonDoc, Serial);
       Serial.println();
-      #endif /* CFG_DEBUG */
   }
 
   file.close();
@@ -70,6 +72,7 @@ void loadConfiguration(configuration &config) { // NOLINT: pass by reference
   config.sensUpdInterval =      jsonDoc["sensUpdInterval"]       | SENSOR_UPDATE_INTERVAL;
   config.mqttPubCycle =         jsonDoc["mqttPubCycle"]          | 5;
   config.inputMethod =          jsonDoc["inputMethod"]           | false;
+  config.dispBrightn =          jsonDoc["dispBrightn"]           | 100;
 }
 
 // Saves the configuration to a file
@@ -84,9 +87,12 @@ bool saveConfiguration(const configuration &config) {
     File file = SPIFFS.open(filename, "r");
 
     DeserializationError error = deserializeJson(jsonDoc, file);
+
     if (error) {
+        #ifdef CFG_DEBUG
         Serial.print(F("deserializeJson() failed with code "));
         Serial.println(error.c_str());
+        #endif
     }
 
     #ifdef CFG_DEBUG
@@ -110,6 +116,7 @@ bool saveConfiguration(const configuration &config) {
     Serial.print((config.sensUpdInterval ==      jsonDoc["sensUpdInterval"]) ? false : true);
     Serial.print((config.mqttPubCycle ==         jsonDoc["mqttPubCycle"]) ? false : true);
     Serial.print((config.inputMethod ==          jsonDoc["inputMethod"]) ? false : true);
+    Serial.print((config.dispBrightn ==          jsonDoc["dispBrightn"]) ? false : true);
     Serial.println();
     #endif /* CFG_DEBUG */
 
@@ -131,6 +138,7 @@ bool saveConfiguration(const configuration &config) {
     writeFile |= (config.sensUpdInterval ==      jsonDoc["sensUpdInterval"]) ? false : true;
     writeFile |= (config.mqttPubCycle ==         jsonDoc["mqttPubCycle"]) ? false : true;
     writeFile |= (config.inputMethod ==          jsonDoc["inputMethod"]) ? false : true;
+    writeFile |= (config.dispBrightn ==          jsonDoc["dispBrightn"]) ? false : true;
 
     file.close();
   } else {
@@ -168,6 +176,7 @@ bool saveConfiguration(const configuration &config) {
     jsonDocNew["sensUpdInterval"] =        config.sensUpdInterval;
     jsonDocNew["mqttPubCycle"] =           config.mqttPubCycle;
     jsonDocNew["inputMethod"] =            config.inputMethod;
+    jsonDocNew["dispBrightn"] =            config.dispBrightn;
 
     // Serialize JSON to file
     if (serializeJson(jsonDocNew, file) == 0) {
@@ -198,15 +207,19 @@ String readSpiffs(String file) {
   if (SPIFFS.exists(file)) {
     File f = SPIFFS.open(file, "r");
     if (!f) {
+      #ifdef CFG_DEBUG
       Serial.println("oh no, failed to open file: " + file);
+      #endif
       /* TODO: Error handling */
     } else {
       fileContent = f.readStringUntil('\n');
       f.close();
 
+      #ifdef CFG_DEBUG
       if (fileContent == "") {
         Serial.println("File " + file + " is empty");
       }
+      #endif
     }
   }
   return fileContent;

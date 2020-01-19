@@ -1,4 +1,4 @@
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 # ESP8266 Smart Home Playground
 
 This is my ESP8266 smart home playground for:  
@@ -15,7 +15,7 @@ SW Built with PlatformIO in Visual Studio Code, some great [Arduino](https://www
 
 [Circuit and PCB](https://github.com/dhzl84/ESP8266_Thermostat_PCB.git) made with [Target 3001](https://ibfriedrich.com/de/index.html)
 
-## 1. Build Status Master: [![Build Status](https://github.com/dhzl84/ESP8266-Smart-Home/workflows/CI/badge.svg?branch=master)](https://github.com/dhzl84/ESP8266-Smart-Home/actions) Develop: [![Build Status](https://github.com/dhzl84/ESP8266-Smart-Home/workflows/CI/badge.svg?branch=develop)](https://github.com/dhzl84/ESP8266-Smart-Home/actions)
+## 1. Build Status Master: [![Build Status](https://github.com/dhzl84/ESP8266-Smart-Home/workflows/CI/badge.svg?branch=master)](https://github.com/dhzl84/ESP8266-Smart-Home/actions?query=branch%3Amaster) Develop: [![Build Status](https://github.com/dhzl84/ESP8266-Smart-Home/workflows/CI/badge.svg?branch=develop)](https://github.com/dhzl84/ESP8266-Smart-Home/actions?query=branch%3Adevelop)
 * Master branch only provides (pre-)release SW
 * Develop may contain untested changes
 
@@ -46,16 +46,12 @@ My *config.h* for building a thermostat SW contains the following information:
 #define SENSOR_UPDATE_INTERVAL 20      /* seconds */
 #define THERMOSTAT_HYSTERESIS  2       /* 0.2 °C */
 #define WIFI_RECONNECT_TIME    30      /* seconds */
-
-#define cArduinoMQTT  0
-#define cPubSubClient 1
-#define CFG_MQTT_LIB                cPubSubClient
 ```
 
 For Travis CI compatibility there is the *config.sh* script which generates the above mentioned dummy code.
 
 
-## 3 Inwall thermostat
+## 3 Inwall Thermostat
 I started to think about new thermostats for my floor heating system while trying to find a good setting for each room with the analog thermostats only giving the range ice cold (0) to 6, whatever temperature that should be.
 So I thought about buying them but they were either expensive as hell or just didn't have the functionalities I wanted, thus I decided to build them on my own.
 
