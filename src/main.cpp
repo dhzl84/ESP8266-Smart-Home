@@ -528,6 +528,7 @@ void DRAW_DISPLAY_MAIN(void) {
   myDisplay.setTextAlignment(TEXT_ALIGN_LEFT);
   myDisplay.setFont(Roboto_Condensed_16);
   myDisplay.drawString(0, drawTargetTempYOffset, String(VERSION));
+  myDisplay.drawString(0, 48, WiFi.localIP().toString());
   #endif
 
   myDisplay.display();

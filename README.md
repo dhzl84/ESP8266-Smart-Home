@@ -25,8 +25,8 @@ Platform:
 
 Arduino Libraries:
 * DHT sensor library for ESPx
-* ESP8266 and ESP32 Oled Driver for SSD1306 display
-* ArduinoMQTT or PubSubClient
+* ESP8266_SSD1306
+* ArduinoMQTT
 * ArduinoJSON
 
 ## 2. General hints
