@@ -1,41 +1,50 @@
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/bfe60968c5c94e88b5aa4b7b383fae2d)](https://app.codacy.com/manual/dhzl84/ESP8266-Smart-Home?utm_source=github.com&utm_medium=referral&utm_content=dhzl84/ESP8266-Smart-Home&utm_campaign=Badge_Grade_Dashboard)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
 # ESP8266 Smart Home Playground
 
 This is my ESP8266 smart home playground for:  
-*  Self made floor heating sens and control units
+
+* Self made floor heating sens and control units
 
 Basic building blocks and technologies:
-*  [ESP8266-07](https://www.espressif.com/)
-*  WiFi 
-*  MQTT
-*  [Home Assistant](https://home-assistant.io/)
-*  c++
+
+* [ESP8266-07](https://www.espressif.com/)
+* WiFi
+* MQTT
+* [Home Assistant](https://home-assistant.io/)
+* c++
 
 SW Built with PlatformIO in Visual Studio Code, some great [Arduino](https://www.arduino.cc) libraries and ESP8266 Arduino
 
 [Circuit and PCB](https://github.com/dhzl84/ESP8266_Thermostat_PCB.git) made with [Target 3001](https://ibfriedrich.com/de/index.html)
 
 ## 1. Build Status Master: [![Build Status](https://github.com/dhzl84/ESP8266-Smart-Home/workflows/CI/badge.svg?branch=master)](https://github.com/dhzl84/ESP8266-Smart-Home/actions?query=branch%3Amaster) Develop: [![Build Status](https://github.com/dhzl84/ESP8266-Smart-Home/workflows/CI/badge.svg?branch=develop)](https://github.com/dhzl84/ESP8266-Smart-Home/actions?query=branch%3Adevelop)
-*  Master branch only provides (pre-)release SW
-*  Develop may contain untested changes
+
+* Master branch only provides (pre-)release SW
+* Develop may contain untested changes
 
 ### Dependencies
+
 Platform:
-*  ESP8266 Core for Arduino
+
+* ESP8266 Core for Arduino
 
 Arduino Libraries:
-*  DHT sensor library for ESPx
-*  ESP8266_SSD1306
-*  ArduinoMQTT
-*  ArduinoJSON
+
+* DHT sensor library for ESPx
+* ESP8266_SSD1306
+* ArduinoMQTT
+* ArduinoJSON
 
 ## 2. General hints
+
 See [my Home Assistant configuration](https://github.com/dhzl84/Home-Assistant-Configuration) for the usage of this devices.
 
 Since there is certain information in my software that I do not want everyone to know I located those in a single header file called *config.h* which is not part of the repository, and therefore the build will fail.
 
 My *config.h* for building a thermostat SW contains the following information:
+
 ```c++
 #define WIFI_SSID              "xxx"
 #define WIFI_PWD               "xxx"
@@ -52,34 +61,40 @@ My *config.h* for building a thermostat SW contains the following information:
 For Travis CI compatibility there is the *config.sh* script which generates the above mentioned dummy code.
 
 ## 3 Inwall Thermostat
+
 I started to think about new thermostats for my floor heating system while trying to find a good setting for each room with the analog thermostats only giving the range ice cold (0) to 6, whatever temperature that should be.
 So I thought about buying them but they were either expensive as hell or just didn't have the functionalities I wanted, thus I decided to build them on my own.
 
 ### 3.1 Features
 
 **local:**
-*  sensing room temperature
-*  controlling room temperature
-*  display current room temperature
-*  display target temperature
+
+* sensing room temperature
+* controlling room temperature
+* display current room temperature
+* display target temperature
 
 **remote:**
-*  allow control from remote devices (smartphones, computers, etc.)
-*  provide a nice front end
-*  stay locally operational if not connected to a network
+
+* allow control from remote devices (smartphones, computers, etc.)
+* provide a nice front end
+* stay locally operational if not connected to a network
 
 ### 3.3 Assembly parts
-*  ESP8266-07
-*  DHT22 temeperture and humidity sensor
-*  0,96" OLED display
-*  SRD-05VDC-SL-C 230V 10A relay
-*  IRM-03-5 230V AC to 5V DC print module
-*  3,3 V DC voltage reulator
-*  rotary encoder with push button or just push buttons
-*  wires, resistors, capacitors, diodes, transistor, optocoupler, circuit board, etc
+
+* ESP8266-07
+* DHT22 temeperture and humidity sensor
+* 0,96" OLED display
+* SRD-05VDC-SL-C 230V 10A relay
+* IRM-03-5 230V AC to 5V DC print module
+* 3,3 V DC voltage reulator
+* rotary encoder with push button or just push buttons
+* wires, resistors, capacitors, diodes, transistor, optocoupler, circuit board, etc
 
 ### 3.4 Wiring
+
 ![image](https://user-images.githubusercontent.com/5675570/35767892-47fde138-08f4-11e8-863e-870828831ac0.png)
 
 ### 3.5 Picture
+
 ![image](https://user-images.githubusercontent.com/5675570/50345529-b7659380-052f-11e9-8c72-13e437296978.jpg)
