@@ -800,22 +800,21 @@ void handleWebServerClient(void) {
   } else {
     webpage +="<select name='InputMethod'> <option value='0' selected> Rotary Encoder </option> <option value='1'> Push Buttons </option> </select>&nbsp;<input type='submit' value='Submit'>";
   }
-
   webpage +="</form>";
 
-  webpage +="<p><b>Change Display Brightness</b></p>";
+  webpage +="<p><b>Change Display Brightness ( 0 .. 255)</b></p>";
   webpage +="<form method='POST' autocomplete='off'>";
   webpage +="<input type='number' name='dispBrightn' min='1' max='255' value="+ String(myConfig.dispBrightn) + ">&nbsp;<input type='submit' value='Submit'>";
   webpage +="</form>";
 
-  webpage +="<p><b>Change Sensor Calibration Offset (Resolution 0.1 deg Celsius)</b></p>";
+  webpage +="<p><b>Change Sensor Calibration Offset (-50 .. 50 | Resolution 0.1 deg Celsius)</b></p>";
   webpage +="<form method='POST' autocomplete='off'>";
   webpage +="<input type='number' name='calibO' min='-50' max='+50' value="+ String(myConfig.calibO) + ">&nbsp;<input type='submit' value='Submit'>";
   webpage +="</form>";
 
-  webpage +="<p><b>Change Sensor Calibration Factor (in %)</b></p>";
+  webpage +="<p><b>Change Sensor Calibration Factor (1 .. 200 %)</b></p>";
   webpage +="<form method='POST' autocomplete='off'>";
-  webpage +="<input type='number' name='dispBrightn' min='1' max='200' value="+ String(myConfig.calibF) + ">&nbsp;<input type='submit' value='Submit'>";
+  webpage +="<input type='number' name='calibF' min='1' max='200' value="+ String(myConfig.calibF) + ">&nbsp;<input type='submit' value='Submit'>";
   webpage +="</form>";
 
   webpage +="<p><b>Restart Device</b></p>";
