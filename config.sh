@@ -1,3 +1,5 @@
+#!/bin/bash
+
 cat > config.h << EOF
 #ifndef CONFIG_H_
 #define CONFIG_H_
