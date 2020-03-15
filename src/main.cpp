@@ -800,9 +800,8 @@ void handleWebServerClient(void) {
   } else {
     webpage +="<select name='InputMethod'> <option value='0' selected> Rotary Encoder </option> <option value='1'> Push Buttons </option> </select>&nbsp;<input type='submit' value='Submit'>";
   }
-
   webpage +="</form>";
-
+  
   webpage +="<p><b>Change Display Brightness ( 0 .. 255)</b></p>";
   webpage +="<form method='POST' autocomplete='off'>";
   webpage +="<input type='number' name='dispBrightn' min='1' max='255' value="+ String(myConfig.dispBrightn) + ">&nbsp;<input type='submit' value='Submit'>";
