@@ -32,8 +32,7 @@ class mqttHelper {
  public:
   mqttHelper(void);
   ~mqttHelper(void);
-  void   init(void);
-  void   setup(void);
+    void   setup(void);
   void   buildTopics(void);
   void   setTriggerDiscovery(bool discover);
   bool   getTriggerDiscovery(void);

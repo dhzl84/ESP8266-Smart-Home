@@ -1,10 +1,9 @@
 #ifndef MAIN_H_
 #define MAIN_H_
 #include "Arduino.h"
-#include <FS.h>  // SPIFFS
+#include <ESP8266WiFi.h>  /* for wl_status_t */
 #include "config.h"
-#include <ESP8266WiFi.h>
-#include <DHTesp.h>
+#include "version.h"
 
 /* the config.h file contains your personal configuration of the parameters below: 
   #define WIFI_SSID                   "xxx"
@@ -17,28 +16,38 @@
   #define SENSOR_UPDATE_INTERVAL      20      // seconds
   #define THERMOSTAT_HYSTERESIS       2       // seconds 
   #define WIFI_RECONNECT_TIME         30      // seconds
-  #define CFG_PUSH_BUTTONS            false
 */
+
+/* inputMethod */
+#define cROTARY_ENCODER 0
+#define cPUSH_BUTTONS   1
+
+/* sensor */
+#define cDHT22 0
+#define cBME280 1
 
 /*===================================================================================================================*/
 /* variable declarations */
 /*===================================================================================================================*/
 struct configuration {
-  char    name[64];
-  boolean mode;   /* 0 = TH_OFF, 1 = TH_HEAT */
-  int16_t tTemp;  /* persistent target temperature */
-  int16_t tHyst;  /* thermostat hysteresis */
-  int16_t calibF;
-  int16_t calibO;
-  char    ssid[64];
-  char    wifiPwd[64];
-  char    mqttHost[64];
-  int16_t mqttPort;
-  char    mqttUser[64];
-  char    mqttPwd[64];
-  char    updServer[256];
-  int16_t sensUpdInterval;
-  int16_t mqttPubCycleInterval;
+  char          name[64];
+  boolean       mode;         /* 0 = TH_OFF, 1 = TH_HEAT */
+  boolean       inputMethod;  /* 0 = rotary encoder , 1 = three push buttons */
+  int16_t       tTemp;        /* persistent target temperature */
+  int16_t       tHyst;        /* thermostat hysteresis */
+  int16_t       calibF;
+  int16_t       calibO;
+  char          ssid[64];
+  char          wifiPwd[64];
+  char          mqttHost[64];
+  int16_t       mqttPort;
+  char          mqttUser[64];
+  char          mqttPwd[64];
+  char          updServer[256];
+  uint8_t       sensUpdInterval;
+  uint8_t       mqttPubCycle;
+  uint8_t dispBrightn;
+  uint8_t       sensor;
 };
 
 /*===================================================================================================================*/
@@ -61,19 +70,15 @@ void HANDLE_HTTP_UPDATE(void);
 /* callback */
 void handleWebServerClient(void);
 void handleHttpReset(void);
-
-#if CFG_MQTT_LIB == cArduinoMQTT
 void messageReceived(String &topic, String &payload);  // NOLINT: pass by reference
-#else
-void messageReceived(char* c_topic, byte* c_payload, unsigned int length);
-#endif
+
 void onOffButton(void);
-#if CFG_PUSH_BUTTONS
 void upButton(void);
 void downButton(void);
-#else
 void updateEncoder(void);
-#endif /* CFG_PUSH_BUTTONS */
+
+/* MACRO to append another line of the webpage table */
+#define webpageTableAppend(key, value) (webpage +="<tr><td>" + key + ":</td><td>"+ value + "</td></tr>");
 
 /*===================================================================================================================*/
 /* global scope functions */
@@ -83,6 +88,7 @@ void mqttPubState(void);
 void loadConfiguration(configuration &config);  // NOLINT: pass by reference
 bool saveConfiguration(const configuration &config);
 String readSpiffs(String file);
+
 /*===================================================================================================================*/
 /* library functions */
 /*===================================================================================================================*/
@@ -97,6 +103,4 @@ void SetNextTimeInterval(uint32_t& timer, const uint32_t step);  // NOLINT: pass
 bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor);
 char* millisFormatted(void);
 String wifiStatusToString(wl_status_t status);
-String comfortStateToString(ComfortState state);
-
 #endif  // MAIN_H_

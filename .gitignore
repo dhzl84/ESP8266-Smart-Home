@@ -8,3 +8,4 @@ lib/readme.txt
 .vscode/launch.json
 backup
 /.pio/
+/.cache/

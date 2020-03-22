@@ -1,8 +1,8 @@
+#!/bin/bash
+
 cat > config.h << EOF
 #ifndef CONFIG_H_
 #define CONFIG_H_
-
-#define TRACE false
 
 /* the config.h file contains your personal configuration of the parameters below: */
 #define WIFI_SSID               "xxx"
@@ -15,11 +15,6 @@ cat > config.h << EOF
 #define SENSOR_UPDATE_INTERVAL  20
 #define THERMOSTAT_HYSTERESIS   2
 #define WIFI_RECONNECT_TIME     30
-#define CFG_PUSH_BUTTONS        $1
-
-#define cArduinoMQTT  0
-#define cPubSubClient 1
-#define CFG_MQTT_LIB            $2
 
 #endif /* CONFIG_H_ */
 EOF

@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron:  '* 3 * * 5'  # * is a special character in YAML so you have to quote this string
+
+jobs:
+  build_var1:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions/setup-python@v1
+      with:
+        python-version: '3.8' # Version range or exact version of a Python version to use, using semvers version range syntax.
+        architecture: 'x64' # optional x64 or x86. Defaults to x64 if not specified
+    - name: install packages
+      run: |
+        pip install -U platformio
+        platformio update
+        platformio lib -g install 1
+        pip install cpplint
+    - name: Build
+      run: |
+        chmod a+x config.sh
+        echo "generate config.h"
+        ./config.sh
+        cat config.h
+        ls -l
+        mv config.h src/config.h
+        platformio run
+    - name: lint
+      run: cpplint --root=src --repository=src --verbose=0 $(find src -name \*.cpp -or -name \*.h)
