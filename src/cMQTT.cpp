@@ -82,6 +82,7 @@ String mqttHelper::buildHassDiscoveryClimate(String name, String firmware) {
   "  \"temp_step\":\"0.5\",\n" \
   "  \"modes\":[\"heat\",\"off\"],\n" \
   "  \"json_attr_t\":\"~" + mqttData + "\",\n" \
+  "  \"json_attr_tpl\":\"{{value_json}}\",\n" \
   "  \"uniq_id\":\"" + mqttNodeId + "_climate\",\n" \
   "  \"dev\" : { \n" \
   "    \"ids\":[\"" + mqttNodeId + "\"],\n" \
