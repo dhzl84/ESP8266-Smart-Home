@@ -108,12 +108,12 @@ BME280I2C::Settings settings(
   BME280::StandbyTime_1000ms,
   BME280::Filter_Off,
   BME280::SpiEnable_False,
-  BME280I2C::I2CAddr_0x76
+  BME280I2C::I2CAddr_0x77
 );
 
 /* classes */
 DHTesp            myDHT22;
-BME280I2C myBME280(settings);
+BME280I2C         myBME280(settings);
 SSD1306           myDisplay(0x3c, SDA_PIN, SCL_PIN);
 Thermostat        myThermostat;
 WiFiClient        myWiFiClient;
