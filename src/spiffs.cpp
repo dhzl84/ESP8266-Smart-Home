@@ -1,5 +1,5 @@
 #include "main.h"
-#include "config.h"
+
 #include "ArduinoJson.h"
 
 /*
@@ -8,8 +8,8 @@
   "state":"true",
   "tTemp":"200",
   "tHyst":"4",
-  "calibF":"95",
-  "calibO":"20",
+  "calibF":"100",                           // factor in percent
+  "calibO":"0",                             // offset in 0.1 *C    
   "ssid":"xxxxxxxxxxxxxxxx",
   "wifiPwd":"xxxxxxxxxxxxxxxxx",
   "mqttHost":"123.456.789.012",
@@ -20,6 +20,7 @@
   "sensUpdInterval":"20",
   "mqttPubCycle":"5",
   "sensor":"0"
+  "dispBrightn":"50"
 }
 */
 
@@ -74,6 +75,7 @@ void loadConfiguration(configuration &config) { // NOLINT: pass by reference
   config.mqttPubCycle =         jsonDoc["mqttPubCycle"]          | 5;
   config.inputMethod =          jsonDoc["inputMethod"]           | false;
   config.sensor =               jsonDoc["sensor"]                | cDHT22;
+  config.dispBrightn =          jsonDoc["dispBrightn"]           | 100;
 }
 
 // Saves the configuration to a file
@@ -118,6 +120,7 @@ bool saveConfiguration(const configuration &config) {
     Serial.print((config.mqttPubCycle ==         jsonDoc["mqttPubCycle"]) ? false : true);
     Serial.print((config.inputMethod ==          jsonDoc["inputMethod"]) ? false : true);
     Serial.print((config.sensor ==               jsonDoc["sensor"]) ? false : true);
+    Serial.print((config.dispBrightn ==          jsonDoc["dispBrightn"]) ? false : true);
     Serial.println();
     #endif /* CFG_DEBUG */
 
@@ -140,6 +143,7 @@ bool saveConfiguration(const configuration &config) {
     writeFile |= (config.mqttPubCycle ==         jsonDoc["mqttPubCycle"]) ? false : true;
     writeFile |= (config.inputMethod ==          jsonDoc["inputMethod"]) ? false : true;
     writeFile |= (config.sensor ==               jsonDoc["sensor"]) ? false : true;
+    writeFile |= (config.dispBrightn ==          jsonDoc["dispBrightn"]) ? false : true;
 
     file.close();
   } else {
@@ -178,6 +182,7 @@ bool saveConfiguration(const configuration &config) {
     jsonDocNew["mqttPubCycle"] =           config.mqttPubCycle;
     jsonDocNew["inputMethod"] =            config.inputMethod;
     jsonDocNew["sensor"] =                 config.sensor;
+    jsonDocNew["dispBrightn"] =            config.dispBrightn;
 
     // Serialize JSON to file
     if (serializeJson(jsonDocNew, file) == 0) {

@@ -1,8 +1,6 @@
 /*===================================================================================================================*/
 /* includes */
 /*===================================================================================================================*/
-#include <Arduino.h>
-#include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <ESP8266httpUpdate.h>
@@ -16,16 +14,14 @@
 #include <SSD1306.h>
 
 #include "main.h"
-#include "version.h"
-#include "cMQTT.h"
 
+#include "cMQTT.h"
 #include "cThermostat.h"
 
-#if CFG_MQTT_LIB == cPubSubClient
-#include "PubSubClient.h"
-#else
+#include <DHTesp.h>
+#include "UserFonts.h"
+#include <SSD1306.h>
 #include "MQTTClient.h"
-#endif
 
 /*===================================================================================================================*/
 /* GPIO config */
@@ -119,11 +115,8 @@ Thermostat        myThermostat;
 WiFiClient        myWiFiClient;
 mqttHelper        myMqttHelper;
 ESP8266WebServer  webServer(80);
-#if CFG_MQTT_LIB == cPubSubClient
-PubSubClient      myMqttClient(LOCAL_MQTT_HOST, LOCAL_MQTT_PORT, messageReceived, myWiFiClient);
-#else
 MQTTClient        myMqttClient(2048); /* 2048 byte buffer */
-#endif
+
 
 bool     systemRestartRequest = false;
 bool     requestSaveToSpiffs = false;
@@ -275,6 +268,7 @@ void DISPLAY_INIT(void) {
   #endif
   myDisplay.init();
   myDisplay.flipScreenVertically();
+  myDisplay.setBrightness(myConfig.dispBrightn);
   myDisplay.clear();
   myDisplay.setFont(Roboto_Condensed_16);
   myDisplay.setTextAlignment(TEXT_ALIGN_CENTER);
@@ -358,20 +352,14 @@ void MQTT_CONNECT(void) {
   if (WiFi.status() == WL_CONNECTED) {
     if (!myMqttClient.connected()) {
       myMqttClient.disconnect();
-      #if CFG_MQTT_LIB == cArduinoMQTT
       myMqttClient.setOptions(30, true, 30000);
       myMqttClient.begin(myConfig.mqttHost, myConfig.mqttPort, myWiFiClient);
       myMqttClient.setWill((myMqttHelper.getTopicLastWill()).c_str(),   "offline", true, MQTT_QOS);     /* broker shall publish 'offline' on ungraceful disconnect >> Last Will */
       myMqttClient.onMessage(messageReceived);                                                        /* register callback */
       (void)myMqttClient.connect(myConfig.name, myConfig.mqttUser, myConfig.mqttPwd);
-      #else
-      myMqttClient.setCallback(messageReceived);
-      (void)myMqttClient.connect(myConfig.name, myConfig.mqttUser, myConfig.mqttPwd, myMqttHelper.getTopicLastWill().c_str(), MQTT_QOS, true, "offline");
-      #endif
 
       homeAssistantDiscovery();  /* make HA discover necessary devices */
 
-      #if CFG_MQTT_LIB == cArduinoMQTT
       myMqttClient.publish(myMqttHelper.getTopicLastWill(),             "online", true,  MQTT_QOS);   /* publish online in will topic */
       myMqttClient.publish(myMqttHelper.getTopicSystemRestartRequest(), "0",      false, MQTT_QOS);   /* publish restart = false on connect */
       /* subscribe topics */
@@ -382,18 +370,6 @@ void MQTT_CONNECT(void) {
       (void)myMqttClient.subscribe(myMqttHelper.getTopicChangeHysteresis(),      MQTT_QOS);
       (void)myMqttClient.subscribe(myMqttHelper.getTopicChangeSensorCalib(),     MQTT_QOS);
       (void)myMqttClient.subscribe(myMqttHelper.getTopicSystemRestartRequest(),  MQTT_QOS);
-      #else
-      myMqttClient.publish(myMqttHelper.getTopicLastWill().c_str(),             "online", true);   /* publish online in will topic */
-      myMqttClient.publish(myMqttHelper.getTopicSystemRestartRequest().c_str(), "0",      false);   /* publish restart = false on connect */
-      /* subscribe topics */
-      (void)myMqttClient.subscribe(myMqttHelper.getTopicTargetTempCmd().c_str(),         MQTT_QOS);
-      (void)myMqttClient.subscribe(myMqttHelper.getTopicThermostatModeCmd().c_str(),     MQTT_QOS);
-      (void)myMqttClient.subscribe(myMqttHelper.getTopicUpdateFirmware().c_str(),        MQTT_QOS);
-      (void)myMqttClient.subscribe(myMqttHelper.getTopicChangeName().c_str(),            MQTT_QOS);
-      (void)myMqttClient.subscribe(myMqttHelper.getTopicChangeHysteresis().c_str(),      MQTT_QOS);
-      (void)myMqttClient.subscribe(myMqttHelper.getTopicChangeSensorCalib().c_str(),     MQTT_QOS);
-      (void)myMqttClient.subscribe(myMqttHelper.getTopicSystemRestartRequest().c_str(),  MQTT_QOS);
-      #endif
     }
   }
 }
@@ -543,7 +519,6 @@ void SENSOR_MAIN() {
 
 void DRAW_DISPLAY_MAIN(void) {
   myDisplay.clear();
-  myDisplay.setContrast(80);
 
   if (systemRestartRequest == true) {
     myDisplay.setFont(Roboto_Condensed_16);
@@ -594,6 +569,7 @@ void DRAW_DISPLAY_MAIN(void) {
   myDisplay.setTextAlignment(TEXT_ALIGN_LEFT);
   myDisplay.setFont(Roboto_Condensed_16);
   myDisplay.drawString(0, drawTargetTempYOffset, String(VERSION));
+  myDisplay.drawString(0, 48, WiFi.localIP().toString());
   #endif
 
   myDisplay.display();
@@ -623,11 +599,7 @@ void MQTT_MAIN(void) {
 void HANDLE_HTTP_UPDATE(void) {
   if (fetchUpdate == true) {
     /* publish and loop here before fetching the update */
-    #if CFG_MQTT_LIB == cArduinoMQTT
     myMqttClient.publish(myMqttHelper.getTopicUpdateFirmwareAccepted(), String(false), false, MQTT_QOS); /* publish accepted update with value false to reset the switch in Home Assistant */
-    #else
-    myMqttClient.publish(myMqttHelper.getTopicUpdateFirmwareAccepted().c_str(), "false", false); /* publish accepted update with value false to reset the switch in Home Assistant */
-    #endif
     myMqttClient.loop();
 
     DRAW_DISPLAY_MAIN();
@@ -776,7 +748,6 @@ void ICACHE_RAM_ATTR updateEncoder(void) {
 
 /* Home Assistant discovery on connect; used to define entities in HA to communicate with*/
 void homeAssistantDiscovery(void) {
-  #if CFG_MQTT_LIB == cArduinoMQTT
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryClimate(),                   myMqttHelper.buildHassDiscoveryClimate(String(myConfig.name), String(FW)),         true, MQTT_QOS);    // make HA discover the climate component
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(bsSensFail),    myMqttHelper.buildHassDiscoveryBinarySensor(String(myConfig.name), bsSensFail),    true, MQTT_QOS);    // make HA discover the binary_sensor for sensor failure
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(bsState),       myMqttHelper.buildHassDiscoveryBinarySensor(String(myConfig.name), bsState),       true, MQTT_QOS);    // make HA discover the binary_sensor for thermostat state
@@ -789,20 +760,6 @@ void homeAssistantDiscovery(void) {
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sFW),                 myMqttHelper.buildHassDiscoverySensor(String(myConfig.name), sFW),                 true, MQTT_QOS);    // make HA discover the firmware version sensor
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swRestart),           myMqttHelper.buildHassDiscoverySwitch(String(myConfig.name), swRestart),           true, MQTT_QOS);    // make HA discover the reset switch
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swUpdate),            myMqttHelper.buildHassDiscoverySwitch(String(myConfig.name), swUpdate),            true, MQTT_QOS);    // make HA discover the update switch
-  #else
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryClimate().c_str(),                   myMqttHelper.buildHassDiscoveryClimate(String(myConfig.name).c_str(), String(FW)).c_str(),         true);    // make HA discover the climate component
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(bsSensFail).c_str(),    myMqttHelper.buildHassDiscoveryBinarySensor(String(myConfig.name).c_str(), bsSensFail).c_str(),    true);    // make HA discover the binary_sensor for sensor failure
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(bsState).c_str(),       myMqttHelper.buildHassDiscoveryBinarySensor(String(myConfig.name).c_str(), bsState).c_str(),       true);    // make HA discover the binary_sensor for thermostat state
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sTemp).c_str(),               myMqttHelper.buildHassDiscoverySensor(String(myConfig.name).c_str(), sTemp).c_str(),               true);    // make HA discover the temperature sensor
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sHum).c_str(),                myMqttHelper.buildHassDiscoverySensor(String(myConfig.name).c_str(), sHum).c_str(),                true);    // make HA discover the humidity sensor
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sIP).c_str(),                 myMqttHelper.buildHassDiscoverySensor(String(myConfig.name).c_str(), sIP).c_str(),                 true);    // make HA discover the IP sensor
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sCalibF).c_str(),             myMqttHelper.buildHassDiscoverySensor(String(myConfig.name).c_str(), sCalibF).c_str(),             true);    // make HA discover the scaling sensor
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sCalibO).c_str(),             myMqttHelper.buildHassDiscoverySensor(String(myConfig.name).c_str(), sCalibO).c_str(),             true);    // make HA discover the offset sensor
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sHysteresis).c_str(),         myMqttHelper.buildHassDiscoverySensor(String(myConfig.name).c_str(), sHysteresis).c_str(),         true);    // make HA discover the hysteresis sensor
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sFW).c_str(),                 myMqttHelper.buildHassDiscoverySensor(String(myConfig.name).c_str(), sFW).c_str(),                 true);    // make HA discover the firmware version sensor
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swRestart).c_str(),           myMqttHelper.buildHassDiscoverySwitch(String(myConfig.name).c_str(), swRestart).c_str(),           true);    // make HA discover the reset switch
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swUpdate).c_str(),            myMqttHelper.buildHassDiscoverySwitch(String(myConfig.name).c_str(), swUpdate).c_str(),            true);    // make HA discover the update switch
-  #endif
 }
 
 /* publish state topic in JSON format */
@@ -820,18 +777,12 @@ void mqttPubState(void) {
       String(intToFloat(myThermostat.getSensorCalibOffset()), 0), \
       WiFi.localIP().toString(), \
       String(FW) );
-  #if CFG_MQTT_LIB == cArduinoMQTT
+
   myMqttClient.publish( \
     myMqttHelper.getTopicData(), /* get topic */ \
     payload, \
     true, /* retain */ \
     MQTT_QOS); /* QoS */
-  #else
-  myMqttClient.publish( \
-    myMqttHelper.getTopicData().c_str(), /* get topic */ \
-    payload.c_str(), \
-    true); /* retain */
-  #endif
 }
 
 void handleWebServerClient(void) {
@@ -859,11 +810,6 @@ void handleWebServerClient(void) {
   webpageTableAppend(String("Chip ID"),           String(ESP.getChipId(), HEX));
   webpageTableAppend(String("IPv4"),              IPaddress);
   webpageTableAppend(String("FW version"),        String(FW));
-  if (myConfig.inputMethod == cROTARY_ENCODER) {
-    webpageTableAppend(String("Input Method"),      String("Rotary Encoder"));
-  } else {
-    webpageTableAppend(String("Input Method"),      String("Push Buttons"));
-  }
   webpageTableAppend(String("Arduino Core"),      ESP.getCoreVersion());
   webpageTableAppend(String("Reset Reason"),      ESP.getResetReason());
   webpageTableAppend(String("Time since Reset"),  String(millisFormatted()));
@@ -891,13 +837,12 @@ void handleWebServerClient(void) {
   /* Change Input Method */
   webpage +="<p><b>Change Input Method</b></p>";
   webpage +="<form method='POST' autocomplete='off'>";
-  webpage +="<select name='InputMethod'> ";
-  if (myConfig.inputMethod == cROTARY_ENCODER) {  /* select currently configured input method */
-  webpage +="<option value='0' selected >Rotary Encoder </option> <option value='1'> Push Buttons </option>";
+
+  if (myConfig.inputMethod == cPUSH_BUTTONS) {
+    webpage +="<select name='InputMethod'> <option value='0'>Rotary Encoder </option> <option value='1' selected> Push Buttons </option> </select>&nbsp;<input type='submit' value='Submit'>";
   } else {
-  webpage +="<option value='0'>Rotary Encoder </option> <option value='1' selected > Push Buttons </option>";
+    webpage +="<select name='InputMethod'> <option value='0' selected> Rotary Encoder </option> <option value='1'> Push Buttons </option> </select>&nbsp;<input type='submit' value='Submit'>";
   }
-  webpage +="</select>&nbsp;<input type='submit' value='Submit'>";
   webpage +="</form>";
   /* Change sensor */
   webpage +="<p><b>Change Sensor</b></p>";
@@ -909,6 +854,21 @@ void handleWebServerClient(void) {
   webpage +="<option value='0'>DHT22 </option> <option value='1' selected > BME280 </option>";
   }
   webpage +="</select>&nbsp;<input type='submit' value='Submit'>";
+  webpage +="</form>";
+
+  webpage +="<p><b>Change Display Brightness ( 0 .. 255)</b></p>";
+  webpage +="<form method='POST' autocomplete='off'>";
+  webpage +="<input type='number' name='dispBrightn' min='1' max='255' value="+ String(myConfig.dispBrightn) + ">&nbsp;<input type='submit' value='Submit'>";
+  webpage +="</form>";
+
+  webpage +="<p><b>Change Sensor Calibration Offset (-50 .. 50 | Resolution 0.1 deg Celsius)</b></p>";
+  webpage +="<form method='POST' autocomplete='off'>";
+  webpage +="<input type='number' name='calibO' min='-50' max='+50' value="+ String(myConfig.calibO) + ">&nbsp;<input type='submit' value='Submit'>";
+  webpage +="</form>";
+
+  webpage +="<p><b>Change Sensor Calibration Factor (1 .. 200 %)</b></p>";
+  webpage +="<form method='POST' autocomplete='off'>";
+  webpage +="<input type='number' name='calibF' min='1' max='200' value="+ String(myConfig.calibF) + ">&nbsp;<input type='submit' value='Submit'>";
   webpage +="</form>";
   /* Restart Device */
   webpage +="<p><b>Restart Device</b></p>";
@@ -981,6 +941,45 @@ void handleWebServerClient(void) {
           #endif
         }
       }
+      if (webServer.argName(i) == "dispBrightn") {  /* check for dedicated arguments */
+        if (webServer.arg(i).toInt() != myConfig.dispBrightn) {
+          #ifdef CFG_DEBUG
+          Serial.println("Request SPIFFS write.");
+          #endif
+          myConfig.dispBrightn = uint8_t(webServer.arg(i).toInt());
+          requestSaveToSpiffsWithRestart = true;
+        } else {
+          #ifdef CFG_DEBUG
+          Serial.println("Configuration unchanged, do nothing");
+          #endif
+        }
+      }
+      if (webServer.argName(i) == "calibF") {  /* check for dedicated arguments */
+        if (webServer.arg(i).toInt() != myConfig.calibF) {
+          #ifdef CFG_DEBUG
+          Serial.println("Request SPIFFS write.");
+          #endif
+          myConfig.calibF = int16_t(webServer.arg(i).toInt());
+          requestSaveToSpiffs = true;
+        } else {
+          #ifdef CFG_DEBUG
+          Serial.println("Configuration unchanged, do nothing");
+          #endif
+        }
+      }
+      if (webServer.argName(i) == "calibO") {  /* check for dedicated arguments */
+        if (webServer.arg(i).toInt() != myConfig.calibO) {
+          #ifdef CFG_DEBUG
+          Serial.println("Request SPIFFS write.");
+          #endif
+          myConfig.calibO = int16_t(webServer.arg(i).toInt());
+          requestSaveToSpiffs = true;
+        } else {
+          #ifdef CFG_DEBUG
+          Serial.println("Configuration unchanged, do nothing");
+          #endif
+        }
+      }
     }
   }
 }
@@ -991,17 +990,7 @@ void handleHttpReset(void) {
 }
 
 /* MQTT callback if a message was received */
-#if CFG_MQTT_LIB == cArduinoMQTT
 void messageReceived(String &topic, String &payload) { //NOLINT
-#else
-void messageReceived(char* c_topic, byte* data, unsigned int data_len) {
-  char dataBuf[data_len+1];  // NOLINT: no need to allocate more buffer than necessary
-  memcpy(dataBuf, data, data_len);
-  dataBuf[sizeof(dataBuf)-1] = 0;
-  String payload = String(dataBuf);
-  String topic = String(c_topic);
-#endif
-
   #ifdef CFG_DEBUG
   Serial.println("received: " + topic + " : " + payload);
   #endif
