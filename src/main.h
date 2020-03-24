@@ -77,13 +77,16 @@ void upButton(void);
 void downButton(void);
 void updateEncoder(void);
 
-/* MACRO to append another line of the webpage table */
-#define webpageTableAppend(key, value) (webpage +="<tr><td>" + key + ":</td><td>"+ value + "</td></tr>");
+/* MACRO to append another line of the webpage table (2 columns) */
+#define webpageTableAppend2Cols(key, value) (webpage +="<tr><td>" + key + ":</td><td>"+ value + "</td></tr>");
+/* MACRO to append another line of the webpage table (4 columns) */
+#define webpageTableAppend4Cols(key, value, current_value, description) (webpage +="<tr><td>" + key + "</td><td>"+ value + "</td><td>"+ current_value + "</td><td>" + description +"</td></tr>");
 
 /*===================================================================================================================*/
 /* global scope functions */
 /*===================================================================================================================*/
 void homeAssistantDiscovery(void);
+void homeAssistantUndiscover(void);
 void mqttPubState(void);
 void loadConfiguration(configuration &config);  // NOLINT: pass by reference
 bool saveConfiguration(const configuration &config);
@@ -103,4 +106,5 @@ void SetNextTimeInterval(uint32_t& timer, const uint32_t step);  // NOLINT: pass
 bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor);
 char* millisFormatted(void);
 String wifiStatusToString(wl_status_t status);
+bool splitHtmlCommand(String sInput, String *key, String *value);
 #endif  // MAIN_H_

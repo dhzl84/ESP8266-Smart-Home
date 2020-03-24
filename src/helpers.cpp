@@ -143,40 +143,22 @@ String wifiStatusToString(wl_status_t status) {
   return ret;
 }
 
-String comfortStateToString(ComfortState state) {
-  String ret;
+bool splitHtmlCommand(String sInput, String *key, String *value) {
+  bool ret = false;
+  String delimiter = ":";
+  size_t pos = 0;
 
-  switch (state) {
-    case Comfort_OK:
-      ret = "OK";
-      break;
-    case Comfort_TooHot:
-      ret = "TooHot";
-      break;
-    case Comfort_TooCold:
-      ret = "TooCold";
-      break;
-    case Comfort_TooDry:
-      ret = "TooDry";
-      break;
-    case Comfort_TooHumid:
-      ret = "TooHumid";
-      break;
-    case Comfort_HotAndHumid:
-      ret = "HotAndHumid";
-      break;
-    case Comfort_HotAndDry:
-      ret = "HotAndDry";
-      break;
-    case Comfort_ColdAndHumid:
-      ret = "ColdAndHumid";
-      break;
-    case Comfort_ColdAndDry:
-      ret = "ColdAndDry";
-      break;
-    default:
-      ret = "Unknown";
-      break;
+  pos = (sInput.indexOf(delimiter));
+
+  /* don't accept empty substring or strings without delimiter */
+  if ((pos > 0) && (pos < UINT32_MAX)) {
+    ret = true;
+    *key = (sInput.substring(0, pos));
+    *value = (sInput.substring(pos+1));
+  } else {
+    #ifdef CFG_DEBUG
+    Serial.println("Malformed HTML Command string");
+    #endif
   }
   return ret;
 }
