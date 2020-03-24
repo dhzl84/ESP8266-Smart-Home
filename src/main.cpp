@@ -457,7 +457,8 @@ void HANDLE_SYSTEM_STATE(void) {
 }
 
 void SENSOR_MAIN() {
-  float sensTemp(NAN), sensHumid(NAN), sensPres(NAN);
+  float sensTemp(NAN), sensHumid(NAN);
+  float sensPres(NAN);  /* TODO: implement pressure from BME280 */
 
   /* schedule routine for sensor read */
   if (TimeReached(readSensorScheduled)) {

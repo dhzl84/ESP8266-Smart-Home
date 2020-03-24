@@ -8,37 +8,39 @@
 // <object_id>: The ID of the device. This is only to allow for separate topics for each device and is not used for the entity_id.
 
 
-mqttHelper::mqttHelper()  {}
+mqttHelper::mqttHelper()  {
+  mqttTriggerDiscovery        = false;
+  mqttTriggerUndiscover       = false;
+  mqttPrefix                  = "homeassistant/";
+  mqttObjectId                = "/thermostat";
+  mqttcompDevice              = "climate/";
+  mqttCompBinarySensor        = "binary_sensor/";
+  mqttCompSensor              = "sensor/";
+  mqttCompSwitch              = "switch/";
+  mqttDeviceName              = "unknown";
+  mqttUpdateFirmware          = "/updateFirmware";
+  mqttChangeName              = "/changeName";
+  mqttSystemRestartRequest    = "/systemRestartRequest";
+  mqttChangeSensorCalib       = "/changeSensorCalib";
+  mqttTargetTempCmd           = "/targetTempCmd";
+  mqttThermostatModeCmd       = "/thermostatModeCmd";
+  mqttChangeHysteresis        = "/changeHysteresis";
+  mqttUpdateFirmwareAccepted  = "/updateFirmwareAccepted";
+  mqttWill                    = "/availability";
+  mqttHassDiscoveryTopic      = "/config";
+  mqttData                    = "/state";
+  mqttNodeId                  = "tbd";            // to be set by SPIFFS_INIT before mqttHelper setup
+  mqttGeneralBaseTopic        = "tbd";            // to be set by buildBaseTopic() after mqttNodeId is defined
+}
 mqttHelper::~mqttHelper() {}
 
 void mqttHelper::setup() {
-  mqttTriggerDiscovery    = false;
-  mqttPrefix              = "homeassistant/";
-  mqttNodeId              = String(ESP.getChipId(), HEX);                     // to be set by SPIFFS_INIT before mqttHelper setup
-  mqttObjectId            = "/thermostat";
-  mqttcompDevice          = "climate/";
-  mqttCompBinarySensor    = "binary_sensor/";
-  mqttCompSensor          = "sensor/";
-  mqttCompSwitch          = "switch/";
-  mqttDeviceName          = "unknown";
-  buildTopics();
+  mqttNodeId              = String(ESP.getChipId(), HEX);
+  buildBaseTopic();
 }
 
-void mqttHelper::buildTopics(void) {
+void mqttHelper::buildBaseTopic(void) {
   mqttGeneralBaseTopic =        mqttPrefix + mqttcompDevice + mqttNodeId + mqttObjectId;  // used for all topics except discovery of the non climate components
-// sub
-  mqttUpdateFirmware =          "/updateFirmware";
-  mqttChangeName =              "/changeName";
-  mqttSystemRestartRequest =    "/systemRestartRequest";
-  mqttChangeSensorCalib =       "/changeSensorCalib";
-  mqttTargetTempCmd =           "/targetTempCmd";
-  mqttThermostatModeCmd =       "/thermostatModeCmd";
-  mqttChangeHysteresis =        "/changeHysteresis";
-// pub
-  mqttUpdateFirmwareAccepted =  "/updateFirmwareAccepted";
-  mqttWill =                    "/availability";
-  mqttHassDiscoveryTopic =      "/config";
-  mqttData =                    "/state";
 }
 
 String mqttHelper::buildStateJSON(String name, String temp, String humid, String hysteresis, String actState, String tarTemp, String sensError, String thermoMode, String calibF, String calibO, String ip, String firmware) {

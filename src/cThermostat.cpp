@@ -1,14 +1,6 @@
 #include "cThermostat.h"
 
 Thermostat::Thermostat() {
-  Thermostat::init();
-}
-
-Thermostat::~Thermostat() {
-  /* do nothing */
-}
-
-void Thermostat::init() {
   // heating
   this->thermostatMode             = TH_HEAT;
   this->actualState                = TH_OFF;
@@ -42,6 +34,10 @@ void Thermostat::init() {
   for (int16_t i=0; i < CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE; i++) {
     this->humidValueQueue[i] = (int16_t)0;
   }
+}
+
+Thermostat::~Thermostat() {
+  /* do nothing */
 }
 
 void Thermostat::setup(uint8_t gpio, uint8_t tarTemp, int16_t calibFactor, int16_t calibOffset, int16_t tHyst, boolean mode) {
