@@ -358,6 +358,7 @@ void MQTT_CONNECT(void) {
       myMqttClient.onMessage(messageReceived);                                                        /* register callback */
       (void)myMqttClient.connect(myConfig.name, myConfig.mqttUser, myConfig.mqttPwd);
 
+      homeAssistantUndiscoverObsolete();  /* for migration from 0.13.x to later versions only */ /* DEPRECATED */
       homeAssistantDiscovery();  /* make HA discover necessary devices */
 
       myMqttClient.publish(myMqttHelper.getTopicLastWill(),             "online", true,  MQTT_QOS);   /* publish online in will topic */
@@ -767,6 +768,19 @@ void homeAssistantUndiscover(void) {
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sHum),                String(""),         true, MQTT_QOS);    // make HA forget the humidity sensor
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swRestart),           String(""),         true, MQTT_QOS);    // make HA forget the reset switch
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swUpdate),            String(""),         true, MQTT_QOS);    // make HA forget the update switch
+  homeAssistantUndiscoverObsolete();
+}
+
+/* DEPRECATED */
+void homeAssistantUndiscoverObsolete(void) {
+  /* for migration from 0.13.x to later versions only */
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(bsSensFail),    String(""),         true, MQTT_QOS);    // make HA discover the binary_sensor for sensor failure
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(bsState),       String(""),         true, MQTT_QOS);    // make HA discover the binary_sensor for thermostat state
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sIP),                 String(""),         true, MQTT_QOS);    // make HA discover the IP sensor
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sCalibF),             String(""),         true, MQTT_QOS);    // make HA discover the scaling sensor
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sCalibO),             String(""),         true, MQTT_QOS);    // make HA discover the offset sensor
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sHysteresis),         String(""),         true, MQTT_QOS);    // make HA discover the hysteresis sensor
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sFW),                 String(""),         true, MQTT_QOS);    // make HA discover the firmware version sensor
 }
 
 /* publish state topic in JSON format */

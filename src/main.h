@@ -87,6 +87,7 @@ void updateEncoder(void);
 /*===================================================================================================================*/
 void homeAssistantDiscovery(void);
 void homeAssistantUndiscover(void);
+void homeAssistantUndiscoverObsolete(void);  /* DEPRECATED */
 void mqttPubState(void);
 void loadConfiguration(configuration &config);  // NOLINT: pass by reference
 bool saveConfiguration(const configuration &config);

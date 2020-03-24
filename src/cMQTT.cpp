@@ -218,6 +218,24 @@ bool   mqttHelper::getTriggerDiscovery(void)                      { return mqttT
 void   mqttHelper::setTriggerDiscovery(bool discover)             { mqttTriggerDiscovery = discover; }
 bool   mqttHelper::getTriggerUndiscover(void)                     { return mqttTriggerUndiscover; }
 void   mqttHelper::setTriggerUndiscover(bool undiscover)          { mqttTriggerUndiscover = undiscover; }
+String mqttHelper::getTopicHassDiscoveryBinarySensor(binarySensor_t binarySensor) {
+  String topic = "void";
+
+  switch (binarySensor) {
+    case bsSensFail:
+    {
+      topic = mqttPrefix + mqttCompBinarySensor + mqttNodeId + mqttObjectId + "SensFail" + mqttHassDiscoveryTopic;
+    }
+    break;
+
+    case bsState:
+    {
+      topic = mqttPrefix + mqttCompBinarySensor + mqttNodeId + mqttObjectId + "State" + mqttHassDiscoveryTopic;
+    }
+    break;
+  }
+  return (topic);
+}
 
 String mqttHelper::getTopicHassDiscoverySensor(sensor_t sensor) {
   String topic = "void";
@@ -228,6 +246,21 @@ String mqttHelper::getTopicHassDiscoverySensor(sensor_t sensor) {
     break;
     case sHum:
       topic = mqttPrefix + mqttCompSensor + mqttNodeId + mqttObjectId + "Hum" + mqttHassDiscoveryTopic;
+    break;
+    case sIP:
+      topic = mqttPrefix + mqttCompSensor + mqttNodeId + mqttObjectId + "IP" + mqttHassDiscoveryTopic;
+    break;
+    case sCalibF:
+      topic = mqttPrefix + mqttCompSensor + mqttNodeId + mqttObjectId + "CalibF" + mqttHassDiscoveryTopic;
+    break;
+    case sCalibO:
+      topic = mqttPrefix + mqttCompSensor + mqttNodeId + mqttObjectId + "CalibO" + mqttHassDiscoveryTopic;
+    break;
+    case sFW:
+      topic = mqttPrefix + mqttCompSensor + mqttNodeId + mqttObjectId + "FW" + mqttHassDiscoveryTopic;
+    break;
+    case sHysteresis:
+      topic = mqttPrefix + mqttCompSensor + mqttNodeId + mqttObjectId + "Hysteresis" + mqttHassDiscoveryTopic;
     break;
     default:
     break;
