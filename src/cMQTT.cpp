@@ -7,31 +7,30 @@
 // <node_id> (Optional): ID of the node providing the topic.
 // <object_id>: The ID of the device. This is only to allow for separate topics for each device and is not used for the entity_id.
 
+mqttHelper::mqttHelper()
+  : mqttTriggerDiscovery(false), \
+    mqttTriggerUndiscover(false), \
+    mqttData("/state"), \
+    mqttUpdateFirmware("/updateFirmware"), \
+    mqttUpdateFirmwareAccepted("/updateFirmwareAccepted"), \
+    mqttChangeName("/changeName"), \
+    mqttWill("/availability"), \
+    mqttSystemRestartRequest("/systemRestartRequest"), \
+    mqttPrefix("homeassistant/"), \
+    mqttNodeId("tbd"), \
+    mqttDeviceName("unknown"), \
+    mqttcompDevice("climate/"), \
+    mqttCompSensor("sensor/"), \
+    mqttCompSwitch("switch/"), \
+    mqttCompBinarySensor("binary_sensor/"), \
+    mqttObjectId("/thermostat"), \
+    mqttGeneralBaseTopic("tbd"), \
+    mqttHassDiscoveryTopic("/config"), \
+    mqttChangeSensorCalib("/changeSensorCalib"), \
+    mqttChangeHysteresis("/changeHysteresis"), \
+    mqttThermostatModeCmd("/thermostatModeCmd"), \
+    mqttTargetTempCmd("/targetTempCmd") {}
 
-mqttHelper::mqttHelper()  {
-  mqttTriggerDiscovery        = false;
-  mqttTriggerUndiscover       = false;
-  mqttPrefix                  = "homeassistant/";
-  mqttObjectId                = "/thermostat";
-  mqttcompDevice              = "climate/";
-  mqttCompBinarySensor        = "binary_sensor/";
-  mqttCompSensor              = "sensor/";
-  mqttCompSwitch              = "switch/";
-  mqttDeviceName              = "unknown";
-  mqttUpdateFirmware          = "/updateFirmware";
-  mqttChangeName              = "/changeName";
-  mqttSystemRestartRequest    = "/systemRestartRequest";
-  mqttChangeSensorCalib       = "/changeSensorCalib";
-  mqttTargetTempCmd           = "/targetTempCmd";
-  mqttThermostatModeCmd       = "/thermostatModeCmd";
-  mqttChangeHysteresis        = "/changeHysteresis";
-  mqttUpdateFirmwareAccepted  = "/updateFirmwareAccepted";
-  mqttWill                    = "/availability";
-  mqttHassDiscoveryTopic      = "/config";
-  mqttData                    = "/state";
-  mqttNodeId                  = "tbd";            // to be set by SPIFFS_INIT before mqttHelper setup
-  mqttGeneralBaseTopic        = "tbd";            // to be set by buildBaseTopic() after mqttNodeId is defined
-}
 mqttHelper::~mqttHelper() {}
 
 void mqttHelper::setup() {
@@ -161,7 +160,6 @@ String mqttHelper::buildHassDiscoverySwitch(String name, switch_t switches) {
       "  \"~\":\"" + mqttGeneralBaseTopic + "\",\n" \
       "  \"name\":\"Neustart " + name + "\",\n" \
       "  \"cmd_t\":\"~" + mqttSystemRestartRequest + "\",\n" \
-      "  \"stat_t\":\"~" + mqttSystemRestartResponse + "\",\n" \
       "  \"pl_on\":\"true\",\n" \
       "  \"pl_off\":\"false\",\n" \
       "  \"avty_t\":\"~" + mqttWill + "\",\n" \

@@ -68,7 +68,6 @@ class mqttHelper {
   String mqttChangeName;
   String mqttWill;
   String mqttSystemRestartRequest;
-  String mqttSystemRestartResponse;
   String mqttPrefix;
   String mqttNodeId;
   String mqttDeviceName;
