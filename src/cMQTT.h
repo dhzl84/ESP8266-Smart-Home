@@ -10,14 +10,15 @@
 typedef enum {
   sTemp,
   sHum,
-  sIP,
-  sCalibF,
-  sCalibO,
-  sFW,
-  sHysteresis,
-  sState
+  sIP,  /* DEPRECATED */
+  sCalibF,  /* DEPRECATED */
+  sCalibO,  /* DEPRECATED */
+  sFW,  /* DEPRECATED */
+  sHysteresis,  /* DEPRECATED */
+  sState  /* DEPRECATED */
 }sensor_t;
 
+/* DEPRECATED */
 typedef enum {
   bsSensFail,
   bsState
@@ -32,10 +33,12 @@ class mqttHelper {
  public:
   mqttHelper(void);
   ~mqttHelper(void);
-    void   setup(void);
-  void   buildTopics(void);
+  void   setup(void);
+  void   buildBaseTopic(void);
   void   setTriggerDiscovery(bool discover);
   bool   getTriggerDiscovery(void);
+  void   setTriggerUndiscover(bool undiscover);
+  bool   getTriggerUndiscover(void);
   String getTopicUpdateFirmware(void);
   String getTopicUpdateFirmwareAccepted(void);
   String getTopicChangeName(void);
@@ -58,13 +61,13 @@ class mqttHelper {
 
  private:
   bool   mqttTriggerDiscovery;
+  bool   mqttTriggerUndiscover;
   String mqttData;
   String mqttUpdateFirmware;
   String mqttUpdateFirmwareAccepted;
   String mqttChangeName;
   String mqttWill;
   String mqttSystemRestartRequest;
-  String mqttSystemRestartResponse;
   String mqttPrefix;
   String mqttNodeId;
   String mqttDeviceName;
