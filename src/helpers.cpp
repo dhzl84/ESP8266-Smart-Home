@@ -89,8 +89,8 @@ bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor)
   return ret;
 }
 
-char* millisFormatted(void) {
-  static char ret_str[16];
+String millisFormatted(void) {
+  char char_buffer[16];
   uint32_t t = millis()/1000;
 
   uint32_t d = t / 86400;
@@ -100,12 +100,12 @@ char* millisFormatted(void) {
   uint16_t m = t / 60;
   uint16_t s = t % 60;
 
-  snprintf(ret_str, sizeof(ret_str), "%uT %02u:%02u:%02u", d, h, m, s);
+  snprintf(char_buffer, sizeof(char_buffer), "%uT %02u:%02u:%02u", d, h, m, s);
   #ifdef CFG_DEBUG
-  Serial.println(ret_str);
+  Serial.println(char_buffer);
   #endif  // CFG_DEBUG
 
-  return ret_str;
+  return String(char_buffer);
 }
 
 String wifiStatusToString(wl_status_t status) {

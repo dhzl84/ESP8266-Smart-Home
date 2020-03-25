@@ -461,16 +461,18 @@ void SENSOR_MAIN() {
   if (TimeReached(readSensorScheduled)) {
     SetNextTimeInterval(readSensorScheduled, (myConfig.sensUpdInterval * secondsToMillisecondsFactor));
 
-    float sensTemp(NAN), sensHumid(NAN), sensPres(NAN);  /* TODO: implement pressure from BME280 */
+    float sensTemp(NAN), sensHumid(NAN);
 
     if (myConfig.sensor == cDHT22) {
       sensHumid = myDHT22.getHumidity();
       sensTemp  = myDHT22.getTemperature();
-    } else {  /* BME280 */
+    } else if (myConfig.sensor == cBME280) {  /* BME280 */
       BME280::TempUnit tempUnit(BME280::TempUnit_Celsius);
       BME280::PresUnit presUnit(BME280::PresUnit_hPa);
-
+      float sensPres(NAN);  /* TODO: implement pressure from BME280 */
       myBME280.read(sensPres, sensTemp, sensHumid, tempUnit, presUnit);
+    } else {
+      /* TODO: Houston we have a problem! */
     }
 
     /* Check if any reads failed */
@@ -833,7 +835,7 @@ void handleWebServerClient(void) {
   webpageTableAppend2Cols(String("FW version"),        String(FW));
   webpageTableAppend2Cols(String("Arduino Core"),      ESP.getCoreVersion());
   webpageTableAppend2Cols(String("Reset Reason"),      ESP.getResetReason());
-  webpageTableAppend2Cols(String("Time since Reset"),  String(millisFormatted()));
+  webpageTableAppend2Cols(String("Time since Reset"),  millisFormatted());
   webpageTableAppend2Cols(String("Flash Size"),        String(ESP.getFlashChipRealSize()));
   webpageTableAppend2Cols(String("Sketch Size"),       String(ESP.getSketchSize()));
   webpageTableAppend2Cols(String("Free for Sketch"),   String(ESP.getFreeSketchSpace()));
