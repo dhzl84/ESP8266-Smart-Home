@@ -35,8 +35,7 @@ Thermostat::Thermostat()
     tempValueQueueFilled(false), \
     humidValueQueueFilled(false), \
     tempValueSampleID(0), \
-    humidValueSampleID(0)
-{
+    humidValueSampleID(0) {
   for (int16_t i=0; i < CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE; i++) {
     tempValueQueue[i] = (int16_t)0;
   }
