@@ -457,12 +457,11 @@ void HANDLE_SYSTEM_STATE(void) {
 }
 
 void SENSOR_MAIN() {
-  float sensTemp(NAN), sensHumid(NAN);
-  float sensPres(NAN);  /* TODO: implement pressure from BME280 */
-
   /* schedule routine for sensor read */
   if (TimeReached(readSensorScheduled)) {
     SetNextTimeInterval(readSensorScheduled, (myConfig.sensUpdInterval * secondsToMillisecondsFactor));
+
+    float sensTemp(NAN), sensHumid(NAN), sensPres(NAN);  /* TODO: implement pressure from BME280 */
 
     if (myConfig.sensor == cDHT22) {
       sensHumid = myDHT22.getHumidity();
