@@ -3,9 +3,9 @@
 
 # ESP8266 Smart Home Playground
 
-This is my ESP8266 smart home playground for:  
+**This is my ESP8266 smart home playground for self made floor heating sens and control units.**
 
-* Self made floor heating sens and control units
+:warning: This project partly uses 230 V so be careful and hands off if you don't know what you are doing.
 
 Basic building blocks and technologies:
 
@@ -53,9 +53,6 @@ My *config.h* for building a thermostat SW contains the following information:
 #define LOCAL_MQTT_USER        "xxx"
 #define LOCAL_MQTT_PWD         "xxx"
 #define DEVICE_BINARY          "http://<domain or ip>/<name>.bin"
-#define SENSOR_UPDATE_INTERVAL 20      /* seconds */
-#define THERMOSTAT_HYSTERESIS  2       /* 0.2 °C */
-#define WIFI_RECONNECT_TIME    30      /* seconds */
 ```
 
 For Travis CI compatibility there is the *config.sh* script which generates the above mentioned dummy code.
@@ -83,18 +80,28 @@ So I thought about buying them but they were either expensive as hell or just di
 ### 3.3 Assembly parts
 
 * ESP8266-07
-* DHT22 temeperture and humidity sensor
+* Sensors: (alternatives)
+  * DHT22 Temperature / Humidity
+  * BME 280 Temperature / Humidity / Pressure
 * 0,96" OLED display
 * SRD-05VDC-SL-C 230V 10A relay
 * IRM-03-5 230V AC to 5V DC print module
-* 3,3 V DC voltage reulator
-* rotary encoder with push button or just push buttons
+* 3,3 V DC voltage regulator
+* Local Control via: (alternatives)
+  * rotary encoder with push button
+  * three push buttons
 * wires, resistors, capacitors, diodes, transistor, optocoupler, circuit board, etc
 
-### 3.4 Wiring
+### 3.4 Schematic
 
-![image](https://user-images.githubusercontent.com/5675570/35767892-47fde138-08f4-11e8-863e-870828831ac0.png)
+The schemnatic shows the wiring for all variants. The sensors DHT22 and BME280 are meant to be alternatives. Same applies to the Rotary Encoder and the Push Buttons for local control.
 
-### 3.5 Picture
+![image](https://user-images.githubusercontent.com/5675570/77818501-36eaf680-70d3-11ea-9c11-1c7bbd2b8cc5.png)
+
+### 3.5 3D Printed Parts
+
+will be added soon
+
+### 3.6 Picture
 
 ![image](https://user-images.githubusercontent.com/5675570/50345529-b7659380-052f-11e9-8c72-13e437296978.jpg)

@@ -1,9 +1,6 @@
 /*===================================================================================================================*/
 /* includes */
 /*===================================================================================================================*/
-#include <ESP8266WebServer.h>
-#include <ESP8266mDNS.h>
-#include <ESP8266httpUpdate.h>
 #include <ArduinoOTA.h>
 
 #include <DHTesp.h>
@@ -12,28 +9,20 @@
 #include <BME280I2C.h>
 #include "UserFonts.h"
 #include <SSD1306.h>
-
 #include "main.h"
-
 #include "cMQTT.h"
 #include "cThermostat.h"
-
-#include <DHTesp.h>
-#include "UserFonts.h"
-#include <SSD1306.h>
 #include "MQTTClient.h"
+#include <Bounce2.h>
 
 /*===================================================================================================================*/
 /* GPIO config */
 /*===================================================================================================================*/
+#if CFG_BOARD_ESP8266
 ADC_MODE(ADC_VCC);             /* measure Vcc */
-#define DHT_PIN              2 /* sensor */
-#define SDA_PIN              4 /* I²C */
-#define SCL_PIN              5 /* I²C */
-#define PHYS_INPUT_1_PIN    12 /* rotary left/right OR down/up */
-#define PHYS_INPUT_2_PIN    13 /* rotary left/right OR down/up */
-#define PHYS_INPUT_3_PIN    14 /* on/off/ok/reset */
-#define RELAY_PIN           16 /* relay control */
+#elif CFG_BOARD_ESP32
+#else
+#endif
 
 /*===================================================================================================================*/
 /* variables, constants, types, classes, etc. definitions */
@@ -71,17 +60,14 @@ typedef enum otaUpdate {
 } OtaUpdate_t; /* global variable used to change display in case OTA update is initiated */
 OtaUpdate_t OTA_UPDATE = TH_OTA_IDLE;
 
-/* 3 PushButtons */
-uint32_t upButtonDebounceTime = 0;
-uint32_t downButtonDebounceTime = 0;
-/* rotary encoder */
-uint32_t onOffButtonDebounceTime = 0;
+/* for critical section lock during interrupt */
+
 #define rotLeft -1
 #define rotRight 1
 #define rotInit  0
 volatile int16_t lastEncoded = 0b11;                   /* initial state of the rotary encoders gray code */
 volatile int16_t rotaryEncoderDirectionInts = rotInit; /* initialize rotary encoder with no direction */
-uint32_t buttonDebounceInterval = 500;
+const uint32_t buttonDebounceInterval = 25;
 uint32_t onOffButtonSystemResetTime = 0;
 uint32_t onOffButtonSystemResetInterval = 5000;
 
@@ -114,20 +100,31 @@ SSD1306           myDisplay(0x3c, SDA_PIN, SCL_PIN);
 Thermostat        myThermostat;
 WiFiClient        myWiFiClient;
 mqttHelper        myMqttHelper;
+#if CFG_BOARD_ESP8266
 ESP8266WebServer  webServer(80);
+ESP8266HTTPUpdate myHttpUpdate;
+#elif CFG_BOARD_ESP32
+WebServer         webServer(80);
+HTTPUpdate        myHttpUpdate;
+#else
+#endif
 MQTTClient        myMqttClient(2048); /* 2048 byte buffer */
+Bounce debounceOnOff = Bounce();
+Bounce debounceUp = Bounce();
+Bounce debounceDown = Bounce();
 
 
 bool     systemRestartRequest = false;
 bool     requestSaveToSpiffs = false;
 bool     requestSaveToSpiffsWithRestart = false;
 uint32_t wifiReconnectTimer = 30000;
+#define WIFI_RECONNECT_TIME 30
 
 #define  SPIFFS_MQTT_ID_FILE        String("/itsme")       // for migration only
 #define  SPIFFS_SENSOR_CALIB_FILE   String("/sensor")      // for migration only
 #define  SPIFFS_TARGET_TEMP_FILE    String("/targetTemp")  // for migration only
 #define  SPIFFS_WRITE_DEBOUNCE      20000 /* write target temperature to spiffs if it wasn't changed for 20 s (time in ms) */
-boolean  SPIFFS_WRITTEN =           true;
+bool     SPIFFS_WRITTEN =           true;
 uint32_t SPIFFS_REFERENCE_TIME;
 
 /*===================================================================================================================*/
@@ -138,9 +135,9 @@ void setup() {
   Serial.begin(115200);
   Serial.println("Serial connection established");
   #endif
-  Wire.begin();   /* needed for I²C communication with display and BME280 */
-  SPIFFS_INIT();                                                                                   /* read stuff from SPIFFS */
-  GPIO_CONFIG();                                                                                   /* configure GPIOs */
+  Wire.begin(SDA_PIN, SCL_PIN);   /* needed for I²C communication with display and BME280 */
+  SPIFFS_INIT();                  /* read stuff from SPIFFS */
+  GPIO_CONFIG();                  /* configure GPIOs */
 
   myThermostat.setup(RELAY_PIN, myConfig.tTemp, myConfig.calibF, myConfig.calibO, myConfig.tHyst, myConfig.mode); /* GPIO to switch the connected relay, initial target temperature, sensor calbigration, thermostat hysteresis and last mode */
 
@@ -154,6 +151,7 @@ void setup() {
     }
   } else if (myConfig.sensor == cDHT22) {
       myDHT22.setup(DHT_PIN, DHTesp::DHT22); /* init DHT sensor */
+      Serial.println("DHT22 init: " + String(myDHT22.getStatusString()));
   } else {
       #ifdef CFG_DEBUG
       Serial.println("Sensor misconfiguration!");
@@ -163,7 +161,8 @@ void setup() {
   DISPLAY_INIT();                                                                                  /* init Display */
   WIFI_CONNECT();                                                                                  /* connect to WiFi */
   OTA_INIT();
-  myMqttHelper.setup();                                                       /* build MQTT topics based on the defined device name */
+
+  myMqttHelper.setup(getEspChipId());        /* build MQTT topics based on the defined device name */
   MQTT_CONNECT(); /* connect to MQTT host and build subscriptions, must be called after SPIFFS_INIT()*/
 
   MDNS.begin(myConfig.name);
@@ -172,27 +171,38 @@ void setup() {
   webServer.on("/", handleWebServerClient);
   webServer.on("/restart", handleHttpReset);
 
+/* button debounce */
+  debounceOnOff.attach(PHYS_INPUT_3_PIN);
+  debounceOnOff.interval(buttonDebounceInterval);
 
   if (myConfig.inputMethod == cPUSH_BUTTONS) {
-  attachInterrupt(PHYS_INPUT_1_PIN, upButton,   FALLING);
-  attachInterrupt(PHYS_INPUT_2_PIN, downButton, FALLING);
-  attachInterrupt(PHYS_INPUT_3_PIN, onOffButton, FALLING);
+    debounceUp.attach(PHYS_INPUT_1_PIN);
+    debounceUp.interval(buttonDebounceInterval);
+    debounceDown.attach(PHYS_INPUT_2_PIN);
+    debounceDown.interval(buttonDebounceInterval);
   } else {
   /* enable interrupts on encoder pins to decode gray code and recognize switch event*/
-  attachInterrupt(PHYS_INPUT_1_PIN, updateEncoder, CHANGE);
-  attachInterrupt(PHYS_INPUT_2_PIN, updateEncoder, CHANGE);
-  attachInterrupt(PHYS_INPUT_3_PIN, onOffButton,   FALLING);
+    attachInterrupt(PHYS_INPUT_1_PIN, updateEncoder, CHANGE);
+    attachInterrupt(PHYS_INPUT_2_PIN, updateEncoder, CHANGE);
   }
 
   SENSOR_MAIN(); /* acquire first sensor data before staring loop() to avoid relay toggle due to current temperature being 0 °C (init value) until first sensor value is read */
 
   #ifdef CFG_DEBUG
+  #if CFG_BOARD_ESP8266
+  Serial.println("Vcc: " + String(ESP.getVcc() / 1000.0));
   Serial.println("Reset Reason: " + String(ESP.getResetReason()));
   Serial.println("Flash Size: " + String(ESP.getFlashChipRealSize()));
+  #elif CFG_BOARD_ESP32
+  Serial.println("CPU Frequency: " + String(ESP.getCpuFreqMHz()));
+  Serial.println("CPU 0 reset reason: " + getEspResetReason(rtc_get_reset_reason(0)));
+  Serial.println("CPU 1 reset reason: " + getEspResetReason(rtc_get_reset_reason(1)));
+  #else
+  #endif
+
   Serial.println("Sketch Size: " + String(ESP.getSketchSize()));
   Serial.println("Free for Sketch: " + String(ESP.getFreeSketchSpace()));
   Serial.println("Free Heap: " + String(ESP.getFreeHeap()));
-  Serial.println("Vcc: " + String(ESP.getVcc() / 1000.0));
   #endif
 }
 
@@ -241,13 +251,18 @@ void SPIFFS_INIT(void) {  // initializes the SPIFFS when first used and loads th
   #endif
 
   #ifdef CFG_DEBUG
+  #if CFG_BOARD_ESP8266
   Dir dir = SPIFFS.openDir("/");
   while (dir.next()) {
     Serial.print("SPIFFS file found: " + dir.fileName() + " - Size in byte: ");
     File f = dir.openFile("r");
     Serial.println(f.size());
   }
+  #elif CFG_BOARD_ESP32
+  listDir(SPIFFS, "/", 0);
+  #else
   #endif
+  #endif  /* CFG_DEBUG */
 
   loadConfiguration(myConfig);  // load config
 
@@ -260,6 +275,7 @@ void GPIO_CONFIG(void) {  /* initialize encoder / push button pins */
   pinMode(PHYS_INPUT_1_PIN, INPUT_PULLUP);
   pinMode(PHYS_INPUT_2_PIN, INPUT_PULLUP);
   pinMode(PHYS_INPUT_3_PIN, INPUT_PULLUP);
+  pinMode(RELAY_PIN, OUTPUT);
 }
 
 void DISPLAY_INIT(void) {
@@ -286,8 +302,12 @@ void WIFI_CONNECT(void) {
     #endif
 
     WiFi.mode(WIFI_STA);
+    #if CFG_BOARD_ESP8266
     WiFi.setSleepMode(WIFI_NONE_SLEEP);
     WiFi.hostname(myConfig.name);
+    #elif CFG_BOARD_ESP32
+    WiFi.setHostname(myConfig.name);
+    #endif
     WiFi.begin(myConfig.ssid, myConfig.wifiPwd);
 
     /* try to connect to WiFi, proceed offline if not connecting here*/
@@ -299,7 +319,7 @@ void WIFI_CONNECT(void) {
   }
 
   #ifdef CFG_DEBUG
-  Serial.println("WiFi Status: "+ String(WiFi.status()));
+  Serial.println("WiFi Status: "+ wifiStatusToString(WiFi.status()));
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
   #endif
@@ -307,7 +327,7 @@ void WIFI_CONNECT(void) {
 
 void OTA_INIT(void) {
   ArduinoOTA.setHostname(myConfig.name);
-
+  ArduinoOTA.setPort(8266);
   ArduinoOTA.onStart([]() {
     myMqttClient.disconnect();
     OTA_UPDATE = TH_OTA_ACTIVE;
@@ -359,7 +379,9 @@ void MQTT_CONNECT(void) {
       (void)myMqttClient.connect(myConfig.name, myConfig.mqttUser, myConfig.mqttPwd);
 
       homeAssistantUndiscoverObsolete();  /* for migration from 0.13.x to later versions only */ /* DEPRECATED */
-      homeAssistantDiscovery();  /* make HA discover necessary devices */
+      if (myConfig.discovery == true) {
+        homeAssistantDiscovery();  /* make HA discover necessary devices */
+      }
 
       myMqttClient.publish(myMqttHelper.getTopicLastWill(),             "online", true,  MQTT_QOS);   /* publish online in will topic */
       myMqttClient.publish(myMqttHelper.getTopicSystemRestartRequest(), "0",      false, MQTT_QOS);   /* publish restart = false on connect */
@@ -381,12 +403,12 @@ void MQTT_CONNECT(void) {
 void loop() {
   /* call every 50 ms */
   if (TimeReached(loop50msMillis)) {
-    SetNextTimeInterval(loop50msMillis, loop50ms);
+    SetNextTimeInterval(&loop50msMillis, loop50ms);
     /* nothing yet */
   }
   /* call every 100 ms */
   if (TimeReached(loop100msMillis)) {
-    SetNextTimeInterval(loop100msMillis, loop100ms);
+    SetNextTimeInterval(&loop100msMillis, loop100ms);
     HANDLE_SYSTEM_STATE();   /* handle connectivity and trigger reconnects */
     myThermostat.loop();     /* control relay for heating */
     DRAW_DISPLAY_MAIN();     /* draw display each loop */
@@ -394,15 +416,31 @@ void loop() {
   }
   /* call every 500 ms */
   if (TimeReached(loop500msMillis)) {
-    SetNextTimeInterval(loop500msMillis, loop500ms);
+    SetNextTimeInterval(&loop500msMillis, loop500ms);
     /* nothing yet */
   }
   /* call every second */
   if (TimeReached(loop1000msMillis)) {
-    SetNextTimeInterval(loop1000msMillis, loop1000ms);
+    SetNextTimeInterval(&loop1000msMillis, loop1000ms);
     SENSOR_MAIN();          /* get sensor data */
     SPIFFS_MAIN();          /* check for new data and write SPIFFS is necessary */
     HANDLE_HTTP_UPDATE();   /* pull update from server if it was requested via MQTT*/
+  }
+
+  /* debounce buttons */
+  debounceOnOff.update();
+  if (myConfig.inputMethod == cPUSH_BUTTONS) {
+    debounceUp.update();
+    debounceDown.update();
+  }
+  if (debounceOnOff.fell()) {
+    myThermostat.toggleThermostatMode();
+  }
+  if (debounceUp.fell()) {
+    myThermostat.increaseTargetTemperature(tempStep);
+  }
+  if (debounceDown.fell()) {
+    myThermostat.decreaseTargetTemperature(tempStep);
   }
 
   webServer.handleClient();
@@ -417,7 +455,7 @@ void loop() {
 void HANDLE_SYSTEM_STATE(void) {
   /* check WiFi connection every 30 seconds*/
   if (TimeReached(wifiReconnectTimer)) {
-    SetNextTimeInterval(wifiReconnectTimer, (WIFI_RECONNECT_TIME * secondsToMillisecondsFactor));
+    SetNextTimeInterval(&wifiReconnectTimer, (WIFI_RECONNECT_TIME * secondsToMillisecondsFactor));
     if (WiFi.status() != WL_CONNECTED) {
       #ifdef CFG_DEBUG
       Serial.println("Lost WiFi; Status: "+ String(WiFi.status()));
@@ -459,7 +497,7 @@ void HANDLE_SYSTEM_STATE(void) {
 void SENSOR_MAIN() {
   /* schedule routine for sensor read */
   if (TimeReached(readSensorScheduled)) {
-    SetNextTimeInterval(readSensorScheduled, (myConfig.sensUpdInterval * secondsToMillisecondsFactor));
+    SetNextTimeInterval(&readSensorScheduled, (myConfig.sensUpdInterval * secondsToMillisecondsFactor));
 
     float sensTemp(NAN), sensHumid(NAN);
 
@@ -479,7 +517,7 @@ void SENSOR_MAIN() {
     if (isnan(sensHumid) || isnan(sensTemp)) {
       myThermostat.setLastSensorReadFailed(true);   /* set failure flag and exit SENSOR_MAIN() */
       #ifdef CFG_DEBUG
-      Serial.println("Failed to read from DHT sensor! Failure counter: " + String(myThermostat.getSensorFailureCounter()));
+      Serial.println("Failed to read from sensor! Failure counter: " + String(myThermostat.getSensorFailureCounter()));
       #endif
     } else {
       myThermostat.setLastSensorReadFailed(false);   /* set no failure during read sensor */
@@ -581,7 +619,7 @@ void DRAW_DISPLAY_MAIN(void) {
 void MQTT_MAIN(void) {
   if (myMqttClient.connected() != true) {
     if (TimeReached(mqttReconnectTime)) {  /* try reconnect to MQTT broker after mqttReconnectTime expired */
-        SetNextTimeInterval(mqttReconnectTime, mqttReconnectInterval); /* reset interval */
+        SetNextTimeInterval(&mqttReconnectTime, mqttReconnectInterval); /* reset interval */
         MQTT_CONNECT();
         mqttPubState();
     } else {
@@ -589,7 +627,7 @@ void MQTT_MAIN(void) {
     }
   } else {  /* check if there is new data to publish and shift PubCycle if data is published on event, else publish every PubCycleInterval */
     if ( TimeReached(mqttPubCycleTime) || myThermostat.getNewData() ) {
-        SetNextTimeInterval(mqttPubCycleTime, myConfig.mqttPubCycle * minutesToMillisecondsFactor);
+        SetNextTimeInterval(&mqttPubCycleTime, myConfig.mqttPubCycle * minutesToMillisecondsFactor);
         mqttPubState();
         myThermostat.resetNewData();
     }
@@ -616,12 +654,17 @@ void HANDLE_HTTP_UPDATE(void) {
     Serial.println("Remote update started");
     #endif
     WiFiClient client;
+    #if CFG_BOARD_ESP8266
     t_httpUpdate_return ret = ESPhttpUpdate.update(client, myConfig.updServer, FW);
+    #elif CFG_BOARD_ESP32
+    t_httpUpdate_return ret = myHttpUpdate.update(client, myConfig.updServer, FW);
+    #else
+    #endif
 
     switch (ret) {
     case HTTP_UPDATE_FAILED:
       #ifdef CFG_DEBUG
-      Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s \n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+      Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s \n", myHttpUpdate.getLastError(), myHttpUpdate.getLastErrorString().c_str());
       #endif
       break;
 
@@ -697,30 +740,6 @@ void SPIFFS_MAIN(void) {
 /* callback, interrupt, timer, other functions */
 /*===================================================================================================================*/
 
-void ICACHE_RAM_ATTR onOffButton(void) {
-  /* debouncing routine for encoder switch */
-  if (TimeReached(onOffButtonDebounceTime)) {
-    SetNextTimeInterval(onOffButtonDebounceTime, buttonDebounceInterval);
-    myThermostat.toggleThermostatMode();
-  }
-}
-
-/* Push Buttons */
-void ICACHE_RAM_ATTR upButton(void) {
-  /* debouncing routine for push button */
-  if (TimeReached(upButtonDebounceTime)) {
-    SetNextTimeInterval(upButtonDebounceTime, buttonDebounceInterval);
-    myThermostat.increaseTargetTemperature(tempStep);
-  }
-}
-
-void ICACHE_RAM_ATTR downButton(void) {
-  /* debouncing routine for push button */
-  if (TimeReached(downButtonDebounceTime)) {
-    SetNextTimeInterval(downButtonDebounceTime, buttonDebounceInterval);
-    myThermostat.decreaseTargetTemperature(tempStep);
-  }
-}
 /* Rotary Encoder */
 void ICACHE_RAM_ATTR updateEncoder(void) {
   int16_t MSB = digitalRead(PHYS_INPUT_1_PIN);
@@ -756,11 +775,11 @@ void ICACHE_RAM_ATTR updateEncoder(void) {
 
 /* Home Assistant discovery on connect; used to define entities in HA to communicate with*/
 void homeAssistantDiscovery(void) {
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryClimate(),                   myMqttHelper.buildHassDiscoveryClimate(String(myConfig.name), String(FW)),         true, MQTT_QOS);    // make HA discover the climate component
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sTemp),               myMqttHelper.buildHassDiscoverySensor(String(myConfig.name), sTemp),               true, MQTT_QOS);    // make HA discover the temperature sensor
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sHum),                myMqttHelper.buildHassDiscoverySensor(String(myConfig.name), sHum),                true, MQTT_QOS);    // make HA discover the humidity sensor
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swRestart),           myMqttHelper.buildHassDiscoverySwitch(String(myConfig.name), swRestart),           true, MQTT_QOS);    // make HA discover the reset switch
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swUpdate),            myMqttHelper.buildHassDiscoverySwitch(String(myConfig.name), swUpdate),            true, MQTT_QOS);    // make HA discover the update switch
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryClimate(),                   myMqttHelper.buildHassDiscoveryClimate(String(myConfig.name), String(FW), String(BOARD)),   true, MQTT_QOS);    // make HA discover the climate component
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sTemp),               myMqttHelper.buildHassDiscoverySensor(String(myConfig.name), sTemp),                        true, MQTT_QOS);    // make HA discover the temperature sensor
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(sHum),                myMqttHelper.buildHassDiscoverySensor(String(myConfig.name), sHum),                         true, MQTT_QOS);    // make HA discover the humidity sensor
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swRestart),           myMqttHelper.buildHassDiscoverySwitch(String(myConfig.name), swRestart),                    true, MQTT_QOS);    // make HA discover the reset switch
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(swUpdate),            myMqttHelper.buildHassDiscoverySwitch(String(myConfig.name), swUpdate),                     true, MQTT_QOS);    // make HA discover the update switch
 }
 
 /* Make Home Assistant forget the discovered entities in demand */
@@ -792,10 +811,10 @@ void mqttPubState(void) {
       String(intToFloat(myThermostat.getFilteredTemperature()), 1), \
       String(intToFloat(myThermostat.getFilteredHumidity()), 1), \
       String(intToFloat(myThermostat.getThermostatHysteresis()), 1), \
-      String(boolToStringOnOff(myThermostat.getActualState())), \
+      boolToStringOnOff(myThermostat.getActualState()), \
       String(intToFloat(myThermostat.getTargetTemperature()), 1), \
-      String(myThermostat.getSensorError()), \
-      String(boolToStringHeatOff(myThermostat.getThermostatMode())), \
+      sensErrorToString(myThermostat.getSensorError()), \
+      boolToStringHeatOff(myThermostat.getThermostatMode()), \
       String(myThermostat.getSensorCalibFactor()), \
       String(intToFloat(myThermostat.getSensorCalibOffset()), 0), \
       WiFi.localIP().toString(), \
@@ -829,23 +848,34 @@ void handleWebServerClient(void) {
   webpage +="<table>";
 
   /*= KEY ======================================||= VALUE ================================*/
-  webpageTableAppend2Cols(String("Name"),              String(myConfig.name));
-  webpageTableAppend2Cols(String("Chip ID"),           String(ESP.getChipId(), HEX));
-  webpageTableAppend2Cols(String("IPv4"),              IPaddress);
-  webpageTableAppend2Cols(String("FW version"),        String(FW));
-  webpageTableAppend2Cols(String("Arduino Core"),      ESP.getCoreVersion());
-  webpageTableAppend2Cols(String("Reset Reason"),      ESP.getResetReason());
-  webpageTableAppend2Cols(String("Time since Reset"),  millisFormatted());
-  webpageTableAppend2Cols(String("Flash Size"),        String(ESP.getFlashChipRealSize()));
-  webpageTableAppend2Cols(String("Sketch Size"),       String(ESP.getSketchSize()));
-  webpageTableAppend2Cols(String("Free for Sketch"),   String(ESP.getFreeSketchSpace()));
-  webpageTableAppend2Cols(String("Free Heap"),         String(ESP.getFreeHeap()));
-  webpageTableAppend2Cols(String("Vcc"),               String(ESP.getVcc()/1000.0));
-  webpageTableAppend2Cols(String("WiFi Status"),       wifiStatusToString(WiFi.status()));
-  webpageTableAppend2Cols(String("WiFi Strength"),     String(rssiInPercent, 0) + " %");
-  webpageTableAppend2Cols(String("WiFi Connects"),     String(WiFiConnectCounter));
-  webpageTableAppend2Cols(String("MQTT Status"),       String((myMqttClient.connected()) == true ? "connected" : "disconnected"));
-  webpageTableAppend2Cols(String("MQTT Connects"),     String(MQTTConnectCounter));
+  webpageTableAppend2Cols(String("Name"),                 String(myConfig.name));
+  webpageTableAppend2Cols(String("Chip ID"),              getEspChipId());
+  #if CFG_BOARD_ESP8266
+  webpageTableAppend2Cols(String("Vcc"),                  String(ESP.getVcc()/1000.0));
+  webpageTableAppend2Cols(String("Arduino Core"),         ESP.getCoreVersion());
+  webpageTableAppend2Cols(String("Reset Reason"),         ESP.getResetReason());
+  webpageTableAppend2Cols(String("Flash Size"),           String(ESP.getFlashChipRealSize()));
+  #elif CFG_BOARD_ESP32
+  webpageTableAppend2Cols(String("Reset Reason CPU 0"),   getEspResetReason(rtc_get_reset_reason(0)));
+  webpageTableAppend2Cols(String("Reset Reason CPU 1"),   getEspResetReason(rtc_get_reset_reason(1)));
+  webpageTableAppend2Cols(String("CPU Frequency"),        String(ESP.getCpuFreqMHz() + String(" MHz")));
+  webpageTableAppend2Cols(String("Flash Speed"),          String(ESP.getFlashChipSpeed()/1000000)  + String(" MHz"));
+  webpageTableAppend2Cols(String("Flash Size"),           String(ESP.getFlashChipSize()));
+  webpageTableAppend2Cols(String("Flash Mode"),           String(ESP.getFlashChipMode()));
+  webpageTableAppend2Cols(String("SDK Verison"),          String(ESP.getSdkVersion()));
+  #else
+  #endif
+  webpageTableAppend2Cols(String("Sketch Size"),          String(ESP.getSketchSize()/1024)  + String(" kB"));
+  webpageTableAppend2Cols(String("Free for Sketch"),      String(ESP.getFreeSketchSpace()/1024)  + String(" kB"));
+  webpageTableAppend2Cols(String("Free Heap"),            String(ESP.getFreeHeap()/1024)  + String(" kB"));
+  webpageTableAppend2Cols(String("Time since Reset"),     millisFormatted());
+  webpageTableAppend2Cols(String("FW version"),           String(FW));
+  webpageTableAppend2Cols(String("IPv4"),                 IPaddress);
+  webpageTableAppend2Cols(String("WiFi Status"),          wifiStatusToString(WiFi.status()));
+  webpageTableAppend2Cols(String("WiFi Strength"),        String(rssiInPercent, 0) + " %");
+  webpageTableAppend2Cols(String("WiFi Connects"),        String(WiFiConnectCounter));
+  webpageTableAppend2Cols(String("MQTT Status"),          String((myMqttClient.connected()) == true ? "connected" : "disconnected"));
+  webpageTableAppend2Cols(String("MQTT Connects"),        String(MQTTConnectCounter));
   webpage +="</table>";
   /* Change Input Method */
   webpage +="<p><b>Change Input Method</b></p>";
@@ -869,20 +899,6 @@ void handleWebServerClient(void) {
   webpage +="</select>&nbsp;<input type='submit' value='Submit'>";
   webpage +="</form>";
 
-  webpage +="<p><b>Change Display Brightness ( 0 .. 255)</b></p>";
-  webpage +="<form method='POST' autocomplete='off'>";
-  webpage +="<input type='number' name='dispBrightn' min='1' max='255' value="+ String(myConfig.dispBrightn) + ">&nbsp;<input type='submit' value='Submit'>";
-  webpage +="</form>";
-
-  webpage +="<p><b>Change Sensor Calibration Offset (-50 .. 50 | Resolution 0.1 deg Celsius)</b></p>";
-  webpage +="<form method='POST' autocomplete='off'>";
-  webpage +="<input type='number' name='calibO' min='-50' max='+50' value="+ String(myConfig.calibO) + ">&nbsp;<input type='submit' value='Submit'>";
-  webpage +="</form>";
-
-  webpage +="<p><b>Change Sensor Calibration Factor (1 .. 200 %)</b></p>";
-  webpage +="<form method='POST' autocomplete='off'>";
-  webpage +="<input type='number' name='calibF' min='1' max='200' value="+ String(myConfig.calibF) + ">&nbsp;<input type='submit' value='Submit'>";
-  webpage +="</form>";
   /* Command Line */
   webpage +="<p><b>Command Line</b></p>";
   webpage +="<form method='POST' autocomplete='off'>";
@@ -890,11 +906,14 @@ void handleWebServerClient(void) {
   webpage +="</form>";
   webpage +="<p><b>Commands</b></p>";
   webpage +="<table style='font-size: 12px'>";
-  webpageTableAppend4Cols(String("<b>Key</b>"),        String("<b>Value</b>"),                  String("<b>Current Value</b>"),             String("<b>Description</b>"));
-  webpageTableAppend4Cols(String("discover"),          String("1"),                             String("1"),                                String("Trigger discovery of entities via MQTT"));
-  webpageTableAppend4Cols(String("undiscover"),        String("1"),                             String("1"),                                String("Trigger undiscover of entities via MQTT"));
-  webpageTableAppend4Cols(String("name"),              String("string"),                        String(myConfig.name),                      String("Define a name for this device"));
-  webpageTableAppend4Cols(String("updServer"),         String("url"),                           String(myConfig.updServer),                 String("Address of the update server"));
+  webpageTableAppend4Cols(String("<b>Key</b>"),        String("<b>Value</b>"),                        String("<b>Current Value</b>"),             String("<b>Description</b>"));
+  webpageTableAppend4Cols(String("discover"),          String("0 | 1"),                               String("void"),                             String("MQTT OnDemand discovery: 1 = discover; 0 = undiscover"));
+  webpageTableAppend4Cols(String("discovery"),         String("0 | 1"),                               String(myConfig.discovery),                 String("MQTT Autodiscovery: 1 = enabled; 0 = disabled"));
+  webpageTableAppend4Cols(String("name"),              String("string"),                              String(myConfig.name),                      String("Define a name for this device"));
+  webpageTableAppend4Cols(String("updServer"),         String("url"),                                 String(myConfig.updServer),                 String("Address of the update server"));
+  webpageTableAppend4Cols(String("calibO"),            String("Range: -50 .. +50, LSB: 0.1 &deg;C"),  String(myConfig.calibO),                    String("Offset calibration for temperature sensor."));
+  webpageTableAppend4Cols(String("calibF"),            String("Range: +50 .. +200, LSB: 1 %"),        String(myConfig.calibF),                    String("Linearity calibration for temperature sensor."));
+  webpageTableAppend4Cols(String("dispBrightn"),       String("Range: 0 .. +255, LSB: 1 step"),       String(myConfig.dispBrightn),               String("Brightness of OLAD display"));
   webpage +="</table>";
   /* Restart Device */
   webpage +="<p><b>Restart Device</b></p>";
@@ -919,21 +938,24 @@ void handleWebServerClient(void) {
         String value = "";
         if (splitHtmlCommand(webServer.arg(i), &key, &value)) {
           Serial.println(key + " : " + value);
-          if (key == "undiscover") {
-            if (value.toInt() == 1) {
+          if (key == "discover") {
+            if ((value.toInt() & 1) == true) {
+              myMqttHelper.setTriggerDiscovery(true);
+            } else if ((value.toInt() & 1) == false) {
               myMqttHelper.setTriggerUndiscover(true);
             }
-          } else if (key == "discover") {
-            if (value.toInt() == 1) {
-              myMqttHelper.setTriggerDiscovery(true);
+          } else if (key == "discovery") {
+            if ((value.toInt() & 1) == true) {
+              myConfig.discovery = true;
+            } else if ((value.toInt() & 1) == false) {
+              myConfig.discovery = false;
             }
-          }
-        } else if (key == "name") {
+          } else if (key == "name") {
             if ( (value != "") && (value != myConfig.name) ) {
               #ifdef CFG_DEBUG
               Serial.println("Request SPIFFS write with restart.");
               #endif
-              strlcpy(myConfig.name, webServer.arg(i).c_str(), sizeof(myConfig.name));
+              strlcpy(myConfig.name, value.c_str(), sizeof(myConfig.name));
               requestSaveToSpiffsWithRestart = true;
             } else {
               #ifdef CFG_DEBUG
@@ -945,21 +967,61 @@ void handleWebServerClient(void) {
               #ifdef CFG_DEBUG
               Serial.println("Request SPIFFS write.");
               #endif
-              strlcpy(myConfig.updServer, webServer.arg(i).c_str(), sizeof(myConfig.updServer));
+              strlcpy(myConfig.updServer, value.c_str(), sizeof(myConfig.updServer));
               requestSaveToSpiffs = true;
             } else {
               #ifdef CFG_DEBUG
               Serial.println("Configuration unchanged, do nothing");
               #endif
             }
+          } else if (key == "calibF") {
+            uint8_t u8_value = (uint8_t) value.toInt();
+            if ((u8_value != myConfig.calibF) && (u8_value >= 50) && (u8_value <= 200)) {
+              #ifdef CFG_DEBUG
+              Serial.println("Request SPIFFS write.");
+              #endif
+              myConfig.calibF = int16_t(u8_value);
+              requestSaveToSpiffs = true;
+            } else {
+              #ifdef CFG_DEBUG
+              Serial.println("Configuration unchanged, do nothing");
+              #endif
+            }
+          } else if (key == "calibO") {
+            int16_t i16_value = (int16_t) value.toInt();
+            if ((i16_value != myConfig.calibO) && (i16_value >= -50) && (i16_value <= 50)) {
+              #ifdef CFG_DEBUG
+              Serial.println("Request SPIFFS write.");
+              #endif
+              myConfig.calibO = int16_t(i16_value);
+              requestSaveToSpiffs = true;
+            } else {
+              #ifdef CFG_DEBUG
+              Serial.println("Configuration unchanged, do nothing");
+              #endif
+            }
+          } else if (key == "dispBrightn") {
+            uint8_t u8_value = (uint8_t) value.toInt();
+            if ((u8_value != myConfig.dispBrightn) && (u8_value <= 255)) {
+              #ifdef CFG_DEBUG
+              Serial.println("Request SPIFFS write.");
+              #endif
+              myConfig.dispBrightn = u8_value;
+              requestSaveToSpiffsWithRestart = true;
+            } else {
+              #ifdef CFG_DEBUG
+              Serial.println("Configuration unchanged, do nothing");
+              #endif
+            }
           }
+        }
       }
       if (webServer.argName(i) == "InputMethod") {  /* check for dedicated arguments */
         if (webServer.arg(i) != String(myConfig.inputMethod) && (webServer.arg(i).toInt() >= 0) && (webServer.arg(i).toInt() < 2)) { /* check range and if changed at all */
           #ifdef CFG_DEBUG
           Serial.println("Request SPIFFS write with restart.");
           #endif
-          myConfig.inputMethod = boolean(webServer.arg(i).toInt());
+          myConfig.inputMethod = static_cast<bool>(webServer.arg(i).toInt());
           requestSaveToSpiffsWithRestart = true;
         } else {
           #ifdef CFG_DEBUG
@@ -974,45 +1036,6 @@ void handleWebServerClient(void) {
           #endif
           myConfig.sensor = webServer.arg(i).toInt();
           requestSaveToSpiffsWithRestart = true;
-        } else {
-          #ifdef CFG_DEBUG
-          Serial.println("Configuration unchanged, do nothing");
-          #endif
-        }
-      }
-      if (webServer.argName(i) == "dispBrightn") {  /* check for dedicated arguments */
-        if (webServer.arg(i).toInt() != myConfig.dispBrightn) {
-          #ifdef CFG_DEBUG
-          Serial.println("Request SPIFFS write.");
-          #endif
-          myConfig.dispBrightn = uint8_t(webServer.arg(i).toInt());
-          requestSaveToSpiffsWithRestart = true;
-        } else {
-          #ifdef CFG_DEBUG
-          Serial.println("Configuration unchanged, do nothing");
-          #endif
-        }
-      }
-      if (webServer.argName(i) == "calibF") {  /* check for dedicated arguments */
-        if (webServer.arg(i).toInt() != myConfig.calibF) {
-          #ifdef CFG_DEBUG
-          Serial.println("Request SPIFFS write.");
-          #endif
-          myConfig.calibF = int16_t(webServer.arg(i).toInt());
-          requestSaveToSpiffs = true;
-        } else {
-          #ifdef CFG_DEBUG
-          Serial.println("Configuration unchanged, do nothing");
-          #endif
-        }
-      }
-      if (webServer.argName(i) == "calibO") {  /* check for dedicated arguments */
-        if (webServer.arg(i).toInt() != myConfig.calibO) {
-          #ifdef CFG_DEBUG
-          Serial.println("Request SPIFFS write.");
-          #endif
-          myConfig.calibO = int16_t(webServer.arg(i).toInt());
-          requestSaveToSpiffs = true;
         } else {
           #ifdef CFG_DEBUG
           Serial.println("Configuration unchanged, do nothing");

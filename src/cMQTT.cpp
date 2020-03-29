@@ -33,8 +33,8 @@ mqttHelper::mqttHelper()
 
 mqttHelper::~mqttHelper() {}
 
-void mqttHelper::setup() {
-  mqttNodeId              = String(ESP.getChipId(), HEX);
+void mqttHelper::setup(String nodeId) {
+  mqttNodeId              = nodeId;
   buildBaseTopic();
 }
 
@@ -62,7 +62,7 @@ String mqttHelper::buildStateJSON(String name, String temp, String humid, String
   return (JSON);
 }
 
-String mqttHelper::buildHassDiscoveryClimate(String name, String firmware) {
+String mqttHelper::buildHassDiscoveryClimate(String name, String firmware, String model) {
   String JSON = \
   "{\n" \
   "  \"~\":\"" + mqttGeneralBaseTopic + "\",\n" \
@@ -86,7 +86,7 @@ String mqttHelper::buildHassDiscoveryClimate(String name, String firmware) {
   "  \"uniq_id\":\"" + mqttNodeId + "_climate\",\n" \
   "  \"dev\" : { \n" \
   "    \"ids\":[\"" + mqttNodeId + "\"],\n" \
-  "    \"mdl\":\"ESP8266 Thermostat\",\n" \
+  "    \"mdl\":\"" + model + " Thermostat\",\n" \
   "    \"name\":\"" + name + "\",\n" \
   "    \"sw\":\"" + firmware + "\",\n" \
   "    \"mf\":\"dhzl84\"\n" \

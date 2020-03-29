@@ -49,7 +49,7 @@ Thermostat::~Thermostat() {
   /* do nothing */
 }
 
-void Thermostat::setup(uint8_t gpio, uint8_t tarTemp, int16_t calibFactor, int16_t calibOffset, int16_t tHyst, boolean mode) {
+void Thermostat::setup(uint8_t gpio, uint8_t tarTemp, int16_t calibFactor, int16_t calibOffset, int16_t tHyst, bool mode) {
   setSensorCalibData(calibFactor, calibOffset, false);
   setThermostatHysteresis(tHyst);
   setThermostatMode(mode);
