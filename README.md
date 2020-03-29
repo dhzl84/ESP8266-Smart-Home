@@ -1,15 +1,17 @@
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/bfe60968c5c94e88b5aa4b7b383fae2d)](https://app.codacy.com/manual/dhzl84/ESP8266-Smart-Home?utm_source=github.com&utm_medium=referral&utm_content=dhzl84/ESP8266-Smart-Home&utm_campaign=Badge_Grade_Dashboard)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Build Status](https://github.com/dhzl84/ESP8266-Smart-Home/workflows/CI/badge.svg?branch=develop)](https://github.com/dhzl84/ESP8266-Smart-Home/actions?query=branch%3Adevelop)
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/bfe60968c5c94e88b5aa4b7b383fae2d)](https://app.codacy.com/manual/dhzl84/ESP8266-Smart-Home?utm_source=github.com&utm_medium=referral&utm_content=dhzl84/ESP8266-Smart-Home&utm_campaign=Badge_Grade_Dashboard)
 
-# ESP8266 Smart Home Playground
+# ESP8266 / ESP32 Smart Home Playground
 
-**This is my ESP8266 smart home playground for self made floor heating sens and control units.**
+**This is my ESP8266 / ESP32 smart home playground for self made floor heating sens and control units.**
 
 :warning: This project partly uses 230 V so be careful and hands off if you don't know what you are doing.
 
 Basic building blocks and technologies:
 
-* [ESP8266-07](https://www.espressif.com/)
+* [ESP8266 or ESP32](https://www.espressif.com/)
 * WiFi
 * MQTT
 * [Home Assistant](https://home-assistant.io/)
@@ -19,16 +21,32 @@ SW Built with PlatformIO in Visual Studio Code, some great [Arduino](https://www
 
 [Circuit and PCB](https://github.com/dhzl84/ESP8266_Thermostat_PCB.git) made with [Target 3001](https://ibfriedrich.com/de/index.html)
 
-## 1. Build Status Master: [![Build Status](https://github.com/dhzl84/ESP8266-Smart-Home/workflows/CI/badge.svg?branch=master)](https://github.com/dhzl84/ESP8266-Smart-Home/actions?query=branch%3Amaster) Develop: [![Build Status](https://github.com/dhzl84/ESP8266-Smart-Home/workflows/CI/badge.svg?branch=develop)](https://github.com/dhzl84/ESP8266-Smart-Home/actions?query=branch%3Adevelop)
+## Features
+
+**local:**
+
+* sensing room temperature
+* controlling room temperature
+* display current room temperature
+* display target temperature
+
+**remote:**
+
+* allow control from remote devices (smartphones, computers, etc.)
+* provide a nice front end
+* stay locally operational if not connected to a network
+
+## Software
 
 * Master branch only provides (pre-)release SW
 * Develop may contain untested changes
 
 ### Dependencies
 
-Platform:
+Platforms:
 
 * ESP8266 Core for Arduino
+* ESP32 Core for Arduino
 
 Arduino Libraries:
 
@@ -36,10 +54,11 @@ Arduino Libraries:
 * ESP8266_SSD1306
 * ArduinoMQTT
 * ArduinoJSON
+* Bounce2
 
-## 2. General hints
+### General Hints
 
-See [my Home Assistant configuration](https://github.com/dhzl84/Home-Assistant-Configuration) for the usage of this devices.
+See [my Home Assistant configuration](https://github.com/dhzl84/Home-Assistant-Configuration) for the usage of these devices.
 
 Since there is certain information in my software that I do not want everyone to know I located those in a single header file called *config.h* which is not part of the repository, and therefore the build will fail.
 
@@ -57,29 +76,18 @@ My *config.h* for building a thermostat SW contains the following information:
 
 For Travis CI compatibility there is the *config.sh* script which generates the above mentioned dummy code.
 
-## 3 Inwall Thermostat
+Once connect to your WiFi, a website is served on port 80 allowing further configuration.
+
+## Hardware
 
 I started to think about new thermostats for my floor heating system while trying to find a good setting for each room with the analog thermostats only giving the range ice cold (0) to 6, whatever temperature that should be.
 So I thought about buying them but they were either expensive as hell or just didn't have the functionalities I wanted, thus I decided to build them on my own.
 
-### 3.1 Features
+### Assembly parts
 
-**local:**
-
-* sensing room temperature
-* controlling room temperature
-* display current room temperature
-* display target temperature
-
-**remote:**
-
-* allow control from remote devices (smartphones, computers, etc.)
-* provide a nice front end
-* stay locally operational if not connected to a network
-
-### 3.3 Assembly parts
-
-* ESP8266-07
+* Microcontrollers: (alternatives)
+  * ESP8266
+  * ESP32
 * Sensors: (alternatives)
   * DHT22 Temperature / Humidity
   * BME 280 Temperature / Humidity / Pressure
@@ -92,16 +100,16 @@ So I thought about buying them but they were either expensive as hell or just di
   * three push buttons
 * wires, resistors, capacitors, diodes, transistor, optocoupler, circuit board, etc
 
-### 3.4 Schematic
+### Schematic
 
 The schemnatic shows the wiring for all variants. The sensors DHT22 and BME280 are meant to be alternatives. Same applies to the Rotary Encoder and the Push Buttons for local control.
 
 ![image](https://user-images.githubusercontent.com/5675570/77818501-36eaf680-70d3-11ea-9c11-1c7bbd2b8cc5.png)
 
-### 3.5 3D Printed Parts
+### 3D Printed Parts
 
 will be added soon
 
-### 3.6 Picture
+### Picture
 
 ![image](https://user-images.githubusercontent.com/5675570/50345529-b7659380-052f-11e9-8c72-13e437296978.jpg)
