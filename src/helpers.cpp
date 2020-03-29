@@ -4,6 +4,7 @@ float    intToFloat(int16_t intValue)     { return (static_cast<float>(intValue/
 int16_t  floatToInt(float floatValue)     { return (static_cast<int16_t>(floatValue * 10)); }
 String boolToStringOnOff(bool boolean)    { return (boolean == true ? "on" : "off"); }
 String boolToStringHeatOff(bool boolean)  { return (boolean == true ? "heat" : "off"); }
+String sensErrorToString(bool boolean)    { return (boolean == true ? "error" : "ok"); }
 
 /* Thanks to Tasmota  for timer functions */
 int32_t TimeDifference(uint32_t prev, uint32_t next) {
@@ -48,17 +49,17 @@ bool TimeReached(uint32_t timer) {
   return (passed >= 0);
 }
 
-void SetNextTimeInterval(uint32_t& timer, const uint32_t step) {  //NOLINT: pass by reference
-  timer += step;
-  const int32_t passed = TimePassedSince(timer);
+void SetNextTimeInterval(volatile uint32_t *timer, const uint32_t step) {
+  *timer += step;
+  const int32_t passed = TimePassedSince(*timer);
   if (passed < 0) { return; }   // Event has not yet happened, which is fine.
   if (static_cast<uint32_t>(passed) > step) {
     // No need to keep running behind, start again.
-    timer = millis() + step;
+    *timer = millis() + step;
     return;
   }
   // Try to get in sync again.
-  timer = millis() + (step - passed);
+  *timer = millis() + (step - passed);
 }
 
 /* sensor calibration parameters are received and stored as a string <offset>;<factor> */
@@ -89,8 +90,8 @@ bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor)
   return ret;
 }
 
-char* millisFormatted(void) {
-  static char str[16];
+String millisFormatted(void) {
+  char char_buffer[16];
   uint32_t t = millis()/1000;
 
   uint32_t d = t / 86400;
@@ -100,12 +101,12 @@ char* millisFormatted(void) {
   uint16_t m = t / 60;
   uint16_t s = t % 60;
 
-  snprintf(str, sizeof(str), "%uT %02u:%02u:%02u", d, h, m, s);
+  snprintf(char_buffer, sizeof(char_buffer), "%uT %02u:%02u:%02u", d, h, m, s);
   #ifdef CFG_DEBUG
-  Serial.println(str);
+  Serial.println(char_buffer);
   #endif  // CFG_DEBUG
 
-  return str;
+  return String(char_buffer);
 }
 
 String wifiStatusToString(wl_status_t status) {
@@ -142,3 +143,91 @@ String wifiStatusToString(wl_status_t status) {
   }
   return ret;
 }
+
+bool splitHtmlCommand(String sInput, String *key, String *value) {
+  bool ret = false;
+  String delimiter = ":";
+  size_t pos = 0;
+
+  pos = (sInput.indexOf(delimiter));
+
+  /* don't accept empty substring or strings without delimiter */
+  if ((pos > 0) && (pos < UINT32_MAX)) {
+    ret = true;
+    *key = (sInput.substring(0, pos));
+    *value = (sInput.substring(pos+1));
+  } else {
+    #ifdef CFG_DEBUG
+    Serial.println("Malformed HTML Command string");
+    #endif
+  }
+  return ret;
+}
+
+String getEspChipId(void) {
+  #if CFG_BOARD_ESP32
+    String str = (String(uint32_t(ESP.getEfuseMac() & 0x0000FFFF00000000), HEX) + String(uint32_t(ESP.getEfuseMac() & 0x00000000FFFFFFFF), HEX));
+  #elif CFG_BOARD_ESP8266
+    String str = String(ESP.getChipId(), HEX);
+  #else
+    String str = "undefined";
+  #endif  /* CFG_BOARD_ESP32 */
+
+  return str;
+}
+
+#if CFG_BOARD_ESP32
+void listDir(fs::FS &fs, const char * dirname, uint8_t levels) {  // NOLINT
+  Serial.printf("Listing directory: %s\r\n", dirname);
+
+  File root = fs.open(dirname);
+  if (!root) {
+    Serial.println("- failed to open directory");
+    return;
+  }
+  if (!root.isDirectory()) {
+    Serial.println(" - not a directory");
+    return;
+  }
+
+  File file = root.openNextFile();
+  while (file) {
+    if (file.isDirectory()) {
+      Serial.print("  DIR : ");
+      Serial.println(file.name());
+      if (levels) {
+        listDir(fs, file.name(), levels -1);
+      }
+    } else {
+      Serial.print("  FILE: ");
+      Serial.print(file.name());
+      Serial.print("\tSIZE: ");
+      Serial.println(file.size());
+    }
+    file = root.openNextFile();
+  }
+}
+
+String getEspResetReason(RESET_REASON reason) {
+  String str_ret = "NO_MEAN";
+  switch (reason) {
+    case 1 :  str_ret = "POWERON_RESET: Vbat power on reset"; break;
+    case 3 :  str_ret = "SW_RESET: Software reset digital core"; break;
+    case 4 :  str_ret = "OWDT_RESET: Software reset digital core"; break;
+    case 5 :  str_ret = "DEEPSLEEP_RESET: Deep Sleep reset digital core"; break;
+    case 6 :  str_ret = "SDIO_RESET: Reset by SLC module, reset digital core"; break;
+    case 7 :  str_ret = "TG0WDT_SYS_RESET: Timer Group0 Watch dog reset digital core"; break;
+    case 8 :  str_ret = "TG1WDT_SYS_RESET: Timer Group1 Watch dog reset digital core"; break;
+    case 9 :  str_ret = "RTCWDT_SYS_RESET: RTC Watch dog Reset digital core"; break;
+    case 10 : str_ret = "INTRUSION_RESET: Instrusion tested to reset CPU"; break;
+    case 11 : str_ret = "TGWDT_CPU_RESET: Time Group reset CPU"; break;
+    case 12 : str_ret = "SW_CPU_RESET: Software reset CPU"; break;
+    case 13 : str_ret = "RTCWDT_CPU_RESET: RTC Watch dog Reset CPU"; break;
+    case 14 : str_ret = "EXT_CPU_RESET: for APP CPU, reseted by PRO CPU"; break;
+    case 15 : str_ret = "RTCWDT_BROWN_OUT_RESET; Reset when the vdd voltage is not stable"; break;
+    case 16 : str_ret = "RTCWDT_RTC_RESET: RTC Watch dog reset digital core and rtc module"; break;
+    default : str_ret = "NO_MEAN";
+  }
+  return str_ret;
+}
+#endif  /* CFG_BOARD_ESP32 */

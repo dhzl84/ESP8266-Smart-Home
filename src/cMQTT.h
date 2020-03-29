@@ -10,14 +10,15 @@
 typedef enum {
   sTemp,
   sHum,
-  sIP,
-  sCalibF,
-  sCalibO,
-  sFW,
-  sHysteresis,
-  sState
+  sIP,  /* DEPRECATED */
+  sCalibF,  /* DEPRECATED */
+  sCalibO,  /* DEPRECATED */
+  sFW,  /* DEPRECATED */
+  sHysteresis,  /* DEPRECATED */
+  sState  /* DEPRECATED */
 }sensor_t;
 
+/* DEPRECATED */
 typedef enum {
   bsSensFail,
   bsState
@@ -32,11 +33,12 @@ class mqttHelper {
  public:
   mqttHelper(void);
   ~mqttHelper(void);
-  void   init(void);
-  void   setup(void);
-  void   buildTopics(void);
+  void   setup(String nodeId);
+  void   buildBaseTopic(void);
   void   setTriggerDiscovery(bool discover);
   bool   getTriggerDiscovery(void);
+  void   setTriggerUndiscover(bool undiscover);
+  bool   getTriggerUndiscover(void);
   String getTopicUpdateFirmware(void);
   String getTopicUpdateFirmwareAccepted(void);
   String getTopicChangeName(void);
@@ -51,7 +53,7 @@ class mqttHelper {
   String getTopicHassDiscoverySensor(sensor_t sensor);
   String getTopicHassDiscoverySwitch(switch_t switches);
   String buildStateJSON(String name, String Temp, String humid, String hysteresis, String actState, String tarTemp, String sensError, String thermoMode, String calibF, String calibO, String ip, String firmware);
-  String buildHassDiscoveryClimate(String name, String firmware);
+  String buildHassDiscoveryClimate(String name, String firmware, String model);
   String buildHassDiscoveryBinarySensor(String name, binarySensor_t binarySensor);
   String buildHassDiscoverySensor(String name, sensor_t sensor);
   String buildHassDiscoverySwitch(String name, switch_t switches);
@@ -59,13 +61,13 @@ class mqttHelper {
 
  private:
   bool   mqttTriggerDiscovery;
+  bool   mqttTriggerUndiscover;
   String mqttData;
   String mqttUpdateFirmware;
   String mqttUpdateFirmwareAccepted;
   String mqttChangeName;
   String mqttWill;
   String mqttSystemRestartRequest;
-  String mqttSystemRestartResponse;
   String mqttPrefix;
   String mqttNodeId;
   String mqttDeviceName;

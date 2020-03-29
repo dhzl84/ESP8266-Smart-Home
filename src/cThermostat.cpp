@@ -1,50 +1,55 @@
 #include "cThermostat.h"
 
-Thermostat::Thermostat() {
-  Thermostat::init();
-}
+/* targetTemperature : initial value if setup() is not called; resolution is 0.1 °C */
+/* newData : flag to indicate new data to be displayed and transmitted vai MQTT */
+/* relayGpio : relay GPIO if setup() is not called */
+/* thermostatHysteresis : hysteresis initialized to 0.2 °C */
+/* sensorError : filtered sensor error */
+/* currentTemperature : current sensor temperature */
+/* currentHumidity : current sensor humidity */
+/* filteredTemperature : filtered sensor temperature; mean value of CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE samples */
+/* filteredHumidity : filtered sensor humidity; mean value of CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE samples */
+/* sensorFailureCounter : count sensor failures during read */
+/* tempOffset : offset in 0.1 *C */
+/* tempFactor : factor in percent */
 
-Thermostat::~Thermostat() {
-  /* do nothing */
-}
-
-void Thermostat::init() {
-  // heating
-  thermostatMode             = TH_HEAT;
-  actualState                = TH_OFF;
-  targetTemperature          = 200;      // initial value if setup() is not called; resolution is 0.1 °C
-  newData                    = true;     // flag to indicate new data to be displayed and transmitted vai MQTT
-  relayGpio                  = 16;       // relay GPIO if setup() is not called
-  thermostatHysteresis       = 2;        // hysteresis initialized to 0.2 °C
-  thermostatHysteresisHigh   = 1;
-  thermostatHysteresisLow    = 1;
-  // sensor
-  sensorError                = false;    // filtered sensor error
-  currentTemperature         = 0;        // current sensor temperature
-  currentHumidity            = 0;        // current sensor humidity
-  filteredTemperature        = 0;        // filtered sensor temperature; mean value of CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE samples
-  filteredHumidity           = 0;        // filtered sensor humidity; mean value of CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE samples
-  sensorFailureCounter       = 0;        // count sensor failures during read
-  tempOffset                 = 0;        // offset in 0.1 *C
-  tempFactor                 = 100;      // factor in percent
-  // temperture filter
-  tempValueQueueFilled       = false;
-  tempValueSampleID          = 0;
-
+Thermostat::Thermostat()
+  : newData(true), \
+    thermostatMode(TH_HEAT), \
+    actualState(TH_OFF), \
+    targetTemperature(200), \
+    relayGpio(16), \
+    thermostatHysteresis(4), \
+    thermostatHysteresisHigh(2), \
+    thermostatHysteresisLow(2), \
+    sensorError(false), \
+    newCalib(0), \
+    currentTemperature(0), \
+    currentHumidity(0), \
+    filteredTemperature(0), \
+    filteredHumidity(0), \
+    sensorFailureCounter(0), \
+    tempOffset(0), \
+    tempFactor(100), \
+    sensorErrorThreshold(3), \
+    tempValueQueueFilled(false), \
+    humidValueQueueFilled(false), \
+    tempValueSampleID(0), \
+    humidValueSampleID(0) {
   for (int16_t i=0; i < CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE; i++) {
     tempValueQueue[i] = (int16_t)0;
   }
-
-  // humidity filter
-  humidValueQueueFilled      = false;
-  humidValueSampleID         = 0;
 
   for (int16_t i=0; i < CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE; i++) {
     humidValueQueue[i] = (int16_t)0;
   }
 }
 
-void Thermostat::setup(uint8_t gpio, uint8_t tarTemp, int16_t calibFactor, int16_t calibOffset, int16_t tHyst, boolean mode) {
+Thermostat::~Thermostat() {
+  /* do nothing */
+}
+
+void Thermostat::setup(uint8_t gpio, uint8_t tarTemp, int16_t calibFactor, int16_t calibOffset, int16_t tHyst, bool mode) {
   setSensorCalibData(calibFactor, calibOffset, false);
   setThermostatHysteresis(tHyst);
   setThermostatMode(mode);
@@ -192,8 +197,8 @@ void Thermostat::setTargetTemperature(int16_t value) {
 void Thermostat::setThermostatMode(bool value) {
   if (value != thermostatMode) {
     newData = true;
+    thermostatMode = value;
   }
-  thermostatMode = value;
 }
 
 void Thermostat::toggleThermostatMode() {
@@ -220,7 +225,7 @@ void Thermostat::setCurrentTemperature(int16_t value) {
     }
   }
 
-  // calculate new filtered temeprature
+  // calculate new filtered temperature
   float tempValue = (int16_t) 0;
   if (tempValueQueueFilled == true) {
     for (int16_t i=0; i < CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE; i++) {

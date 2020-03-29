@@ -1,6 +1,7 @@
 #include "main.h"
 
 #include "ArduinoJson.h"
+
 /*
 {
   "name":"ABCDEFGHIJKLMNOPQRSTUVWXYZ",
@@ -18,7 +19,9 @@
   "updServer":"http://192.168.178.12:88/firmware/thermostat/firmware.bin",
   "sensUpdInterval":"20",
   "mqttPubCycle":"5",
-  "dispBrightn":"50"
+  "sensor":"0"
+  "dispBrightn":"50",
+  "discovery":"false"
 }
 */
 
@@ -36,12 +39,12 @@ void loadConfiguration(configuration &config) { // NOLINT: pass by reference
 
   DeserializationError error = deserializeJson(jsonDoc, file);
 
-    if (error) {
-      #ifdef CFG_DEBUG
-      Serial.print(F("deserializeJson() failed with code "));
-      Serial.println(error.c_str());
-      #endif /* CFG_DEBUG */
-      return;
+  if (error) {
+    #ifdef CFG_DEBUG
+    Serial.print(F("deserializeJson() failed with code "));
+    Serial.println(error.c_str());
+    #endif /* CFG_DEBUG */
+    return;
   } else {
       serializeJsonPretty(jsonDoc, Serial);
       Serial.println();
@@ -55,8 +58,8 @@ void loadConfiguration(configuration &config) { // NOLINT: pass by reference
     #endif /* CFG_DEBUG */
   }
 
-  // Copy values from the jsonDoc  to the Config, if the key doesn't exist, load the default config
-  strlcpy(config.name,          jsonDoc["name"]                  | "unknown",         sizeof(config.name));
+  // Copy values from the jsonDoc to the Config, if the key doesn't exist, load the default config
+  strlcpy(config.name,          jsonDoc["name"]                  | getEspChipId().c_str(), sizeof(config.name));
   config.mode =                 jsonDoc["mode"]                  | true;
   strlcpy(config.ssid,          jsonDoc["ssid"]                  | WIFI_SSID,         sizeof(config.ssid));
   strlcpy(config.wifiPwd,       jsonDoc["wifiPwd"]               | WIFI_PWD ,         sizeof(config.wifiPwd));
@@ -65,14 +68,16 @@ void loadConfiguration(configuration &config) { // NOLINT: pass by reference
   strlcpy(config.mqttUser,      jsonDoc["mqttUser"]              | LOCAL_MQTT_USER,   sizeof(config.mqttUser));
   strlcpy(config.mqttPwd,       jsonDoc["mqttPwd"]               | LOCAL_MQTT_PWD,    sizeof(config.mqttPwd));
   config.tTemp =                jsonDoc["tTemp"]                 | 200;
-  config.tHyst =                jsonDoc["tHyst"]                 | THERMOSTAT_HYSTERESIS;
+  config.tHyst =                jsonDoc["tHyst"]                 | 4;
   config.calibF =               jsonDoc["calibF"]                | 100;
   config.calibO =               jsonDoc["calibO"]                | 0;
   strlcpy(config.updServer,     jsonDoc["updServer"]             | DEVICE_BINARY, sizeof(config.updServer));
-  config.sensUpdInterval =      jsonDoc["sensUpdInterval"]       | SENSOR_UPDATE_INTERVAL;
+  config.sensUpdInterval =      jsonDoc["sensUpdInterval"]       | 30;
   config.mqttPubCycle =         jsonDoc["mqttPubCycle"]          | 5;
   config.inputMethod =          jsonDoc["inputMethod"]           | false;
+  config.sensor =               jsonDoc["sensor"]                | cDHT22;
   config.dispBrightn =          jsonDoc["dispBrightn"]           | 100;
+  config.discovery =            jsonDoc["discovery"]             | false;
 }
 
 // Saves the configuration to a file
@@ -116,7 +121,9 @@ bool saveConfiguration(const configuration &config) {
     Serial.print((config.sensUpdInterval ==      jsonDoc["sensUpdInterval"]) ? false : true);
     Serial.print((config.mqttPubCycle ==         jsonDoc["mqttPubCycle"]) ? false : true);
     Serial.print((config.inputMethod ==          jsonDoc["inputMethod"]) ? false : true);
+    Serial.print((config.sensor ==               jsonDoc["sensor"]) ? false : true);
     Serial.print((config.dispBrightn ==          jsonDoc["dispBrightn"]) ? false : true);
+    Serial.print((config.discovery ==            jsonDoc["discovery"]) ? false : true);
     Serial.println();
     #endif /* CFG_DEBUG */
 
@@ -138,7 +145,9 @@ bool saveConfiguration(const configuration &config) {
     writeFile |= (config.sensUpdInterval ==      jsonDoc["sensUpdInterval"]) ? false : true;
     writeFile |= (config.mqttPubCycle ==         jsonDoc["mqttPubCycle"]) ? false : true;
     writeFile |= (config.inputMethod ==          jsonDoc["inputMethod"]) ? false : true;
+    writeFile |= (config.sensor ==               jsonDoc["sensor"]) ? false : true;
     writeFile |= (config.dispBrightn ==          jsonDoc["dispBrightn"]) ? false : true;
+    writeFile |= (config.discovery ==            jsonDoc["discovery"]) ? false : true;
 
     file.close();
   } else {
@@ -176,7 +185,9 @@ bool saveConfiguration(const configuration &config) {
     jsonDocNew["sensUpdInterval"] =        config.sensUpdInterval;
     jsonDocNew["mqttPubCycle"] =           config.mqttPubCycle;
     jsonDocNew["inputMethod"] =            config.inputMethod;
+    jsonDocNew["sensor"] =                 config.sensor;
     jsonDocNew["dispBrightn"] =            config.dispBrightn;
+    jsonDocNew["discovery"] =              config.discovery;
 
     // Serialize JSON to file
     if (serializeJson(jsonDocNew, file) == 0) {
