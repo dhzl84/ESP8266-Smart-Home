@@ -14,7 +14,7 @@
   #define DEVICE_BINARY               "http://<domain or ip>/<name>.bin"
 */
 
-/* inputMethod */
+/* input_method */
 #define cROTARY_ENCODER 0
 #define cPUSH_BUTTONS   1
 
@@ -25,26 +25,26 @@
 /*===================================================================================================================*/
 /* variable declarations */
 /*===================================================================================================================*/
-struct configuration {
+struct Configuration {
   char          name[64];
-  bool          mode;         /* 0 = TH_OFF, 1 = TH_HEAT */
-  bool          inputMethod;  /* 0 = rotary encoder , 1 = three push buttons */
-  int16_t       tTemp;        /* persistent target temperature */
-  int16_t       tHyst;        /* thermostat hysteresis */
-  int16_t       calibF;
-  int16_t       calibO;
+  bool          thermostat_mode;         /* 0 = TH_OFF, 1 = TH_HEAT */
+  bool          input_method;  /* 0 = rotary encoder , 1 = three push buttons */
+  int16_t       target_temperature;        /* persistent target temperature */
+  int16_t       temperature_hysteresis;        /* thermostat hysteresis */
+  int16_t       calibration_factor;
+  int16_t       calibration_offset;
   char          ssid[64];
-  char          wifiPwd[64];
-  char          mqttHost[64];
-  int16_t       mqttPort;
-  char          mqttUser[64];
-  char          mqttPwd[64];
-  char          updServer[256];
-  uint8_t       sensUpdInterval;
-  uint8_t       mqttPubCycle;
-  uint8_t       dispBrightn;
-  uint8_t       sensor;
-  bool          discovery;
+  char          wifi_password[64];
+  char          mqtt_host[64];
+  int16_t       mqtt_port;
+  char          mqtt_user[64];
+  char          mqtt_password[64];
+  char          update_server_address[256];
+  uint8_t       sensor_update_interval;
+  uint8_t       mqtt_publish_cycle;
+  uint8_t       display_brightness;
+  uint8_t       sensor_type;
+  bool          discovery_enabled;
 };
 
 /*===================================================================================================================*/
@@ -82,8 +82,8 @@ void homeAssistantDiscovery(void);
 void homeAssistantUndiscover(void);
 void homeAssistantUndiscoverObsolete(void);  /* DEPRECATED */
 void mqttPubState(void);
-void loadConfiguration(configuration &config);  // NOLINT: pass by reference
-bool saveConfiguration(const configuration &config);
+void loadConfiguration(Configuration &config);  // NOLINT: pass by reference
+bool saveConfiguration(const Configuration &config);
 String readSpiffs(String file);
 
 /*===================================================================================================================*/
@@ -109,5 +109,26 @@ String getEspChipId(void);
 void listDir(fs::FS &fs, const char * dirname, uint8_t levels);  // NOLINT
 String getEspResetReason(RESET_REASON reason);
 #endif
+
+class DiffTime {
+ public:
+  DiffTime(void);
+  ~DiffTime(void);
+  void set_time_start(void);
+  void set_time_end(void);
+  uint16_t get_time_duration(void);
+  uint16_t get_time_duration_mean(void);
+  uint16_t get_time_duration_min(void);
+  uint16_t get_time_duration_max(void);
+ private:
+  uint32_t time_start_;
+  uint32_t time_end_;
+  uint16_t time_duration_;
+  uint16_t time_duration_min_;
+  uint16_t time_duration_max_;
+  uint16_t time_duration_mean_;
+  uint16_t time_count_;
+  uint16_t time_duration_array_[1000];
+};
 
 #endif  // MAIN_H_

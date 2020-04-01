@@ -28,7 +28,7 @@
 #define filename "/configJSON"
 
 // Loads the configuration from a file
-void loadConfiguration(configuration &config) { // NOLINT: pass by reference
+void loadConfiguration(Configuration &config) { // NOLINT: pass by reference
   // Open file for reading
   File file = SPIFFS.open(filename, "r");
 
@@ -59,29 +59,29 @@ void loadConfiguration(configuration &config) { // NOLINT: pass by reference
   }
 
   // Copy values from the jsonDoc to the Config, if the key doesn't exist, load the default config
-  strlcpy(config.name,          jsonDoc["name"]                  | getEspChipId().c_str(), sizeof(config.name));
-  config.mode =                 jsonDoc["mode"]                  | true;
-  strlcpy(config.ssid,          jsonDoc["ssid"]                  | WIFI_SSID,         sizeof(config.ssid));
-  strlcpy(config.wifiPwd,       jsonDoc["wifiPwd"]               | WIFI_PWD ,         sizeof(config.wifiPwd));
-  strlcpy(config.mqttHost,      jsonDoc["mqttHost"]              | LOCAL_MQTT_HOST,   sizeof(config.mqttHost));
-  config.mqttPort =             jsonDoc["mqttPort"]              | LOCAL_MQTT_PORT;
-  strlcpy(config.mqttUser,      jsonDoc["mqttUser"]              | LOCAL_MQTT_USER,   sizeof(config.mqttUser));
-  strlcpy(config.mqttPwd,       jsonDoc["mqttPwd"]               | LOCAL_MQTT_PWD,    sizeof(config.mqttPwd));
-  config.tTemp =                jsonDoc["tTemp"]                 | 200;
-  config.tHyst =                jsonDoc["tHyst"]                 | 4;
-  config.calibF =               jsonDoc["calibF"]                | 100;
-  config.calibO =               jsonDoc["calibO"]                | 0;
-  strlcpy(config.updServer,     jsonDoc["updServer"]             | DEVICE_BINARY, sizeof(config.updServer));
-  config.sensUpdInterval =      jsonDoc["sensUpdInterval"]       | 30;
-  config.mqttPubCycle =         jsonDoc["mqttPubCycle"]          | 5;
-  config.inputMethod =          jsonDoc["inputMethod"]           | false;
-  config.sensor =               jsonDoc["sensor"]                | cDHT22;
-  config.dispBrightn =          jsonDoc["dispBrightn"]           | 100;
-  config.discovery =            jsonDoc["discovery"]             | false;
+  strlcpy(config.name,                    jsonDoc["name"]                  | getEspChipId().c_str(), sizeof(config.name));
+  config.thermostat_mode =                jsonDoc["mode"]                  | true;
+  strlcpy(config.ssid,                    jsonDoc["ssid"]                  | WIFI_SSID,         sizeof(config.ssid));
+  strlcpy(config.wifi_password,           jsonDoc["wifiPwd"]               | WIFI_PWD ,         sizeof(config.wifi_password));
+  strlcpy(config.mqtt_host,               jsonDoc["mqttHost"]              | LOCAL_MQTT_HOST,   sizeof(config.mqtt_host));
+  config.mqtt_port =                      jsonDoc["mqttÜort"]              | LOCAL_MQTT_PORT;
+  strlcpy(config.mqtt_user,               jsonDoc["mqttUser"]              | LOCAL_MQTT_USER,   sizeof(config.mqtt_user));
+  strlcpy(config.mqtt_password,           jsonDoc["mqttPwd"]               | LOCAL_MQTT_PWD,    sizeof(config.mqtt_password));
+  config.target_temperature =             jsonDoc["tTemp"]                 | 200;
+  config.temperature_hysteresis =         jsonDoc["tHyst"]                 | 4;
+  config.calibration_factor =             jsonDoc["calibF"]                | 100;
+  config.calibration_offset =             jsonDoc["calibO"]                | 0;
+  strlcpy(config.update_server_address,   jsonDoc["updServer"]             | DEVICE_BINARY, sizeof(config.update_server_address));
+  config.sensor_update_interval =         jsonDoc["sensUpdInterval"]       | 30;
+  config.mqtt_publish_cycle =             jsonDoc["mqttPubCycle"]          | 5;
+  config.input_method =                   jsonDoc["inputMethod"]           | false;
+  config.sensor_type =                    jsonDoc["sensor"]                | cDHT22;
+  config.display_brightness =             jsonDoc["dispBrightn"]           | 100;
+  config.discovery_enabled =              jsonDoc["discovery"]             | false;
 }
 
-// Saves the configuration to a file
-bool saveConfiguration(const configuration &config) {
+// Saves the Configuration to a file
+bool saveConfiguration(const Configuration &config) {
   bool ret = true;
   bool writeFile = false;
   StaticJsonDocument<768> jsonDoc;
@@ -105,49 +105,49 @@ bool saveConfiguration(const configuration &config) {
     serializeJsonPretty(jsonDoc, Serial);
     Serial.println();
     Serial.println("Check SPIFFS vs. current config, 0 is equal, 1 is diff.");
-    Serial.print((config.name ==                 jsonDoc["name"]) ? false : true);
-    Serial.print((config.mode ==                 jsonDoc["mode"]) ? false : true);
-    Serial.print((config.ssid ==                 jsonDoc["ssid"]) ? false : true);
-    Serial.print((config.wifiPwd ==              jsonDoc["wifiPwd"]) ? false : true);
-    Serial.print((config.mqttHost ==             jsonDoc["mqttHost"]) ? false : true);
-    Serial.print((config.mqttPort ==             jsonDoc["mqttPort"]) ? false : true);
-    Serial.print((config.mqttUser ==             jsonDoc["mqttUser"]) ? false : true);
-    Serial.print((config.mqttPwd ==              jsonDoc["mqttPwd"]) ? false : true);
-    Serial.print((config.tTemp ==                jsonDoc["tTemp"]) ? false : true);
-    Serial.print((config.tHyst ==                jsonDoc["tHyst"]) ? false : true);
-    Serial.print((config.calibF ==               jsonDoc["calibF"]) ? false : true);
-    Serial.print((config.calibO ==               jsonDoc["calibO"]) ? false : true);
-    Serial.print((config.updServer ==            jsonDoc["updServer"]) ? false : true);
-    Serial.print((config.sensUpdInterval ==      jsonDoc["sensUpdInterval"]) ? false : true);
-    Serial.print((config.mqttPubCycle ==         jsonDoc["mqttPubCycle"]) ? false : true);
-    Serial.print((config.inputMethod ==          jsonDoc["inputMethod"]) ? false : true);
-    Serial.print((config.sensor ==               jsonDoc["sensor"]) ? false : true);
-    Serial.print((config.dispBrightn ==          jsonDoc["dispBrightn"]) ? false : true);
-    Serial.print((config.discovery ==            jsonDoc["discovery"]) ? false : true);
+    Serial.print((config.name ==                    jsonDoc["name"]) ? false : true);
+    Serial.print((config.thermostat_mode ==         jsonDoc["mode"]) ? false : true);
+    Serial.print((config.ssid ==                    jsonDoc["ssid"]) ? false : true);
+    Serial.print((config.wifi_password ==           jsonDoc["wifiPwd"]) ? false : true);
+    Serial.print((config.mqtt_host ==               jsonDoc["mqttHost"]) ? false : true);
+    Serial.print((config.mqtt_port ==               jsonDoc["mqttPort"]) ? false : true);
+    Serial.print((config.mqtt_user ==               jsonDoc["mqttUser"]) ? false : true);
+    Serial.print((config.mqtt_password ==           jsonDoc["mqttPwd"]) ? false : true);
+    Serial.print((config.target_temperature ==      jsonDoc["tTemp"]) ? false : true);
+    Serial.print((config.temperature_hysteresis ==  jsonDoc["tHyst"]) ? false : true);
+    Serial.print((config.calibration_factor ==      jsonDoc["calibF"]) ? false : true);
+    Serial.print((config.calibration_offset ==      jsonDoc["calibO"]) ? false : true);
+    Serial.print((config.update_server_address ==   jsonDoc["updServer"]) ? false : true);
+    Serial.print((config.sensor_update_interval ==  jsonDoc["sensUpdInterval"]) ? false : true);
+    Serial.print((config.mqtt_publish_cycle ==      jsonDoc["mqttPubCycle"]) ? false : true);
+    Serial.print((config.input_method ==            jsonDoc["inputMethod"]) ? false : true);
+    Serial.print((config.sensor_type ==             jsonDoc["sensor"]) ? false : true);
+    Serial.print((config.display_brightness ==      jsonDoc["dispBrightn"]) ? false : true);
+    Serial.print((config.discovery_enabled ==       jsonDoc["discovery"]) ? false : true);
     Serial.println();
     #endif /* CFG_DEBUG */
 
     /* check if SPIFFS content is equal to avoid delete and write */
 
-    writeFile |= (config.name ==                 jsonDoc["name"]) ? false : true;
-    writeFile |= (config.mode ==                 jsonDoc["mode"]) ? false : true;
-    writeFile |= (config.ssid ==                 jsonDoc["ssid"]) ? false : true;
-    writeFile |= (config.wifiPwd ==              jsonDoc["wifiPwd"]) ? false : true;
-    writeFile |= (config.mqttHost ==             jsonDoc["mqttHost"]) ? false : true;
-    writeFile |= (config.mqttPort ==             jsonDoc["mqttPort"]) ? false : true;
-    writeFile |= (config.mqttUser ==             jsonDoc["mqttUser"]) ? false : true;
-    writeFile |= (config.mqttPwd ==              jsonDoc["mqttPwd"]) ? false : true;
-    writeFile |= (config.tTemp ==                jsonDoc["tTemp"]) ? false : true;
-    writeFile |= (config.tHyst ==                jsonDoc["tHyst"]) ? false : true;
-    writeFile |= (config.calibF ==               jsonDoc["calibF"]) ? false : true;
-    writeFile |= (config.calibO ==               jsonDoc["calibO"]) ? false : true;
-    writeFile |= (config.updServer ==            jsonDoc["updServer"]) ? false : true;
-    writeFile |= (config.sensUpdInterval ==      jsonDoc["sensUpdInterval"]) ? false : true;
-    writeFile |= (config.mqttPubCycle ==         jsonDoc["mqttPubCycle"]) ? false : true;
-    writeFile |= (config.inputMethod ==          jsonDoc["inputMethod"]) ? false : true;
-    writeFile |= (config.sensor ==               jsonDoc["sensor"]) ? false : true;
-    writeFile |= (config.dispBrightn ==          jsonDoc["dispBrightn"]) ? false : true;
-    writeFile |= (config.discovery ==            jsonDoc["discovery"]) ? false : true;
+    writeFile |= (config.name ==                    jsonDoc["name"]) ? false : true;
+    writeFile |= (config.thermostat_mode ==         jsonDoc["mode"]) ? false : true;
+    writeFile |= (config.ssid ==                    jsonDoc["ssid"]) ? false : true;
+    writeFile |= (config.wifi_password ==           jsonDoc["wifiPwd"]) ? false : true;
+    writeFile |= (config.mqtt_host ==               jsonDoc["mqttHost"]) ? false : true;
+    writeFile |= (config.mqtt_port ==               jsonDoc["mqttPort"]) ? false : true;
+    writeFile |= (config.mqtt_user ==               jsonDoc["mqttUser"]) ? false : true;
+    writeFile |= (config.mqtt_password ==           jsonDoc["mqttPwd"]) ? false : true;
+    writeFile |= (config.target_temperature ==      jsonDoc["tTemp"]) ? false : true;
+    writeFile |= (config.temperature_hysteresis ==  jsonDoc["tHyst"]) ? false : true;
+    writeFile |= (config.calibration_factor ==      jsonDoc["calibF"]) ? false : true;
+    writeFile |= (config.calibration_offset ==      jsonDoc["calibO"]) ? false : true;
+    writeFile |= (config.update_server_address ==   jsonDoc["updServer"]) ? false : true;
+    writeFile |= (config.sensor_update_interval ==  jsonDoc["sensUpdInterval"]) ? false : true;
+    writeFile |= (config.mqtt_publish_cycle ==      jsonDoc["mqttPubCycle"]) ? false : true;
+    writeFile |= (config.input_method ==            jsonDoc["inputMethod"]) ? false : true;
+    writeFile |= (config.sensor_type ==             jsonDoc["sensor"]) ? false : true;
+    writeFile |= (config.display_brightness ==      jsonDoc["dispBrightn"]) ? false : true;
+    writeFile |= (config.discovery_enabled ==       jsonDoc["discovery"]) ? false : true;
 
     file.close();
   } else {
@@ -170,24 +170,24 @@ bool saveConfiguration(const configuration &config) {
     File file = SPIFFS.open(filename, "w");
 
     jsonDocNew["name"] =                   config.name;
-    jsonDocNew["mode"] =                   config.mode;
+    jsonDocNew["mode"] =                   config.thermostat_mode;
     jsonDocNew["ssid"] =                   config.ssid;
-    jsonDocNew["wifiPwd"] =                config.wifiPwd;
-    jsonDocNew["mqttHost"] =               config.mqttHost;
-    jsonDocNew["mqttPort"] =               config.mqttPort;
-    jsonDocNew["mqttUser"] =               config.mqttUser;
-    jsonDocNew["mqttPwd"] =                config.mqttPwd;
-    jsonDocNew["tTemp"] =                  config.tTemp;
-    jsonDocNew["tHyst"] =                  config.tHyst;
-    jsonDocNew["calibF"] =                 config.calibF;
-    jsonDocNew["calibO"] =                 config.calibO;
-    jsonDocNew["updServer"] =              config.updServer;
-    jsonDocNew["sensUpdInterval"] =        config.sensUpdInterval;
-    jsonDocNew["mqttPubCycle"] =           config.mqttPubCycle;
-    jsonDocNew["inputMethod"] =            config.inputMethod;
-    jsonDocNew["sensor"] =                 config.sensor;
-    jsonDocNew["dispBrightn"] =            config.dispBrightn;
-    jsonDocNew["discovery"] =              config.discovery;
+    jsonDocNew["wifiPwd"] =                config.wifi_password;
+    jsonDocNew["mqttHost"] =               config.mqtt_host;
+    jsonDocNew["mqttPort"] =               config.mqtt_port;
+    jsonDocNew["mqttUser"] =               config.mqtt_user;
+    jsonDocNew["mqttPwd"] =                config.mqtt_password;
+    jsonDocNew["tTemp"] =                  config.target_temperature;
+    jsonDocNew["tHyst"] =                  config.temperature_hysteresis;
+    jsonDocNew["calibF"] =                 config.calibration_factor;
+    jsonDocNew["calibO"] =                 config.calibration_offset;
+    jsonDocNew["updServer"] =              config.update_server_address;
+    jsonDocNew["sensUpdInterval"] =        config.sensor_update_interval;
+    jsonDocNew["mqttPubCycle"] =           config.mqtt_publish_cycle;
+    jsonDocNew["inputMethod"] =           config.input_method;
+    jsonDocNew["sensor"] =                 config.sensor_type;
+    jsonDocNew["dispBrightn"] =            config.display_brightness;
+    jsonDocNew["discovery"] =              config.discovery_enabled;
 
     // Serialize JSON to file
     if (serializeJson(jsonDocNew, file) == 0) {
