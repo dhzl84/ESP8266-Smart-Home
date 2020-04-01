@@ -231,3 +231,56 @@ String getEspResetReason(RESET_REASON reason) {
   return str_ret;
 }
 #endif  /* CFG_BOARD_ESP32 */
+
+DiffTime::DiffTime() \
+  : time_start_(0), \
+    time_end_(0), \
+    time_duration_(0), \
+    time_duration_min_(UINT16_MAX), \
+    time_duration_max_(0), \
+    time_duration_mean_(0), \
+    time_count_(0) {
+  for (uint16_t iter : time_duration_array_) {
+    time_duration_array_[iter] = 0;
+  }
+}
+
+DiffTime::~DiffTime() {
+  /* do nothing */
+}
+
+void DiffTime::set_time_start(void) {
+  time_start_ = millis();
+}
+
+void DiffTime::set_time_end(void) {
+  time_end_ = millis();
+  time_duration_ = time_end_ - time_start_;
+
+  if (time_duration_ > time_duration_max_) {
+    time_duration_max_ = time_duration_;
+  }
+  if (time_duration_ < time_duration_min_) {
+    time_duration_min_ = time_duration_;
+  }
+  if (time_count_ < 1000) {
+    time_duration_array_[time_count_] = time_duration_;
+    time_count_++;
+  } else {
+    time_count_ = 0;
+    for (uint16_t element : time_duration_array_) {
+      time_duration_mean_ += time_duration_array_[element];
+    }
+    time_duration_mean_ = time_duration_mean_ / 1000;
+    #ifdef CFG_DEBUG_RUNTIME
+    Serial.println("Duration (last 1000): " + String(static_cast<float>(time_duration_mean_)) + " ms");
+    Serial.println("Duration min: " + String(time_duration_min_) + " ms");
+    Serial.println("Duration max: " + String(time_duration_max_) + " ms");
+    #endif /* CFG_DEBUG */
+  }
+}
+
+uint16_t DiffTime::get_time_duration(void)      { return time_duration_; }
+uint16_t DiffTime::get_time_duration_mean(void) { return time_duration_mean_; }
+uint16_t DiffTime::get_time_duration_min(void)  { return time_duration_min_; }
+uint16_t DiffTime::get_time_duration_max(void)  { return time_duration_max_; }
