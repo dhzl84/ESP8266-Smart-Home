@@ -962,13 +962,17 @@ void handleWebServerClient(void) {
             } else if ((value.toInt() & 1) == false) {
               myConfig.discovery_enabled = false;
             }
+            requestSaveToSpiffs = true;
           } else if (key == "name") {
             if ( (value != "") && (value != myConfig.name) ) {
               #ifdef CFG_DEBUG
               Serial.println("Request SPIFFS write with restart.");
               #endif
               strlcpy(myConfig.name, value.c_str(), sizeof(myConfig.name));
-              requestSaveToSpiffsWithRestart = true;
+              /* new name will create new entities in HA if discovery is enabled so do a restart then */
+              if (myConfig.discovery_enabled == true) {
+                requestSaveToSpiffsWithRestart = true;
+              }
             } else {
               #ifdef CFG_DEBUG
               Serial.println("Configuration unchanged, do nothing");
