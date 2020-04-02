@@ -114,6 +114,7 @@ String mqttHelper::buildHassDiscoveryBinarySensor(String name, BinarySensor_t bi
       "  \"avty_t\":\"~" + mqttWill_ + "\",\n" \
       "  \"pl_avail\":\"online\",\n" \
       "  \"pl_not_avail\":\"offline\",\n" \
+      "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
       "  \"uniq_id\":\"" + mqttNodeId_ + "_state\",\n" \
       "  \"device\" : { \n" \
       "    \"identifiers\":[\"" + mqttNodeId_ + "\"]\n" \

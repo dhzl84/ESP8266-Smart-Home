@@ -14,6 +14,7 @@
 #include "c_thermostat.h"
 #include "MQTTClient.h"
 #include <Bounce2.h>
+#include "time.h"
 
 /*===================================================================================================================*/
 /* GPIO config */
@@ -45,10 +46,12 @@ uint32_t mqttPubCycleTime        = 0;
 #define loop100ms      100
 #define loop500ms      500
 #define loop1000ms    1000
+#define loop1m       60000
 uint32_t loop50msMillis   =  0;
-uint32_t loop100msMillis  = 22; /* start loops with some offset to avoid calling all loops every second */
-uint32_t loop500msMillis  = 44; /* start loops with some offset to avoid calling all loops every second */
-uint32_t loop1000msMillis = 66; /* start loops with some offset to avoid calling all loops every second */
+uint32_t loop100msMillis   = 13; /* start loops with some offset to avoid calling all loops every second */
+uint32_t loop500msMillis   = 17; /* start loops with some offset to avoid calling all loops every second */
+uint32_t loop1000msMillis  = 19; /* start loops with some offset to avoid calling all loops every second */
+uint32_t loop1minuteMillis = 23; /* start loops with some offset to avoid calling all loops every second */
 /* HTTP Update */
 bool fetchUpdate = false;       /* global variable used to decide whether an update shall be fetched from server or not */
 /* OTA */
@@ -326,8 +329,9 @@ void WIFI_CONNECT(void) {
 
   #ifdef CFG_DEBUG
   Serial.println("WiFi Status: "+ wifiStatusToString(WiFi.status()));
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
+  WiFi.printDiag(Serial);
+  Serial.println("Local IP: "+ WiFi.localIP().toString());
+  Serial.println("Gateway IP: " + WiFi.gatewayIP().toString());
   #endif
 }
 
@@ -434,6 +438,11 @@ void loop() {
     HANDLE_HTTP_UPDATE();   /* pull update from server if it was requested via MQTT*/
   }
 
+  /* call every minute */
+  if (TimeReached(loop1minuteMillis)) {
+    SetNextTimeInterval(&loop1minuteMillis, loop1m);
+    NTP_MAIN();             /* get time from gateway */
+  }
   /* debounce buttons */
   debounceOnOff.update();
   if (myConfig.input_method == cPUSH_BUTTONS) {
@@ -500,6 +509,23 @@ void HANDLE_SYSTEM_STATE(void) {
     delay(3000);
     ESP.restart();
   }
+}
+
+void NTP_MAIN(void) {
+  const char* ntpServer = WiFi.gatewayIP().toString().c_str();
+  const int32_t  gmtOffset_sec = 3600;  /* Berlin */
+  const int16_t  daylightOffset_sec = 3600;  /* DST */
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    #ifdef CFG_DEBUG
+    Serial.println("Failed to obtain time");
+    #endif  /* CFG_DEBUG */
+  }
+  #ifdef CFG_DEBUG
+  Serial.println(&timeinfo, "%A, %d.%m.%Y %H:%M:%S");
+  #endif  /* CFG_DEBUG */
 }
 
 void SENSOR_MAIN() {

@@ -64,6 +64,7 @@ void DRAW_DISPLAY_MAIN(void);
 void MQTT_MAIN(void);
 void SPIFFS_MAIN(void);
 void HANDLE_HTTP_UPDATE(void);
+void NTP_MAIN(void);
 /* callback */
 void handleWebServerClient(void);
 void handleHttpReset(void);
