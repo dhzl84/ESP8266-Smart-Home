@@ -130,6 +130,9 @@ uint32_t wifiReconnectTimer = 30000;
 bool     SPIFFS_WRITTEN =           true;
 uint32_t SPIFFS_REFERENCE_TIME;
 
+struct tm time_info;
+char time_string[6];
+
 /*===================================================================================================================*/
 /* The setup function is called once at startup of the sketch */
 /*===================================================================================================================*/
@@ -517,14 +520,16 @@ void NTP_MAIN(void) {
   const int16_t  daylightOffset_sec = 3600;  /* DST */
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
 
-  struct tm timeinfo;
-  if (!getLocalTime(&timeinfo)) {
+  if (!getLocalTime(&time_info)) {
     #ifdef CFG_DEBUG
     Serial.println("Failed to obtain time");
     #endif  /* CFG_DEBUG */
   }
   #ifdef CFG_DEBUG
-  Serial.println(&timeinfo, "%A, %d.%m.%Y %H:%M:%S");
+  // Serial.println(&time_info, "%A, %d.%m.%Y %H:%M:%S");
+  const char* time_format = "%H:%M";
+  strftime(time_string, sizeof(time_string), time_format, &time_info);
+  Serial.println(time_string);
   #endif  /* CFG_DEBUG */
 }
 
@@ -645,6 +650,8 @@ void DRAW_DISPLAY_MAIN(void) {
   myDisplay.setFont(Roboto_Condensed_16);
   myDisplay.drawString(0, drawTargetTempYOffset, String(VERSION));
   myDisplay.drawString(0, 48, String("IPv4: " + (WiFi.localIP().toString()).substring(((WiFi.localIP().toString()).lastIndexOf(".") + 1), (WiFi.localIP().toString()).length())));
+  myDisplay.setTextAlignment(TEXT_ALIGN_RIGHT);
+  myDisplay.drawString(128, 48, String(time_string));
   #endif
 
   myDisplay.display();
