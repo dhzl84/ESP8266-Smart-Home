@@ -284,3 +284,14 @@ uint16_t DiffTime::get_time_duration(void)      { return time_duration_; }
 uint16_t DiffTime::get_time_duration_mean(void) { return time_duration_mean_; }
 uint16_t DiffTime::get_time_duration_min(void)  { return time_duration_min_; }
 uint16_t DiffTime::get_time_duration_max(void)  { return time_duration_max_; }
+
+bool get_local_time(struct tm * info) {
+  time_t now;
+  bool ret = false;
+  time(&now);
+  localtime_r(&now, info);
+  if (info->tm_year > (2016 - 1900)) {
+    ret = true;
+  }
+  return ret;
+}

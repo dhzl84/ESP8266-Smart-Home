@@ -71,9 +71,6 @@ void Thermostat::setup(uint8_t gpio, uint8_t tarTemp, int16_t calibFactor, int16
 void Thermostat::loop(void) {
   if (getSensorError()) {
     /* switch off heating if sensor does not provide values */
-    #ifdef CFG_DEBUG
-    Serial.println("not heating, sensor data invalid");
-    #endif
     if (getActualState() == TH_HEAT) {
       setActualState(TH_OFF);
     }

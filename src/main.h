@@ -27,9 +27,9 @@
 /*===================================================================================================================*/
 struct Configuration {
   char          name[64];
-  bool          thermostat_mode;         /* 0 = TH_OFF, 1 = TH_HEAT */
-  bool          input_method;  /* 0 = rotary encoder , 1 = three push buttons */
-  int16_t       target_temperature;        /* persistent target temperature */
+  bool          thermostat_mode;               /* 0 = TH_OFF, 1 = TH_HEAT */
+  bool          input_method;                  /* 0 = rotary encoder , 1 = three push buttons */
+  int16_t       target_temperature;            /* persistent target temperature */
   int16_t       temperature_hysteresis;        /* thermostat hysteresis */
   int16_t       calibration_factor;
   int16_t       calibration_offset;
@@ -45,6 +45,8 @@ struct Configuration {
   uint8_t       display_brightness;
   uint8_t       sensor_type;
   bool          discovery_enabled;
+  int8_t        utc_offset;                   /* UTC offset in hours, no fractions supported */
+  bool          daylight_saving_time;
 };
 
 /*===================================================================================================================*/
@@ -57,6 +59,7 @@ void DISPLAY_INIT(void);
 void WIFI_CONNECT(void);
 void MQTT_CONNECT(void);
 void OTA_INIT(void);
+void SENSOR_INIT(void);
 /* loop */
 void HANDLE_SYSTEM_STATE(void);
 void SENSOR_MAIN(void);
@@ -64,6 +67,7 @@ void DRAW_DISPLAY_MAIN(void);
 void MQTT_MAIN(void);
 void SPIFFS_MAIN(void);
 void HANDLE_HTTP_UPDATE(void);
+void NTP_INIT(void);
 void NTP_MAIN(void);
 /* callback */
 void handleWebServerClient(void);
@@ -103,7 +107,7 @@ bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor)
 String millisFormatted(void);
 String wifiStatusToString(wl_status_t status);
 bool splitHtmlCommand(String sInput, String *key, String *value);
-
+void updateTimeBuffer(void);
 String getEspChipId(void);
 
 #if CFG_BOARD_ESP32
@@ -131,5 +135,7 @@ class DiffTime {
   uint16_t time_count_;
   uint16_t time_duration_array_[1000];
 };
+
+bool get_local_time(struct tm * info);
 
 #endif  // MAIN_H_

@@ -16,6 +16,7 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <ESP8266httpUpdate.h>
+#include <sntp.h>
 #elif CFG_BOARD_ESP32
 #define BOARD "ESP32"
 #define DHT_PIN             GPIO_NUM_26 /* sensor */
