@@ -81,7 +81,7 @@ void loadConfiguration(Configuration &config) { // NOLINT: pass by reference
   config.display_brightness =                   jsonDoc["dispBrightn"]           | 100;
   config.discovery_enabled =                    jsonDoc["discovery"]             | false;
   config.utc_offset =                           jsonDoc["utcOffset"]             | 1;
-  config.daylight_saving_time =                 jsonDoc["dst"]                   | 0;
+  config.daylight_saving_time =                 jsonDoc["dst"]                   | false;
 }
 
 // Saves the Configuration to a file

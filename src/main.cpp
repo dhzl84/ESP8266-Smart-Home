@@ -157,7 +157,7 @@ void setup() {
   WIFI_CONNECT();  /* connect to WiFi */
   OTA_INIT();      /* init over the air update */
   MQTT_CONNECT();  /* connect to MQTT host and build subscriptions, must be called after SPIFFS_INIT()*/
-  NTP_INIT();      /* init network time protocol, must be called after WIFI_CONNECT() and SPIFFS_INIT() */
+  NTP();            /* init network time protocol, must be called after WIFI_CONNECT() and SPIFFS_INIT() */
   MDNS.begin(myConfig.name);
 
   webServer.begin();
@@ -315,6 +315,7 @@ void WIFI_CONNECT(void) {
   WiFi.printDiag(Serial);
   Serial.println("Local IP: "+ WiFi.localIP().toString());
   Serial.println("Gateway IP: " + WiFi.gatewayIP().toString());
+  Serial.println("DNS IP: " + WiFi.dnsIP().toString());
   #endif
 }
 
@@ -425,7 +426,7 @@ void loop() {
   /* call every minute */
   if (TimeReached(loop1minuteMillis)) {
     SetNextTimeInterval(&loop1minuteMillis, loop1m);
-    NTP_MAIN();             /* get time from gateway */
+    NTP();                 /* check time regularly and change DST is necessary */
   }
   /* debounce buttons */
   debounceOnOff.update();
@@ -495,11 +496,19 @@ void HANDLE_SYSTEM_STATE(void) {
   }
 }
 
-void NTP_INIT(void) {
-  Serial.println("Connect to NTP Server");
-  const char* ntp_server = WiFi.gatewayIP().toString().c_str();
+void NTP(void) {
+  const char* ntp_server[] = { "fritz.box", "fritz.box", "fritz.box" };  // WiFi.gatewayIP().toString().c_str()
+  #ifdef CFG_DEBUG_SNTP
+  Serial.print("NTP Servers: ");
+  for (auto server : ntp_server) {
+    Serial.printf("%s ", server);
+  }
+  Serial.println();
+  Serial.println("UTC Offset: " + String(myConfig.utc_offset));
+  Serial.println("DST : " + String(myConfig.daylight_saving_time));
+  #endif  /* CFG_DEBUG_SNTP */
 
-  configTime((myConfig.utc_offset * 3600), (myConfig.daylight_saving_time * 3600), ntp_server);
+  configTime((myConfig.utc_offset * 3600), (static_cast<uint8_t>(myConfig.daylight_saving_time) * 3600), ntp_server[0], ntp_server[1], ntp_server[2]);
 
   #ifdef CFG_BOARD_ESP8266
   /* try every second to get an answer from the NTP server for max. 15 seconds */
@@ -511,40 +520,36 @@ void NTP_INIT(void) {
     millis_delta = millis() - ntp_start_time;
     if (millis_delta >= 1000) {
       #ifdef CFG_DEBUG_SNTP
-      Serial.printf("Waiting for NTP-Answer %02ld sec\n", millis_delta / 1000);
+      Serial.printf("Waiting for NTP-Answer %02u sec\n", millis_delta / 1000);
       #endif  /* CFG_DEBUG_SNTP */
       delay(975);
     }
-    if (sntp_getreachability(0)) {
-      #ifdef CFG_DEBUG_SNTP
-      Serial.println("NTP Server: " + String(ntp_server) + " not reachable!");
-      #endif  /* CFG_DEBUG_SNTP */
-    } else {
-      server_reachable = true;
+
+    for (uint8_t server_id = 0; server_id < 3 ; server_id++) {
+      if (sntp_getreachability(server_id)) {
+        #ifdef CFG_DEBUG_SNTP
+        Serial.printf("NTP Server %s not reachable!\n", ntp_server[server_id]);
+        #endif  /* CFG_DEBUG_SNTP */
+      } else {
+        server_reachable = true;
+      }
     }
-  } while ((millis_delta <= (15 * secondsToMillisecondsFactor)) && !server_reachable);
+  } while ((millis_delta <= (30 * secondsToMillisecondsFactor)) && !server_reachable);
 
   #ifdef CFG_DEBUG_SNTP
-  Serial.println("SNTP connected to: " + String(ntp_server));
+  // Serial.printf("SNTP connected to: %s\n", sntp_getserver());
   #endif  /* CFG_DEBUG_SNTP */
   #endif  /* CFG_BOARD_ESP8266 */
-
-  updateTimeBuffer();
-}
-
-void NTP_MAIN(void) {
-  updateTimeBuffer();
 
   // In the EU, EFTA and associated countries, European Summer Time begins at 01:00 UTC/WET (02:00 CET, 03:00 EET) on the last Sunday in March and ends at 01:00 UTC (02:00 WEST, 03:00 CEST, 04:00 EEST) on the last Sunday in October each year */
   // Sunday: time_info.tm_wday == 7
   // Last Sunday: time_info.tm_mday >= 25 (must be in the range of 25th to 31st)
-  // March: time_info.tm_mon == 3
+  // March: time_info.tm_mon == 2
   // Hour: time_info.tm_hour - myConfig.utc_offset == 1
 
-  // check for DST change to summer time, re-initialize NTP and save to SPIFFS if DST has changed
-
   // variable used for determination of actual DST
-  bool local_daylight_saving_time = 0;
+  bool local_daylight_saving_time = myConfig.daylight_saving_time;
+  bool local_ntp_time_received = false;
 
   // calculate if the last Sunday is still to come
   // positive values: last sunday is still to come
@@ -552,59 +557,15 @@ void NTP_MAIN(void) {
   // negative values: last sunday is already gone
   int8_t day_of_dst_change = ((31 - (time_info.tm_mday - 1)) - time_info.tm_wday > 0);
 
-  // April to Septermber is always DST
-  if (time_info.tm_mon > 3 && time_info.tm_mon < 10) {
-    local_daylight_saving_time = 1;
-  // November to February is always not DST
-  } else if (time_info.tm_mon > 10 || time_info.tm_mon < 3) {
-    local_daylight_saving_time = 0;
-  // March
-  } else if (time_info.tm_mon == 3) {
-    // DST coming
-    if (day_of_dst_change > 0) {
-      local_daylight_saving_time = 0;
-    // DST gone
-    } else if (day_of_dst_change < 0) {
-      local_daylight_saving_time = 1;
-    // DST change today
-    } else {
-      // UTC hour is 1 or later
-      if ((time_info.tm_hour - myConfig.utc_offset - myConfig.daylight_saving_time) >= 1) {
-        local_daylight_saving_time = 1;
-      // UTC hour is before 1
-      } else {
-        local_daylight_saving_time = 0;
-      }
-    }
-  // October
-  } else if (time_info.tm_mon == 10) {
-    // not DST coming
-    if (day_of_dst_change > 0) {
-      local_daylight_saving_time = 1;
-    // not DST gone
-    } else if (day_of_dst_change < 0) {
-      local_daylight_saving_time = 0;
-    // not DST change today
-    } else {
-      // UTC hour is 1 or later
-      if ((time_info.tm_hour - myConfig.utc_offset - myConfig.daylight_saving_time) >= 1) {
-        local_daylight_saving_time = 0;
-      // UTC hour is before 1
-      } else {
-        local_daylight_saving_time = 1;
-      }
-    }
-  }
-
-  // if actual DST differs from the stored one, change it, persist it and re-initialze NTP with new DST flag
-  if (myConfig.daylight_saving_time != local_daylight_saving_time) {
-    myConfig.daylight_saving_time = local_daylight_saving_time;
-    requestSaveToSpiffs = true;
-    NTP_INIT();
+  if (time_info.tm_year >= (2016 - 1900)) {
+    local_ntp_time_received = true;
+  } else {
+    #ifdef CFG_DEBUG
+    Serial.println("Failed to obtain time from NTP");
+    #endif /* CFG_DEBUG */
   }
 
   #ifdef CFG_DEBUG_SNTP
-  Serial.println(time_buffer);
   Serial.println("DST: " + String(time_info.tm_isdst));
   Serial.println("YDay: " + String(time_info.tm_yday));
   Serial.println("WDay: " + String(time_info.tm_wday));
@@ -614,11 +575,115 @@ void NTP_MAIN(void) {
   Serial.println("Hour: " + String(time_info.tm_hour));
   Serial.println("Min: " + String(time_info.tm_min));
   Serial.println("Sec: " + String(time_info.tm_sec));
-  if (!(time_info.tm_year >= (2020 - 1900))) {
-    Serial.println("Failed to obtain time");
-  }
-  Serial.println("time_buffer: " + String(time_buffer));
+  Serial.println("Time: " + String(time_buffer));
   #endif  /* CFG_DEBUG_SNTP */
+
+  if (local_ntp_time_received == true) {
+    // April to September is always DST
+    if (time_info.tm_mon > 2 && time_info.tm_mon < 9) {
+      local_daylight_saving_time = 1;
+      #ifdef CFG_DEBUG_SNTP
+      Serial.println("April to September - DST: " + String(local_daylight_saving_time));
+      #endif  /* CFG_DEBUG_SNTP */
+    // November to February is always not DST
+    } else if (time_info.tm_mon > 9 || time_info.tm_mon < 2) {
+      local_daylight_saving_time = 0;
+      #ifdef CFG_DEBUG_SNTP
+      Serial.println("November to February - DST: " + String(local_daylight_saving_time));
+      #endif  /* CFG_DEBUG_SNTP */
+    // March
+    } else if (time_info.tm_mon == 2) {
+      #ifdef CFG_DEBUG_SNTP
+      Serial.print("March");
+      #endif  /* CFG_DEBUG_SNTP */
+      // DST coming
+      if (day_of_dst_change > 0) {
+        #ifdef CFG_DEBUG_SNTP
+        Serial.print(" before DST change");
+        #endif  /* CFG_DEBUG_SNTP */
+        local_daylight_saving_time = 0;
+      // DST gone
+      } else if (day_of_dst_change < 0) {
+        #ifdef CFG_DEBUG_SNTP
+        Serial.print(" after DST change");
+        #endif  /* CFG_DEBUG_SNTP */
+        local_daylight_saving_time = 1;
+      // DST change today
+      } else {
+        // UTC hour is 1 or later
+        #ifdef CFG_DEBUG_SNTP
+        Serial.print(" DST change today");
+        #endif  /* CFG_DEBUG_SNTP */
+        if ((time_info.tm_hour - myConfig.utc_offset - static_cast<uint8_t>(myConfig.daylight_saving_time)) >= 1) {
+          #ifdef CFG_DEBUG_SNTP
+          Serial.print(" - pending");
+          #endif  /* CFG_DEBUG_SNTP */
+          local_daylight_saving_time = 1;
+        // UTC hour is before 1
+        } else {
+          #ifdef CFG_DEBUG_SNTP
+          Serial.print(" - done");
+          #endif  /* CFG_DEBUG_SNTP */
+          local_daylight_saving_time = 0;
+        }
+      }
+      #ifdef CFG_DEBUG_SNTP
+      Serial.println("");
+      #endif  /* CFG_DEBUG_SNTP */
+    // October
+    } else if (time_info.tm_mon == 9) {
+      #ifdef CFG_DEBUG_SNTP
+      Serial.print("October");
+      #endif  /* CFG_DEBUG_SNTP */
+      // not DST coming
+      if (day_of_dst_change > 0) {
+        #ifdef CFG_DEBUG_SNTP
+        Serial.print(" before DST change");
+        #endif  /* CFG_DEBUG_SNTP */
+        local_daylight_saving_time = 1;
+      // not DST gone
+      } else if (day_of_dst_change < 0) {
+        #ifdef CFG_DEBUG_SNTP
+        Serial.print(" after DST change");
+        #endif  /* CFG_DEBUG_SNTP */
+        local_daylight_saving_time = 0;
+      // not DST change today
+      } else {
+        #ifdef CFG_DEBUG_SNTP
+        Serial.print(" DST change today");
+        #endif  /* CFG_DEBUG_SNTP */
+        // UTC hour is 1 or later
+        if ((time_info.tm_hour - myConfig.utc_offset - static_cast<uint8_t>(myConfig.daylight_saving_time)) >= 1) {
+          #ifdef CFG_DEBUG_SNTP
+          Serial.print(" - pending");
+          #endif  /* CFG_DEBUG_SNTP */
+          local_daylight_saving_time = 0;
+        // UTC hour is before 1
+        } else {
+          #ifdef CFG_DEBUG_SNTP
+          Serial.print(" - done");
+          #endif  /* CFG_DEBUG_SNTP */
+          local_daylight_saving_time = 1;
+        }
+      }
+      #ifdef CFG_DEBUG_SNTP
+      Serial.println("");
+      #endif  /* CFG_DEBUG_SNTP */
+    }
+  }
+
+  // if actual DST differs from the stored one, change it, persist it and re-initialze NTP with new DST flag
+  if (myConfig.daylight_saving_time != local_daylight_saving_time) {
+    #ifdef CFG_DEBUG_SNTP
+    Serial.println("DST change calculated");
+    Serial.println("DST old: " + String(myConfig.daylight_saving_time));
+    Serial.println("DST new: " + String(local_daylight_saving_time));
+    #endif  /* CFG_DEBUG_SNTP */
+    myConfig.daylight_saving_time = local_daylight_saving_time;
+    requestSaveToSpiffs = true;
+    configTime((myConfig.utc_offset * 3600), (static_cast<uint8_t>(myConfig.daylight_saving_time) * 3600), ntp_server[0], ntp_server[1], ntp_server[2]);
+  }
+  updateTimeBuffer();
 }
 
 void SENSOR_INIT() {
