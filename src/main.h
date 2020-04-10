@@ -30,7 +30,7 @@ struct Configuration {
   bool          thermostat_mode;               /* 0 = TH_OFF, 1 = TH_HEAT */
   bool          input_method;                  /* 0 = rotary encoder , 1 = three push buttons */
   int16_t       target_temperature;            /* persistent target temperature */
-  int16_t       temperature_hysteresis;        /* thermostat hysteresis */
+  uint8_t       temperature_hysteresis;        /* thermostat hysteresis */
   int16_t       calibration_factor;
   int16_t       calibration_offset;
   char          ssid[64];

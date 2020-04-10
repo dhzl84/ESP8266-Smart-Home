@@ -1,6 +1,6 @@
 #include "main.h"
 
-float    intToFloat(int16_t intValue)     { return (static_cast<float>(intValue/10.0)); }
+float    intToFloat(int16_t intValue)     { return (static_cast<float>(intValue/10.0f)); }
 int16_t  floatToInt(float floatValue)     { return (static_cast<int16_t>(floatValue * 10)); }
 String boolToStringOnOff(bool boolean)    { return (boolean == true ? "on" : "off"); }
 String boolToStringHeatOff(bool boolean)  { return (boolean == true ? "heat" : "off"); }
@@ -92,16 +92,16 @@ bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor)
 
 String millisFormatted(void) {
   char char_buffer[16];
-  uint32_t t = millis()/1000;
+  uint32_t t = millis()/1000u;
 
-  uint32_t d = t / 86400;
+  uint32_t d = t / 86400u;
   t = t % 86400;
-  uint32_t h = t / 3600;
+  uint32_t h = t / 3600u;
   t = t % 3600;
   uint16_t m = t / 60;
   uint16_t s = t % 60;
 
-  snprintf(char_buffer, sizeof(char_buffer), "%uT %02u:%02u:%02u", d, h, m, s);
+  (void) snprintf(char_buffer, sizeof(char_buffer), "%uT %02u:%02u:%02u", d, h, m, s);
   #ifdef CFG_DEBUG
   Serial.println(char_buffer);
   #endif  // CFG_DEBUG
@@ -191,7 +191,7 @@ void listDir(fs::FS &fs, const char * dirname, uint8_t levels) {  // NOLINT
   }
 
   File file = root.openNextFile();
-  while (file) {
+  while (file == true) {
     if (file.isDirectory()) {
       Serial.print("  DIR : ");
       Serial.println(file.name());

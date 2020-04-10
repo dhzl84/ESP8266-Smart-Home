@@ -4,19 +4,19 @@
 #include "Arduino.h"
 
 #ifndef MINIMUM_TARGET_TEMP
-  #define MINIMUM_TARGET_TEMP (int16_t)150  // 15.0 °C
+  #define MINIMUM_TARGET_TEMP (uint8_t)150  // 15.0 °C
 #endif
 
 #ifndef MAXIMUM_TARGET_TEMP
-  #define MAXIMUM_TARGET_TEMP (int16_t)250  // 25.0 °C
+  #define MAXIMUM_TARGET_TEMP (uint8_t)250  // 25.0 °C
 #endif
 
 #ifndef MAXIMUM_HYSTERESIS
-  #define MAXIMUM_HYSTERESIS (int16_t)20   // 2.0 °C
+  #define MAXIMUM_HYSTERESIS (uint8_t)20   // 2.0 °C
 #endif
 
 #ifndef MINIMUM_HYSTERESIS
-  #define MINIMUM_HYSTERESIS (int16_t)2    // 0.2 °C
+  #define MINIMUM_HYSTERESIS (uint8_t)2    // 0.2 °C
 #endif
 
 #ifndef CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE
@@ -30,13 +30,13 @@ class Thermostat {
  public:
   Thermostat(void);
   ~Thermostat(void);
-  void setup(uint8_t gpio, uint8_t tarTemp, int16_t calibFactor, int16_t calibOffset, int16_t temperature_hysteresis, bool thermostat_mode);
+  void setup(uint8_t gpio, uint8_t tarTemp, int16_t calibFactor, int16_t calibOffset, uint8_t temperature_hysteresis, bool thermostat_mode);
   void loop(void);
   // heating
   void setActualState(bool value);
-  void setTargetTemperature(int16_t value);
-  void increaseTargetTemperature(uint16_t value);
-  void decreaseTargetTemperature(uint16_t value);
+  void setTargetTemperature(uint8_t value);
+  void increaseTargetTemperature(uint8_t value);
+  void decreaseTargetTemperature(uint8_t value);
   void resetTransmitRequest();
   void resetNewData();
   bool getActualState(void);
@@ -44,13 +44,13 @@ class Thermostat {
   bool getThermostatMode();
   void setThermostatMode(bool value);
   void toggleThermostatMode();
-  int16_t getTargetTemperature(void);
+  uint8_t getTargetTemperature(void);
 
   // sensor
   void setCurrentTemperature(int16_t temperature);
   void setCurrentHumidity(int16_t value);
   void setLastSensorReadFailed(bool value);
-  void setThermostatHysteresis(int16_t hysteresis);
+  void setThermostatHysteresis(uint8_t hysteresis);
   void resetNewCalib();
   void setSensorCalibData(int16_t factor, int16_t offset, bool calib);
   bool getSensorError(void);
@@ -62,9 +62,9 @@ class Thermostat {
   int16_t getFilteredHumidity(void);
   int16_t getSensorCalibOffset(void);
   int16_t getSensorCalibFactor(void);
-  int16_t getThermostatHysteresis(void);
-  int16_t getThermostatHysteresisHigh(void);
-  int16_t getThermostatHysteresisLow(void);
+  uint8_t getThermostatHysteresis(void);
+  uint8_t getThermostatHysteresisHigh(void);
+  uint8_t getThermostatHysteresisLow(void);
 
  private:
   // heating

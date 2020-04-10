@@ -181,9 +181,9 @@ void setup() {
 
   #ifdef CFG_DEBUG
   #if CFG_BOARD_ESP8266
-  Serial.println("Vcc: " + String(ESP.getVcc() / 1000.0));
-  Serial.println("Reset Reason: " + String(ESP.getResetReason()));
-  Serial.println("Flash Size: " + String(ESP.getFlashChipRealSize()));
+  Serial.printf("Vcc: %d", (ESP.getVcc() / 1000.0));
+  Serial.printf("Reset Reason: %s\n", ESP.getResetReason().c_str());
+  Serial.printf("lash Size: %d\n", ESP.getFlashChipRealSize());
   #elif CFG_BOARD_ESP32
   Serial.println("CPU Frequency: " + String(ESP.getCpuFreqMHz()));
   Serial.println("CPU 0 reset reason: " + getEspResetReason(rtc_get_reset_reason(0)));
@@ -474,7 +474,7 @@ void HANDLE_SYSTEM_STATE(void) {
     Serial.println("Current time: "+ String(millis()));
     #endif
 
-    if (onOffButtonSystemResetTime + onOffButtonSystemResetInterval < millis()) {
+    if ((onOffButtonSystemResetTime + onOffButtonSystemResetInterval) < millis()) {
       systemRestartRequest = true;
     } else {
       /* waiting */
