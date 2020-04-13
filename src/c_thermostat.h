@@ -47,7 +47,7 @@ class Thermostat {
   uint8_t getTargetTemperature(void);
 
   // sensor
-  void setCurrentTemperature(int16_t temperature);
+  void setCurrentTemperature(int16_t value);
   void setCurrentHumidity(int16_t value);
   void setLastSensorReadFailed(bool value);
   void setThermostatHysteresis(uint8_t hysteresis);
@@ -73,9 +73,9 @@ class Thermostat {
   bool actual_state_;
   uint8_t target_temperature_;
   uint8_t relay_gpio_;
-  int16_t thermostat_hysteresis_;
-  int16_t thermostat_hysteresis_high_;
-  int16_t thermostat_hysteresis_low_;
+  uint8_t thermostat_hysteresis_;
+  uint8_t thermostat_hysteresis_high_;
+  uint8_t thermostat_hysteresis_low_;
   // sensor
   bool sensor_error_;
   bool new_calib_;

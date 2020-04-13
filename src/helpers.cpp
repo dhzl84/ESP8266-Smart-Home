@@ -269,6 +269,7 @@ void DiffTime::set_time_end(void) {
   } else {
     time_count_ = 0;
     for (uint16_t element : time_duration_array_) {
+      // cppcheck-suppress useStlAlgorithm ; accumulate is not available in <numeric>
       time_duration_mean_ += time_duration_array_[element];
     }
     time_duration_mean_ = time_duration_mean_ / 1000;

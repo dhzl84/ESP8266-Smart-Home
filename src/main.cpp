@@ -181,7 +181,7 @@ void setup() {
 
   #ifdef CFG_DEBUG
   #if CFG_BOARD_ESP8266
-  Serial.printf("Vcc: %d", (ESP.getVcc() / 1000.0));
+  Serial.printf("Vcc: %f", (ESP.getVcc() / 1000.0f));
   Serial.printf("Reset Reason: %s\n", ESP.getResetReason().c_str());
   Serial.printf("lash Size: %d\n", ESP.getFlashChipRealSize());
   #elif CFG_BOARD_ESP32
@@ -1296,7 +1296,8 @@ void handleHttpReset(void) {
 }
 
 /* MQTT callback if a message was received */
-void messageReceived(String &topic, String &payload) { //NOLINT
+// cppcheck-suppress constParameter ; messageReceived is a library function
+void messageReceived(String &topic, String &payload) {  // NOLINT
   #ifdef CFG_DEBUG
   Serial.println("received: " + topic + " : " + payload);
   #endif
