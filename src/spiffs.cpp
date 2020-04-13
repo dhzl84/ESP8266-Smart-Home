@@ -66,7 +66,7 @@ void loadConfiguration(Configuration &config) { // NOLINT: pass by reference
   strlcpy(config.ssid,                          jsonDoc["ssid"]                  | WIFI_SSID,         sizeof(config.ssid));
   strlcpy(config.wifi_password,                 jsonDoc["wifiPwd"]               | WIFI_PWD ,         sizeof(config.wifi_password));
   strlcpy(config.mqtt_host,                     jsonDoc["mqttHost"]              | LOCAL_MQTT_HOST,   sizeof(config.mqtt_host));
-  config.mqtt_port =                            jsonDoc["mqttÜort"]              | LOCAL_MQTT_PORT;
+  config.mqtt_port =                            jsonDoc["mqttPort"]              | LOCAL_MQTT_PORT;
   strlcpy(config.mqtt_user,                     jsonDoc["mqttUser"]              | LOCAL_MQTT_USER,   sizeof(config.mqtt_user));
   strlcpy(config.mqtt_password,                 jsonDoc["mqttPwd"]               | LOCAL_MQTT_PWD,    sizeof(config.mqtt_password));
   config.target_temperature =                   jsonDoc["tTemp"]                 | 200;
