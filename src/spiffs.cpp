@@ -22,6 +22,8 @@
   "sensor":"0"
   "dispBrightn":"50",
   "discovery":"false"
+  "utcOffset":"1"
+  "dst":"0"
 }
 */
 
@@ -59,25 +61,27 @@ void loadConfiguration(Configuration &config) { // NOLINT: pass by reference
   }
 
   // Copy values from the jsonDoc to the Config, if the key doesn't exist, load the default config
-  strlcpy(config.name,                    jsonDoc["name"]                  | getEspChipId().c_str(), sizeof(config.name));
-  config.thermostat_mode =                jsonDoc["mode"]                  | true;
-  strlcpy(config.ssid,                    jsonDoc["ssid"]                  | WIFI_SSID,         sizeof(config.ssid));
-  strlcpy(config.wifi_password,           jsonDoc["wifiPwd"]               | WIFI_PWD ,         sizeof(config.wifi_password));
-  strlcpy(config.mqtt_host,               jsonDoc["mqttHost"]              | LOCAL_MQTT_HOST,   sizeof(config.mqtt_host));
-  config.mqtt_port =                      jsonDoc["mqttÜort"]              | LOCAL_MQTT_PORT;
-  strlcpy(config.mqtt_user,               jsonDoc["mqttUser"]              | LOCAL_MQTT_USER,   sizeof(config.mqtt_user));
-  strlcpy(config.mqtt_password,           jsonDoc["mqttPwd"]               | LOCAL_MQTT_PWD,    sizeof(config.mqtt_password));
-  config.target_temperature =             jsonDoc["tTemp"]                 | 200;
-  config.temperature_hysteresis =         jsonDoc["tHyst"]                 | 4;
-  config.calibration_factor =             jsonDoc["calibF"]                | 100;
-  config.calibration_offset =             jsonDoc["calibO"]                | 0;
-  strlcpy(config.update_server_address,   jsonDoc["updServer"]             | DEVICE_BINARY, sizeof(config.update_server_address));
-  config.sensor_update_interval =         jsonDoc["sensUpdInterval"]       | 30;
-  config.mqtt_publish_cycle =             jsonDoc["mqttPubCycle"]          | 5;
-  config.input_method =                   jsonDoc["inputMethod"]           | false;
-  config.sensor_type =                    jsonDoc["sensor"]                | cDHT22;
-  config.display_brightness =             jsonDoc["dispBrightn"]           | 100;
-  config.discovery_enabled =              jsonDoc["discovery"]             | false;
+  strlcpy(config.name,                          jsonDoc["name"]                  | getEspChipId().c_str(), sizeof(config.name));
+  config.thermostat_mode =                      jsonDoc["mode"]                  | true;
+  strlcpy(config.ssid,                          jsonDoc["ssid"]                  | WIFI_SSID,         sizeof(config.ssid));
+  strlcpy(config.wifi_password,                 jsonDoc["wifiPwd"]               | WIFI_PWD ,         sizeof(config.wifi_password));
+  strlcpy(config.mqtt_host,                     jsonDoc["mqttHost"]              | LOCAL_MQTT_HOST,   sizeof(config.mqtt_host));
+  config.mqtt_port =                            jsonDoc["mqttPort"]              | LOCAL_MQTT_PORT;
+  strlcpy(config.mqtt_user,                     jsonDoc["mqttUser"]              | LOCAL_MQTT_USER,   sizeof(config.mqtt_user));
+  strlcpy(config.mqtt_password,                 jsonDoc["mqttPwd"]               | LOCAL_MQTT_PWD,    sizeof(config.mqtt_password));
+  config.target_temperature =                   jsonDoc["tTemp"]                 | 200;
+  config.temperature_hysteresis =               jsonDoc["tHyst"]                 | 4;
+  config.calibration_factor =                   jsonDoc["calibF"]                | 100;
+  config.calibration_offset =                   jsonDoc["calibO"]                | 0;
+  strlcpy(config.update_server_address,         jsonDoc["updServer"]             | DEVICE_BINARY, sizeof(config.update_server_address));
+  config.sensor_update_interval =               jsonDoc["sensUpdInterval"]       | 30;
+  config.mqtt_publish_cycle =                   jsonDoc["mqttPubCycle"]          | 5;
+  config.input_method =                         jsonDoc["inputMethod"]           | false;
+  config.sensor_type =                          jsonDoc["sensor"]                | cDHT22;
+  config.display_brightness =                   jsonDoc["dispBrightn"]           | 100;
+  config.discovery_enabled =                    jsonDoc["discovery"]             | false;
+  config.utc_offset =                           jsonDoc["utcOffset"]             | 1;
+  config.daylight_saving_time =                 jsonDoc["dst"]                   | false;
 }
 
 // Saves the Configuration to a file
@@ -124,6 +128,8 @@ bool saveConfiguration(const Configuration &config) {
     Serial.print((config.sensor_type ==             jsonDoc["sensor"]) ? false : true);
     Serial.print((config.display_brightness ==      jsonDoc["dispBrightn"]) ? false : true);
     Serial.print((config.discovery_enabled ==       jsonDoc["discovery"]) ? false : true);
+    Serial.print((config.utc_offset ==              jsonDoc["utcOffset"]) ? false : true);
+    Serial.print((config.daylight_saving_time ==    jsonDoc["dst"]) ? false : true);
     Serial.println();
     #endif /* CFG_DEBUG */
 
@@ -148,6 +154,8 @@ bool saveConfiguration(const Configuration &config) {
     writeFile |= (config.sensor_type ==             jsonDoc["sensor"]) ? false : true;
     writeFile |= (config.display_brightness ==      jsonDoc["dispBrightn"]) ? false : true;
     writeFile |= (config.discovery_enabled ==       jsonDoc["discovery"]) ? false : true;
+    writeFile |= (config.utc_offset ==              jsonDoc["utcOffset"]) ? false : true;
+    writeFile |= (config.daylight_saving_time ==    jsonDoc["dst"]) ? false : true;
 
     file.close();
   } else {
@@ -184,10 +192,12 @@ bool saveConfiguration(const Configuration &config) {
     jsonDocNew["updServer"] =              config.update_server_address;
     jsonDocNew["sensUpdInterval"] =        config.sensor_update_interval;
     jsonDocNew["mqttPubCycle"] =           config.mqtt_publish_cycle;
-    jsonDocNew["inputMethod"] =           config.input_method;
+    jsonDocNew["inputMethod"] =            config.input_method;
     jsonDocNew["sensor"] =                 config.sensor_type;
     jsonDocNew["dispBrightn"] =            config.display_brightness;
     jsonDocNew["discovery"] =              config.discovery_enabled;
+    jsonDocNew["utcOffset"] =              config.utc_offset;
+    jsonDocNew["dst"] =                    config.daylight_saving_time;
 
     // Serialize JSON to file
     if (serializeJson(jsonDocNew, file) == 0) {

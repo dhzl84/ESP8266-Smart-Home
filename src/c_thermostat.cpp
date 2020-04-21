@@ -24,9 +24,9 @@ Thermostat::Thermostat()
     thermostat_hysteresis_low_(2), \
     sensor_error_(false), \
     new_calib_(0), \
-    current_temperature_(0), \
+    current_temperature_(INT16_MIN), \
     current_humidity_(0), \
-    filtered_temperature_(0), \
+    filtered_temperature_(INT16_MIN), \
     filtered_humidity_(0), \
     sensor_failure_counter_(0), \
     temperature_offset_(0), \
@@ -49,7 +49,7 @@ Thermostat::~Thermostat() {
   /* do nothing */
 }
 
-void Thermostat::setup(uint8_t gpio, uint8_t tarTemp, int16_t calibFactor, int16_t calibOffset, int16_t temperature_hysteresis, bool thermostat_mode) {
+void Thermostat::setup(uint8_t gpio, uint8_t tarTemp, int16_t calibFactor, int16_t calibOffset, uint8_t temperature_hysteresis, bool thermostat_mode) {
   setSensorCalibData(calibFactor, calibOffset, false);
   setThermostatHysteresis(temperature_hysteresis);
   setThermostatMode(thermostat_mode);
@@ -69,26 +69,24 @@ void Thermostat::setup(uint8_t gpio, uint8_t tarTemp, int16_t calibFactor, int16
 }
 
 void Thermostat::loop(void) {
-  if (getSensorError()) {
+  /* prevent heating if sensor has a confirmed error or no value was received yet */
+  if ((sensor_error_ == true) || (current_temperature_ == INT16_MIN)) {
     /* switch off heating if sensor does not provide values */
-    #ifdef CFG_DEBUG
-    Serial.println("not heating, sensor data invalid");
-    #endif
-    if (getActualState() == TH_HEAT) {
-      setActualState(TH_OFF);
+    if (actual_state_ == TH_HEAT) {
+      actual_state_ = TH_OFF;
     }
   } else {  /* sensor is healthy */
-    if (getThermostatMode() == TH_HEAT) {  /* check if heating is allowed by user */
-      if (getFilteredTemperature() <= (getTargetTemperature() - getThermostatHysteresisLow() )) {  /* check if measured temperature is lower than heating target */
-        if (getActualState() == TH_OFF) {  /* switch on heating if target temperature is higher than measured temperature */
-          setActualState(TH_HEAT);
+    if (thermostat_mode_ == TH_HEAT) {  /* check if heating is allowed by user */
+      if (filtered_temperature_ <= static_cast<int16_t>(target_temperature_ - thermostat_hysteresis_low_ )) {  /* check if measured temperature is lower than heating target */
+        if (actual_state_ == TH_OFF) {  /* switch on heating if target temperature is higher than measured temperature */
+          actual_state_ = TH_HEAT;
           #ifdef CFG_DEBUG
           Serial.println("heating");
           #endif
         }
-      } else if (getFilteredTemperature() >= (getTargetTemperature() + getThermostatHysteresisHigh() )) {  /* check if measured temperature is higher than heating target */
-        if (getActualState() == TH_HEAT) {  /* switch off heating if target temperature is lower than measured temperature */
-          setActualState(TH_OFF);
+      } else if (filtered_temperature_ >= static_cast<int16_t>(target_temperature_ + thermostat_hysteresis_high_)) {  /* check if measured temperature is higher than heating target */
+        if (actual_state_ == TH_HEAT) {  /* switch off heating if target temperature is lower than measured temperature */
+          actual_state_ = TH_OFF;
           #ifdef CFG_DEBUG
           Serial.println("not heating");
           #endif
@@ -98,13 +96,13 @@ void Thermostat::loop(void) {
       }
     } else {
       /* disable heating if heating is set to not allowed by user */
-      setActualState(TH_OFF);
+      actual_state_ = TH_OFF;
     }
   }
 }
 
 bool    Thermostat::getActualState(void)              { return actual_state_; }
-int16_t Thermostat::getTargetTemperature(void)        { return target_temperature_; }
+uint8_t Thermostat::getTargetTemperature(void)        { return target_temperature_; }
 bool    Thermostat::getNewData()                      { return new_data_; }
 bool    Thermostat::getThermostatMode()               { return thermostat_mode_; }
 int16_t Thermostat::getSensorFailureCounter(void)     { return sensor_failure_counter_; }
@@ -116,11 +114,11 @@ bool    Thermostat::getSensorError(void)              { return sensor_error_; }
 bool    Thermostat::getNewCalib(void)                 { return new_calib_; }
 int16_t Thermostat::getSensorCalibOffset(void)        { return temperature_offset_; }
 int16_t Thermostat::getSensorCalibFactor(void)        { return temperature_factor_; }
-int16_t Thermostat::getThermostatHysteresis(void)     { return thermostat_hysteresis_; }
-int16_t Thermostat::getThermostatHysteresisHigh(void) { return thermostat_hysteresis_high_; }
-int16_t Thermostat::getThermostatHysteresisLow(void)  { return thermostat_hysteresis_low_; }
+uint8_t Thermostat::getThermostatHysteresis(void)     { return thermostat_hysteresis_; }
+uint8_t Thermostat::getThermostatHysteresisHigh(void) { return thermostat_hysteresis_high_; }
+uint8_t Thermostat::getThermostatHysteresisLow(void)  { return thermostat_hysteresis_low_; }
 
-void Thermostat::setThermostatHysteresis(int16_t hysteresis) {
+void Thermostat::setThermostatHysteresis(uint8_t hysteresis) {
   /*
   if hysteresis can not be applied symmetrically due to the internal resolution of 0.1 °C, round up (ceil) hysteresis high and round down (floor) hysteresis low
   example:
@@ -129,22 +127,22 @@ void Thermostat::setThermostatHysteresis(int16_t hysteresis) {
     hysteresis high will be 0.3
     hysteresis low will be 0.2
   */
-  if (hysteresis > MAXIMUM_HYSTERESIS) {
-    hysteresis = MAXIMUM_HYSTERESIS;
-  }
-  if (hysteresis < MINIMUM_HYSTERESIS) {
-    hysteresis = MINIMUM_HYSTERESIS;
-  }
   if (hysteresis != thermostat_hysteresis_) {
+    if (hysteresis > MAXIMUM_HYSTERESIS) {
+      thermostat_hysteresis_ = MAXIMUM_HYSTERESIS;
+    } else if (hysteresis < MINIMUM_HYSTERESIS) {
+      thermostat_hysteresis_ = MINIMUM_HYSTERESIS;
+    } else {
+      thermostat_hysteresis_ = hysteresis;
+    }
     new_data_ = true;
-    thermostat_hysteresis_ = hysteresis;
 
-    if (hysteresis % 2 == 0) {
+    if ((hysteresis % 2) == 0) {
       thermostat_hysteresis_low_  = (hysteresis / 2);
       thermostat_hysteresis_high_ = (hysteresis / 2);
     } else {
-      thermostat_hysteresis_low_  = ( (int16_t)(floorf( static_cast<float> (hysteresis) / 2) ) );
-      thermostat_hysteresis_high_ = ( (int16_t)(ceilf( static_cast<float> (hysteresis) / 2) ) );
+      thermostat_hysteresis_low_  = ( (uint8_t)(floorf( static_cast<float> (hysteresis) / 2) ) );
+      thermostat_hysteresis_high_ = ( (uint8_t)(ceilf( static_cast<float> (hysteresis) / 2) ) );
     }
   }
 }
@@ -167,29 +165,29 @@ void Thermostat::resetNewData() {
   new_data_  = false;
 }
 
-void Thermostat::increaseTargetTemperature(uint16_t value) {
+void Thermostat::increaseTargetTemperature(uint8_t value) {
   if ((target_temperature_ + value) <= MAXIMUM_TARGET_TEMP) {
     target_temperature_ += value;
     new_data_ = true;
   }
 }
 
-void Thermostat::decreaseTargetTemperature(uint16_t value) {
+void Thermostat::decreaseTargetTemperature(uint8_t value) {
   if ((target_temperature_ - value) >= MINIMUM_TARGET_TEMP) {
     target_temperature_ -= value;
     new_data_ = true;
   }
 }
 
-void Thermostat::setTargetTemperature(int16_t value) {
-  if (value > MAXIMUM_TARGET_TEMP) {
-    value = MAXIMUM_TARGET_TEMP;
-  }
-  if (value < MINIMUM_TARGET_TEMP) {
-    value = MINIMUM_TARGET_TEMP;
-  }
+void Thermostat::setTargetTemperature(uint8_t value) {
   if (value != target_temperature_) {
-    target_temperature_  = value;
+    if (value > MAXIMUM_TARGET_TEMP) {
+      target_temperature_ = MAXIMUM_TARGET_TEMP;
+    } else if (value < MINIMUM_TARGET_TEMP) {
+      target_temperature_ = MINIMUM_TARGET_TEMP;
+    } else {
+      target_temperature_  = value;
+    }
     new_data_ = true;
   }
 }
@@ -281,7 +279,7 @@ void Thermostat::setLastSensorReadFailed(bool value) {
       sensor_failure_counter_++;
     }
   } else {
-    if (sensor_failure_counter_ > 0) {
+    if (sensor_failure_counter_ > 0u) {
       sensor_failure_counter_--;
     }
   }
@@ -292,7 +290,7 @@ void Thermostat::setLastSensorReadFailed(bool value) {
       sensor_error_ = true;
     }
   } else {
-    if (sensor_failure_counter_ == 0) {
+    if (sensor_failure_counter_ == 0u) {
       new_data_ = true;
       sensor_error_ = false;
     }

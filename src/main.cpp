@@ -14,6 +14,7 @@
 #include "c_thermostat.h"
 #include "MQTTClient.h"
 #include <Bounce2.h>
+#include "time.h"
 
 /*===================================================================================================================*/
 /* GPIO config */
@@ -45,12 +46,14 @@ uint32_t mqttPubCycleTime        = 0;
 #define loop100ms      100
 #define loop500ms      500
 #define loop1000ms    1000
+#define loop1m       60000
 uint32_t loop50msMillis   =  0;
-uint32_t loop100msMillis  = 22; /* start loops with some offset to avoid calling all loops every second */
-uint32_t loop500msMillis  = 44; /* start loops with some offset to avoid calling all loops every second */
-uint32_t loop1000msMillis = 66; /* start loops with some offset to avoid calling all loops every second */
+uint32_t loop100msMillis   = 13; /* start loops with some offset to avoid calling all loops every second */
+uint32_t loop500msMillis   = 17; /* start loops with some offset to avoid calling all loops every second */
+uint32_t loop1000msMillis  = 19; /* start loops with some offset to avoid calling all loops every second */
+uint32_t loop1minuteMillis = 23; /* start loops with some offset to avoid calling all loops every second */
 /* HTTP Update */
-bool fetchUpdate = false;       /* global variable used to decide whether an update shall be fetched from server or not */
+bool fetch_update = false;       /* global variable used to decide whether an update shall be fetched from server or not */
 /* OTA */
 typedef enum otaUpdate {
   TH_OTA_IDLE,
@@ -127,13 +130,16 @@ uint32_t wifiReconnectTimer = 30000;
 bool     SPIFFS_WRITTEN =           true;
 uint32_t SPIFFS_REFERENCE_TIME;
 
+struct tm time_info;
+char time_buffer[6];
+
 /*===================================================================================================================*/
 /* The setup function is called once at startup of the sketch */
 /*===================================================================================================================*/
 void setup() {
   #ifdef CFG_DEBUG
   Serial.begin(115200);
-  Serial.println("Serial connection established");
+  Serial.println("SETUP STARTED");
   #endif
   Wire.begin(SDA_PIN, SCL_PIN);   /* needed for I²C communication with display and BME280 */
   SPIFFS_INIT();                  /* read stuff from SPIFFS */
@@ -144,32 +150,14 @@ void setup() {
                      myConfig.calibration_factor,
                      myConfig.calibration_offset,
                      myConfig.temperature_hysteresis,
-                     myConfig.thermostat_mode); /* GPIO to switch the connected relay, initial target temperature, sensor calbigration, thermostat hysteresis and last thermostat_mode */
+                     myConfig.thermostat_mode);
 
-  if (myConfig.sensor_type == cBME280) {
-    if (!myBME280.begin()) { /* init BMP sensor */
-      #ifdef CFG_DEBUG
-      Serial.println("Could not find a valid BME sensor!");
-      #endif
-    } else {
-      myBME280.setSettings(settings);
-    }
-  } else if (myConfig.sensor_type == cDHT22) {
-      myDHT22.setup(DHT_PIN, DHTesp::DHT22); /* init DHT sensor */
-      Serial.println("DHT22 init: " + String(myDHT22.getStatusString()));
-  } else {
-      #ifdef CFG_DEBUG
-      Serial.println("Sensor misconfiguration!");
-      #endif
-  }
-
-  DISPLAY_INIT();                                                                                  /* init Display */
-  WIFI_CONNECT();                                                                                  /* connect to WiFi */
-  OTA_INIT();
-
-  myMqttHelper.setup(getEspChipId());        /* build MQTT topics based on the defined device name */
-  MQTT_CONNECT(); /* connect to MQTT host and build subscriptions, must be called after SPIFFS_INIT()*/
-
+  SENSOR_INIT();   /* init sensors */
+  DISPLAY_INIT();  /* init Display */
+  WIFI_CONNECT();  /* connect to WiFi */
+  OTA_INIT();      /* init over the air update */
+  MQTT_CONNECT();  /* connect to MQTT host and build subscriptions, must be called after SPIFFS_INIT()*/
+  NTP();            /* init network time protocol, must be called after WIFI_CONNECT() and SPIFFS_INIT() */
   MDNS.begin(myConfig.name);
 
   webServer.begin();
@@ -191,24 +179,24 @@ void setup() {
     attachInterrupt(PHYS_INPUT_2_PIN, updateEncoder, CHANGE);
   }
 
-  SENSOR_MAIN(); /* acquire first sensor data before staring loop() to avoid relay toggle due to current temperature being 0 °C (init value) until first sensor value is read */
-
   #ifdef CFG_DEBUG
   #if CFG_BOARD_ESP8266
-  Serial.println("Vcc: " + String(ESP.getVcc() / 1000.0));
-  Serial.println("Reset Reason: " + String(ESP.getResetReason()));
-  Serial.println("Flash Size: " + String(ESP.getFlashChipRealSize()));
+  Serial.printf("Vcc: %f", (ESP.getVcc() / 1000.0f));
+  Serial.printf("Reset Reason: %s\n", ESP.getResetReason().c_str());
+  Serial.printf("lash Size: %d\n", ESP.getFlashChipRealSize());
   #elif CFG_BOARD_ESP32
   Serial.println("CPU Frequency: " + String(ESP.getCpuFreqMHz()));
   Serial.println("CPU 0 reset reason: " + getEspResetReason(rtc_get_reset_reason(0)));
   Serial.println("CPU 1 reset reason: " + getEspResetReason(rtc_get_reset_reason(1)));
   #else
   #endif
-
   Serial.println("Sketch Size: " + String(ESP.getSketchSize()));
   Serial.println("Free for Sketch: " + String(ESP.getFreeSketchSpace()));
   Serial.println("Free Heap: " + String(ESP.getFreeHeap()));
+  Serial.println("SETUP COMPLETE - ENTER LOOP");
   #endif
+
+  SENSOR_MAIN();  /* acquire first sensor data before staring loop() to avoid false value reporting due to current temperature, etc. being the init value until first sensor value is read */
 }
 
 /*===================================================================================================================*/
@@ -326,8 +314,10 @@ void WIFI_CONNECT(void) {
 
   #ifdef CFG_DEBUG
   Serial.println("WiFi Status: "+ wifiStatusToString(WiFi.status()));
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
+  WiFi.printDiag(Serial);
+  Serial.println("Local IP: "+ WiFi.localIP().toString());
+  Serial.println("Gateway IP: " + WiFi.gatewayIP().toString());
+  Serial.println("DNS IP: " + WiFi.dnsIP().toString());
   #endif
 }
 
@@ -339,7 +329,7 @@ void OTA_INIT(void) {
     OTA_UPDATE = TH_OTA_ACTIVE;
     DRAW_DISPLAY_MAIN();
     #ifdef CFG_DEBUG
-    Serial.println("Start");
+    Serial.println("Start OTA");
     #endif
   });
 
@@ -347,7 +337,7 @@ void OTA_INIT(void) {
     OTA_UPDATE = TH_OTA_FINISHED;
     DRAW_DISPLAY_MAIN();
     #ifdef CFG_DEBUG
-    Serial.println("\nEnd");
+    Serial.println("\nEnd OTA");
     #endif
   });
 
@@ -374,6 +364,7 @@ void OTA_INIT(void) {
 }
 
 void MQTT_CONNECT(void) {
+  myMqttHelper.setup(getEspChipId());        /* build MQTT topics based on the defined device name */
   mqtt_connect_counter++;
   if (WiFi.status() == WL_CONNECTED) {
     if (!myMqttClient.connected()) {
@@ -434,6 +425,11 @@ void loop() {
     HANDLE_HTTP_UPDATE();   /* pull update from server if it was requested via MQTT*/
   }
 
+  /* call every minute */
+  if (TimeReached(loop1minuteMillis)) {
+    SetNextTimeInterval(&loop1minuteMillis, loop1m);
+    NTP();                 /* check time regularly and change DST is necessary */
+  }
   /* debounce buttons */
   debounceOnOff.update();
   if (myConfig.input_method == cPUSH_BUTTONS) {
@@ -480,7 +476,7 @@ void HANDLE_SYSTEM_STATE(void) {
     Serial.println("Current time: "+ String(millis()));
     #endif
 
-    if (onOffButtonSystemResetTime + onOffButtonSystemResetInterval < millis()) {
+    if ((onOffButtonSystemResetTime + onOffButtonSystemResetInterval) < millis()) {
       systemRestartRequest = true;
     } else {
       /* waiting */
@@ -499,6 +495,215 @@ void HANDLE_SYSTEM_STATE(void) {
     myMqttClient.disconnect();
     delay(3000);
     ESP.restart();
+  }
+}
+
+void NTP(void) {
+  const char* ntp_server[] = { "fritz.box", "fritz.box", "fritz.box" };  // WiFi.gatewayIP().toString().c_str()
+  #ifdef CFG_DEBUG_SNTP
+  Serial.print("NTP Servers: ");
+  for (auto server : ntp_server) {
+    Serial.printf("%s ", server);
+  }
+  Serial.println();
+  Serial.println("UTC Offset: " + String(myConfig.utc_offset));
+  Serial.println("DST : " + String(myConfig.daylight_saving_time));
+  #endif  /* CFG_DEBUG_SNTP */
+
+  configTime((myConfig.utc_offset * 3600), (static_cast<uint8_t>(myConfig.daylight_saving_time) * 3600), ntp_server[0], ntp_server[1], ntp_server[2]);
+
+  #ifdef CFG_BOARD_ESP8266
+  /* try every second to get an answer from the NTP server for max. 15 seconds */
+  bool server_reachable = false;
+  uint32_t ntp_start_time = millis();
+  uint32_t millis_delta = millis() - ntp_start_time;
+  do {
+    delay(25);
+    millis_delta = millis() - ntp_start_time;
+    if (millis_delta >= 1000) {
+      #ifdef CFG_DEBUG_SNTP
+      Serial.printf("Waiting for NTP-Answer %02u sec\n", millis_delta / 1000);
+      #endif  /* CFG_DEBUG_SNTP */
+      delay(975);
+    }
+
+    for (uint8_t server_id = 0; server_id < 3 ; server_id++) {
+      if (sntp_getreachability(server_id)) {
+        #ifdef CFG_DEBUG_SNTP
+        Serial.printf("NTP Server %s not reachable!\n", ntp_server[server_id]);
+        #endif  /* CFG_DEBUG_SNTP */
+      } else {
+        server_reachable = true;
+      }
+    }
+  } while ((millis_delta <= (30 * secondsToMillisecondsFactor)) && !server_reachable);
+
+  #ifdef CFG_DEBUG_SNTP
+  // Serial.printf("SNTP connected to: %s\n", sntp_getserver());
+  #endif  /* CFG_DEBUG_SNTP */
+  #endif  /* CFG_BOARD_ESP8266 */
+
+  // In the EU, EFTA and associated countries, European Summer Time begins at 01:00 UTC/WET (02:00 CET, 03:00 EET) on the last Sunday in March and ends at 01:00 UTC (02:00 WEST, 03:00 CEST, 04:00 EEST) on the last Sunday in October each year */
+  // Sunday: time_info.tm_wday == 7
+  // Last Sunday: time_info.tm_mday >= 25 (must be in the range of 25th to 31st)
+  // March: time_info.tm_mon == 2
+  // Hour: time_info.tm_hour - myConfig.utc_offset == 1
+
+  // variable used for determination of actual DST
+  bool local_daylight_saving_time = myConfig.daylight_saving_time;
+  bool local_ntp_time_received = false;
+
+  // calculate if the last Sunday is still to come
+  // positive values: last sunday is still to come
+  // zero: is is Sunday
+  // negative values: last sunday is already gone
+  int8_t day_of_dst_change = ((31 - (time_info.tm_mday - 1)) - time_info.tm_wday > 0);
+
+  if (time_info.tm_year >= (2016 - 1900)) {
+    local_ntp_time_received = true;
+  } else {
+    #ifdef CFG_DEBUG
+    Serial.println("Failed to obtain time from NTP");
+    #endif /* CFG_DEBUG */
+  }
+
+  #ifdef CFG_DEBUG_SNTP
+  Serial.println("DST: " + String(time_info.tm_isdst));
+  Serial.println("YDay: " + String(time_info.tm_yday));
+  Serial.println("WDay: " + String(time_info.tm_wday));
+  Serial.println("Year: " + String(time_info.tm_year));
+  Serial.println("Month: " + String(time_info.tm_mon));
+  Serial.println("Day: " + String(time_info.tm_mday));
+  Serial.println("Hour: " + String(time_info.tm_hour));
+  Serial.println("Min: " + String(time_info.tm_min));
+  Serial.println("Sec: " + String(time_info.tm_sec));
+  Serial.println("Time: " + String(time_buffer));
+  #endif  /* CFG_DEBUG_SNTP */
+
+  if (local_ntp_time_received == true) {
+    // April to September is always DST
+    if (time_info.tm_mon > 2 && time_info.tm_mon < 9) {
+      local_daylight_saving_time = 1;
+      #ifdef CFG_DEBUG_SNTP
+      Serial.println("April to September - DST: " + String(local_daylight_saving_time));
+      #endif  /* CFG_DEBUG_SNTP */
+    // November to February is always not DST
+    } else if (time_info.tm_mon > 9 || time_info.tm_mon < 2) {
+      local_daylight_saving_time = 0;
+      #ifdef CFG_DEBUG_SNTP
+      Serial.println("November to February - DST: " + String(local_daylight_saving_time));
+      #endif  /* CFG_DEBUG_SNTP */
+    // March
+    } else if (time_info.tm_mon == 2) {
+      #ifdef CFG_DEBUG_SNTP
+      Serial.print("March");
+      #endif  /* CFG_DEBUG_SNTP */
+      // DST coming
+      if (day_of_dst_change > 0) {
+        #ifdef CFG_DEBUG_SNTP
+        Serial.print(" before DST change");
+        #endif  /* CFG_DEBUG_SNTP */
+        local_daylight_saving_time = 0;
+      // DST gone
+      } else if (day_of_dst_change < 0) {
+        #ifdef CFG_DEBUG_SNTP
+        Serial.print(" after DST change");
+        #endif  /* CFG_DEBUG_SNTP */
+        local_daylight_saving_time = 1;
+      // DST change today
+      } else {
+        // UTC hour is 1 or later
+        #ifdef CFG_DEBUG_SNTP
+        Serial.print(" DST change today");
+        #endif  /* CFG_DEBUG_SNTP */
+        if ((time_info.tm_hour - myConfig.utc_offset - static_cast<uint8_t>(myConfig.daylight_saving_time)) >= 1) {
+          #ifdef CFG_DEBUG_SNTP
+          Serial.print(" - pending");
+          #endif  /* CFG_DEBUG_SNTP */
+          local_daylight_saving_time = 1;
+        // UTC hour is before 1
+        } else {
+          #ifdef CFG_DEBUG_SNTP
+          Serial.print(" - done");
+          #endif  /* CFG_DEBUG_SNTP */
+          local_daylight_saving_time = 0;
+        }
+      }
+      #ifdef CFG_DEBUG_SNTP
+      Serial.println("");
+      #endif  /* CFG_DEBUG_SNTP */
+    // October
+    } else if (time_info.tm_mon == 9) {
+      #ifdef CFG_DEBUG_SNTP
+      Serial.print("October");
+      #endif  /* CFG_DEBUG_SNTP */
+      // not DST coming
+      if (day_of_dst_change > 0) {
+        #ifdef CFG_DEBUG_SNTP
+        Serial.print(" before DST change");
+        #endif  /* CFG_DEBUG_SNTP */
+        local_daylight_saving_time = 1;
+      // not DST gone
+      } else if (day_of_dst_change < 0) {
+        #ifdef CFG_DEBUG_SNTP
+        Serial.print(" after DST change");
+        #endif  /* CFG_DEBUG_SNTP */
+        local_daylight_saving_time = 0;
+      // not DST change today
+      } else {
+        #ifdef CFG_DEBUG_SNTP
+        Serial.print(" DST change today");
+        #endif  /* CFG_DEBUG_SNTP */
+        // UTC hour is 1 or later
+        if ((time_info.tm_hour - myConfig.utc_offset - static_cast<uint8_t>(myConfig.daylight_saving_time)) >= 1) {
+          #ifdef CFG_DEBUG_SNTP
+          Serial.print(" - pending");
+          #endif  /* CFG_DEBUG_SNTP */
+          local_daylight_saving_time = 0;
+        // UTC hour is before 1
+        } else {
+          #ifdef CFG_DEBUG_SNTP
+          Serial.print(" - done");
+          #endif  /* CFG_DEBUG_SNTP */
+          local_daylight_saving_time = 1;
+        }
+      }
+      #ifdef CFG_DEBUG_SNTP
+      Serial.println("");
+      #endif  /* CFG_DEBUG_SNTP */
+    }
+  }
+
+  // if actual DST differs from the stored one, change it, persist it and re-initialze NTP with new DST flag
+  if (myConfig.daylight_saving_time != local_daylight_saving_time) {
+    #ifdef CFG_DEBUG_SNTP
+    Serial.println("DST change calculated");
+    Serial.println("DST old: " + String(myConfig.daylight_saving_time));
+    Serial.println("DST new: " + String(local_daylight_saving_time));
+    #endif  /* CFG_DEBUG_SNTP */
+    myConfig.daylight_saving_time = local_daylight_saving_time;
+    requestSaveToSpiffs = true;
+    configTime((myConfig.utc_offset * 3600), (static_cast<uint8_t>(myConfig.daylight_saving_time) * 3600), ntp_server[0], ntp_server[1], ntp_server[2]);
+  }
+  updateTimeBuffer();
+}
+
+void SENSOR_INIT() {
+  if (myConfig.sensor_type == cBME280) {
+    if (!myBME280.begin()) { /* init BMP sensor */
+      #ifdef CFG_DEBUG
+      Serial.println("Could not find a valid BME sensor!");
+      #endif
+    } else {
+      myBME280.setSettings(settings);
+    }
+  } else if (myConfig.sensor_type == cDHT22) {
+      myDHT22.setup(DHT_PIN, DHTesp::DHT22); /* init DHT sensor */
+      Serial.println("DHT22 init: " + String(myDHT22.getStatusString()));
+  } else {
+      #ifdef CFG_DEBUG
+      Serial.println("Sensor misconfiguration!");
+      #endif
   }
 }
 
@@ -532,7 +737,7 @@ void SENSOR_MAIN() {
       myThermostat.setCurrentHumidity((int16_t)(10* sensHumid));     /* read value and convert to one decimal precision integer */
       myThermostat.setCurrentTemperature((int16_t)(10* sensTemp));   /* read value and convert to one decimal precision integer */
 
-      #ifdef CFG_DEBUG
+      #ifdef CFG_DEBUG_SENSOR_VALUES
       Serial.print("Temperature: ");
       Serial.print(intToFloat(myThermostat.getCurrentTemperature()), 1);
       Serial.println(" *C ");
@@ -546,7 +751,7 @@ void SENSOR_MAIN() {
       Serial.print("Filtered humidity: ");
       Serial.print(intToFloat(myThermostat.getFilteredHumidity()), 1);
       Serial.println(" %");
-      #endif
+      #endif  /* CFG_DEBUG_SENSOR_VALUES */
 
       #ifdef CFG_PRINT_TEMPERATURE_QUEUE
       for (int16_t i = 0; i < CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE; i++) {
@@ -590,7 +795,7 @@ void DRAW_DISPLAY_MAIN(void) {
     case TH_OTA_IDLE:
       break;
     }
-  } else if (fetchUpdate == true) { /* HTTP Update */
+  } else if (fetch_update == true) { /* HTTP Update */
     myDisplay.setFont(Roboto_Condensed_16);
     myDisplay.setTextAlignment(TEXT_ALIGN_CENTER);
     myDisplay.drawString(64, 22, "Update");
@@ -600,6 +805,8 @@ void DRAW_DISPLAY_MAIN(void) {
 
     if (myThermostat.getSensorError()) {
       myDisplay.drawString(128, drawTempYOffset, "err");
+    } else if (myThermostat.getFilteredTemperature() == INT16_MIN) {
+      myDisplay.drawString(128, drawTempYOffset, "init");
     } else {
       myDisplay.drawString(128, drawTempYOffset, String(intToFloat(myThermostat.getFilteredTemperature()), 1));
     }
@@ -619,6 +826,8 @@ void DRAW_DISPLAY_MAIN(void) {
   myDisplay.setFont(Roboto_Condensed_16);
   myDisplay.drawString(0, drawTargetTempYOffset, String(VERSION));
   myDisplay.drawString(0, 48, String("IPv4: " + (WiFi.localIP().toString()).substring(((WiFi.localIP().toString()).lastIndexOf(".") + 1), (WiFi.localIP().toString()).length())));
+  myDisplay.setTextAlignment(TEXT_ALIGN_RIGHT);
+  myDisplay.drawString(128, 48, String(time_buffer));
   #endif
 
   myDisplay.display();
@@ -651,13 +860,13 @@ void MQTT_MAIN(void) {
 }
 
 void HANDLE_HTTP_UPDATE(void) {
-  if (fetchUpdate == true) {
+  if (fetch_update == true) {
     /* publish and loop here before fetching the update */
     myMqttClient.publish(myMqttHelper.getTopicUpdateFirmwareAccepted(), String(false), false, MQTT_QOS); /* publish accepted update with value false to reset the switch in Home Assistant */
     myMqttClient.loop();
 
     DRAW_DISPLAY_MAIN();
-    fetchUpdate = false;
+    fetch_update = false;
     #ifdef CFG_DEBUG
     Serial.println("Remote update started");
     #endif
@@ -836,6 +1045,15 @@ void mqttPubState(void) {
     MQTT_QOS); /* QoS */
 }
 
+/* time_buffer holds the current time in the %H:%M format */
+void updateTimeBuffer(void) {
+  time_t now;
+  time(&now);
+  (void) localtime_r(&now, &time_info);
+  const char* time_format = "%H:%M";
+  strftime(time_buffer, sizeof(time_buffer), time_format, &time_info);
+}
+
 void handleWebServerClient(void) {
   float rssiInPercent = WiFi.RSSI();
   rssiInPercent = isnan(rssiInPercent) ? -100.0 : min(max(2 * (rssiInPercent + 100.0), 0.0), 100.0);
@@ -926,6 +1144,7 @@ void handleWebServerClient(void) {
   webpageTableAppend4Cols(String("calibration_offset"),       String("Range: -50 .. +50, LSB: 0.1 &deg;C"),  String(myConfig.calibration_offset),        String("Offset calibration for temperature sensor."));
   webpageTableAppend4Cols(String("calibration_factor"),       String("Range: +50 .. +200, LSB: 1 %"),        String(myConfig.calibration_factor),        String("Linearity calibration for temperature sensor."));
   webpageTableAppend4Cols(String("display_brightness"),       String("Range: 0 .. +255, LSB: 1 step"),       String(myConfig.display_brightness),        String("Brightness of OLAD display"));
+  webpageTableAppend4Cols(String("fetch_update"),             String("0 | 1"),                               String(fetch_update),                       String("Trigger download and install binary from update server: 1 = fetch; 0 = do nothing"));
   webpage +="</table>";
   /* Restart Device */
   webpage +="<p><b>Restart Device</b></p>";
@@ -962,13 +1181,22 @@ void handleWebServerClient(void) {
             } else if ((value.toInt() & 1) == false) {
               myConfig.discovery_enabled = false;
             }
+            requestSaveToSpiffs = true;
           } else if (key == "name") {
             if ( (value != "") && (value != myConfig.name) ) {
-              #ifdef CFG_DEBUG
-              Serial.println("Request SPIFFS write with restart.");
-              #endif
               strlcpy(myConfig.name, value.c_str(), sizeof(myConfig.name));
-              requestSaveToSpiffsWithRestart = true;
+              /* new name will create new entities in HA if discovery is enabled so do a restart then */
+              if (myConfig.discovery_enabled == true) {
+                requestSaveToSpiffsWithRestart = true;
+                #ifdef CFG_DEBUG
+                Serial.println("Request SPIFFS write with restart.");
+                #endif
+              } else {
+                requestSaveToSpiffs = true;
+                #ifdef CFG_DEBUG
+                Serial.println("Request SPIFFS write.");
+                #endif
+              }
             } else {
               #ifdef CFG_DEBUG
               Serial.println("Configuration unchanged, do nothing");
@@ -1025,6 +1253,13 @@ void handleWebServerClient(void) {
               Serial.println("Configuration unchanged, do nothing");
               #endif
             }
+          } else if (key == "fetch_update") {
+            if ((value.toInt() & 1) == true) {
+              fetch_update = true;
+              #ifdef CFG_DEBUG
+              Serial.println("HTTP Update triggered via webpage");
+              #endif
+            }
           }
         }
       }
@@ -1064,7 +1299,8 @@ void handleHttpReset(void) {
 }
 
 /* MQTT callback if a message was received */
-void messageReceived(String &topic, String &payload) { //NOLINT
+// cppcheck-suppress constParameter ; messageReceived is a library function
+void messageReceived(String &topic, String &payload) {  // NOLINT
   #ifdef CFG_DEBUG
   Serial.println("received: " + topic + " : " + payload);
   #endif
@@ -1081,7 +1317,7 @@ void messageReceived(String &topic, String &payload) { //NOLINT
       #ifdef CFG_DEBUG
       Serial.println("Firmware updated triggered via MQTT");
       #endif
-      fetchUpdate = true;
+      fetch_update = true;
     }
   } else if (topic == myMqttHelper.getTopicTargetTempCmd()) { /* check incoming target temperature, don't set same target temperature as new*/
     if (myThermostat.getTargetTemperature() != floatToInt(payload.toFloat())) {
