@@ -26,7 +26,7 @@ Thermostat::Thermostat()
     new_calib_(0), \
     current_temperature_(INT16_MIN), \
     current_humidity_(0), \
-    filtered_temperature_(0), \
+    filtered_temperature_(INT16_MIN), \
     filtered_humidity_(0), \
     sensor_failure_counter_(0), \
     temperature_offset_(0), \

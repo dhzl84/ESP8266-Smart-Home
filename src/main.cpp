@@ -150,7 +150,7 @@ void setup() {
                      myConfig.calibration_factor,
                      myConfig.calibration_offset,
                      myConfig.temperature_hysteresis,
-                     myConfig.thermostat_mode); /* GPIO to switch the connected relay, initial target temperature, sensor calbigration, thermostat hysteresis and last thermostat_mode */
+                     myConfig.thermostat_mode);
 
   SENSOR_INIT();   /* init sensors */
   DISPLAY_INIT();  /* init Display */
@@ -195,6 +195,8 @@ void setup() {
   Serial.println("Free Heap: " + String(ESP.getFreeHeap()));
   Serial.println("SETUP COMPLETE - ENTER LOOP");
   #endif
+
+  SENSOR_MAIN();  /* acquire first sensor data before staring loop() to avoid false value reporting due to current temperature, etc. being the init value until first sensor value is read */
 }
 
 /*===================================================================================================================*/
@@ -703,7 +705,6 @@ void SENSOR_INIT() {
       Serial.println("Sensor misconfiguration!");
       #endif
   }
-  SENSOR_MAIN(); /* acquire first sensor data before staring loop() to avoid relay toggle due to current temperature being 0 °C (init value) until first sensor value is read */
 }
 
 void SENSOR_MAIN() {
@@ -804,6 +805,8 @@ void DRAW_DISPLAY_MAIN(void) {
 
     if (myThermostat.getSensorError()) {
       myDisplay.drawString(128, drawTempYOffset, "err");
+    } else if (myThermostat.getFilteredTemperature() == INT16_MIN) {
+      myDisplay.drawString(128, drawTempYOffset, "init");
     } else {
       myDisplay.drawString(128, drawTempYOffset, String(intToFloat(myThermostat.getFilteredTemperature()), 1));
     }
