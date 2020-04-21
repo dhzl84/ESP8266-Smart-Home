@@ -499,7 +499,7 @@ void HANDLE_SYSTEM_STATE(void) {
 }
 
 void NTP(void) {
-  const char* ntp_server[] = { "fritz.box", "fritz.box", "fritz.box" };  // WiFi.gatewayIP().toString().c_str()
+  const char* ntp_server[] = { "fritz.box", "0.de.pool.ntp.org", "0.ch.pool.ntp.org" };  // WiFi.gatewayIP().toString().c_str()
   #ifdef CFG_DEBUG_SNTP
   Serial.print("NTP Servers: ");
   for (auto server : ntp_server) {
