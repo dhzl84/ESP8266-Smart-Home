@@ -14,6 +14,9 @@
   #define DEVICE_BINARY               "http://<domain or ip>/<name>.bin"
 */
 
+#define secondsToMilliseconds(s)  static_cast<uint32_t>(s*1000u)
+#define minutesToMilliseconds(m)  static_cast<uint32_t>(m*60000u)
+
 /* input_method */
 #define cROTARY_ENCODER 0
 #define cPUSH_BUTTONS   1
@@ -131,10 +134,8 @@ class DiffTime {
   uint16_t time_duration_min_;
   uint16_t time_duration_max_;
   uint16_t time_duration_mean_;
+  uint32_t time_duration_mean_buffer_;
   uint16_t time_count_;
-  uint16_t time_duration_array_[1000];
 };
-
-bool get_local_time(struct tm * info);
 
 #endif  // MAIN_H_

@@ -22,6 +22,7 @@
 #if CFG_BOARD_ESP8266
 ADC_MODE(ADC_VCC);             /* measure Vcc */
 #elif CFG_BOARD_ESP32
+/* no SW only solution available */
 #else
 #endif
 
@@ -30,24 +31,20 @@ ADC_MODE(ADC_VCC);             /* measure Vcc */
 /*===================================================================================================================*/
 uint32_t wifi_connect_counter = 0;
 uint32_t mqtt_connect_counter = 0;
-/* config */
 struct Configuration myConfig;
-/* mqtt */
 #ifndef MQTT_QOS
   #define MQTT_QOS 0 /* valid values are 0, 1 and 2 */
 #endif
 uint32_t mqttReconnectTime       = 0;
-uint32_t mqttReconnectInterval   = MQTT_RECONNECT_TIME;
+uint32_t mqttReconnectInterval   = secondsToMilliseconds(5); /* 5 s in milliseconds */
 uint32_t mqttPubCycleTime        = 0;
-#define secondsToMillisecondsFactor  1000
-#define minutesToMillisecondsFactor 60000
 /* loop handler */
 #define loop50ms        50
 #define loop100ms      100
 #define loop500ms      500
-#define loop1000ms    1000
-#define loop1m       60000
-uint32_t loop50msMillis   =  0;
+#define loop1000ms     secondsToMilliseconds(1)
+#define loop1m         minutesToMilliseconds(1)
+uint32_t loop50msMillis    =  0;
 uint32_t loop100msMillis   = 13; /* start loops with some offset to avoid calling all loops every second */
 uint32_t loop500msMillis   = 17; /* start loops with some offset to avoid calling all loops every second */
 uint32_t loop1000msMillis  = 19; /* start loops with some offset to avoid calling all loops every second */
@@ -72,7 +69,7 @@ volatile int16_t lastEncoded = 0b11;                   /* initial state of the r
 volatile int16_t rotaryEncoderDirectionInts = rotInit; /* initialize rotary encoder with no direction */
 const uint32_t buttonDebounceInterval = 25;
 uint32_t onOffButtonSystemResetTime = 0;
-uint32_t onOffButtonSystemResetInterval = 5000;
+uint32_t onOffButtonSystemResetInterval = secondsToMilliseconds(5);
 
 /* thermostat */
 #define tempStep              5
@@ -120,18 +117,19 @@ DiffTime MyLooptime;
 bool     systemRestartRequest = false;
 bool     requestSaveToSpiffs = false;
 bool     requestSaveToSpiffsWithRestart = false;
-uint32_t wifiReconnectTimer = 30000;
+uint32_t wifiReconnectTimer = secondsToMilliseconds(30);
 #define WIFI_RECONNECT_TIME 30
 
 #define  SPIFFS_MQTT_ID_FILE        String("/itsme")       // for migration only
 #define  SPIFFS_SENSOR_CALIB_FILE   String("/sensor")      // for migration only
 #define  SPIFFS_TARGET_TEMP_FILE    String("/targetTemp")  // for migration only
-#define  SPIFFS_WRITE_DEBOUNCE      20000 /* write target temperature to spiffs if it wasn't changed for 20 s (time in ms) */
+#define  SPIFFS_WRITE_DEBOUNCE      secondsToMilliseconds(20) /* write target temperature to spiffs if it wasn't changed for 20 s (time in ms) */
 bool     SPIFFS_WRITTEN =           true;
-uint32_t SPIFFS_REFERENCE_TIME;
+uint32_t SPIFFS_REFERENCE_TIME      = 0;
 
+/* Time */
 struct tm time_info;
-char time_buffer[6];
+char time_buffer[6];  /* hold the current time in format "%H:%M" */
 
 /*===================================================================================================================*/
 /* The setup function is called once at startup of the sketch */
@@ -369,7 +367,7 @@ void MQTT_CONNECT(void) {
   if (WiFi.status() == WL_CONNECTED) {
     if (!myMqttClient.connected()) {
       myMqttClient.disconnect();
-      myMqttClient.setOptions(30, true, 30000);
+      myMqttClient.setOptions(30, true, secondsToMilliseconds(30));
       myMqttClient.begin(myConfig.mqtt_host, myConfig.mqtt_port, myWiFiClient);
       myMqttClient.setWill((myMqttHelper.getTopicLastWill()).c_str(),   "offline", true, MQTT_QOS);     /* broker shall publish 'offline' on ungraceful disconnect >> Last Will */
       myMqttClient.onMessage(messageReceived);                                                        /* register callback */
@@ -459,7 +457,7 @@ void loop() {
 void HANDLE_SYSTEM_STATE(void) {
   /* check WiFi connection every 30 seconds*/
   if (TimeReached(wifiReconnectTimer)) {
-    SetNextTimeInterval(&wifiReconnectTimer, (WIFI_RECONNECT_TIME * secondsToMillisecondsFactor));
+    SetNextTimeInterval(&wifiReconnectTimer, (secondsToMilliseconds(WIFI_RECONNECT_TIME)));
     if (WiFi.status() != WL_CONNECTED) {
       #ifdef CFG_DEBUG
       Serial.println("Lost WiFi; Status: "+ String(WiFi.status()));
@@ -493,7 +491,7 @@ void HANDLE_SYSTEM_STATE(void) {
     Serial.println("Restarting in 3 seconds");
     #endif
     myMqttClient.disconnect();
-    delay(3000);
+    delay(secondsToMilliseconds(3));
     ESP.restart();
   }
 }
@@ -510,6 +508,7 @@ void NTP(void) {
   Serial.println("DST : " + String(myConfig.daylight_saving_time));
   #endif  /* CFG_DEBUG_SNTP */
 
+  /* UTC and DST are defined in hours, configTime expects seconds, thus multiply with 3600 */
   configTime((myConfig.utc_offset * 3600), (static_cast<uint8_t>(myConfig.daylight_saving_time) * 3600), ntp_server[0], ntp_server[1], ntp_server[2]);
 
   #ifdef CFG_BOARD_ESP8266
@@ -536,7 +535,7 @@ void NTP(void) {
         server_reachable = true;
       }
     }
-  } while ((millis_delta <= (30 * secondsToMillisecondsFactor)) && !server_reachable);
+  } while ((millis_delta <= (secondsToMilliseconds(30))) && !server_reachable);
 
   #ifdef CFG_DEBUG_SNTP
   // Serial.printf("SNTP connected to: %s\n", sntp_getserver());
@@ -683,6 +682,7 @@ void NTP(void) {
     #endif  /* CFG_DEBUG_SNTP */
     myConfig.daylight_saving_time = local_daylight_saving_time;
     requestSaveToSpiffs = true;
+    /* UTC and DST are defined in hours, configTime expects seconds, thus multiply with 3600 */
     configTime((myConfig.utc_offset * 3600), (static_cast<uint8_t>(myConfig.daylight_saving_time) * 3600), ntp_server[0], ntp_server[1], ntp_server[2]);
   }
   updateTimeBuffer();
@@ -710,7 +710,7 @@ void SENSOR_INIT() {
 void SENSOR_MAIN() {
   /* schedule routine for sensor read */
   if (TimeReached(readSensorScheduled)) {
-    SetNextTimeInterval(&readSensorScheduled, (myConfig.sensor_update_interval * secondsToMillisecondsFactor));
+    SetNextTimeInterval(&readSensorScheduled, (secondsToMilliseconds(myConfig.sensor_update_interval)));
 
     float sensTemp(NAN), sensHumid(NAN);
 
@@ -825,6 +825,7 @@ void DRAW_DISPLAY_MAIN(void) {
   myDisplay.setTextAlignment(TEXT_ALIGN_LEFT);
   myDisplay.setFont(Roboto_Condensed_16);
   myDisplay.drawString(0, drawTargetTempYOffset, String(VERSION));
+  myDisplay.drawString(0, 18, String(BUILD_NUMBER));
   myDisplay.drawString(0, 48, String("IPv4: " + (WiFi.localIP().toString()).substring(((WiFi.localIP().toString()).lastIndexOf(".") + 1), (WiFi.localIP().toString()).length())));
   myDisplay.setTextAlignment(TEXT_ALIGN_RIGHT);
   myDisplay.drawString(128, 48, String(time_buffer));
@@ -844,7 +845,7 @@ void MQTT_MAIN(void) {
     }
   } else {  /* check if there is new data to publish and shift PubCycle if data is published on event, else publish every PubCycleInterval */
     if ( TimeReached(mqttPubCycleTime) || myThermostat.getNewData() ) {
-        SetNextTimeInterval(&mqttPubCycleTime, myConfig.mqtt_publish_cycle * minutesToMillisecondsFactor);
+        SetNextTimeInterval(&mqttPubCycleTime, minutesToMilliseconds(myConfig.mqtt_publish_cycle));
         mqttPubState();
         myThermostat.resetNewData();
     }
@@ -871,12 +872,7 @@ void HANDLE_HTTP_UPDATE(void) {
     Serial.println("Remote update started");
     #endif
     WiFiClient client;
-    #if CFG_BOARD_ESP8266
-    t_httpUpdate_return ret = ESPhttpUpdate.update(client, myConfig.update_server_address, FW);
-    #elif CFG_BOARD_ESP32
     t_httpUpdate_return ret = myHttpUpdate.update(client, myConfig.update_server_address, FW);
-    #else
-    #endif
 
     switch (ret) {
     case HTTP_UPDATE_FAILED:
@@ -1102,6 +1098,7 @@ void handleWebServerClient(void) {
   webpageTableAppend2Cols(String("WiFi Connects"),        String(wifi_connect_counter));
   webpageTableAppend2Cols(String("MQTT Status"),          String((myMqttClient.connected()) == true ? "connected" : "disconnected"));
   webpageTableAppend2Cols(String("MQTT Connects"),        String(mqtt_connect_counter));
+  webpageTableAppend2Cols(String("Local Time"),           String(time_buffer));
   webpageTableAppend2Cols(String("Looptime mean"),        String(MyLooptime.get_time_duration_mean()));
   webpageTableAppend2Cols(String("Looptime min"),         String(MyLooptime.get_time_duration_min()));
   webpageTableAppend2Cols(String("Looptime max"),         String(MyLooptime.get_time_duration_max()));
