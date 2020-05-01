@@ -73,20 +73,20 @@ void Thermostat::loop(void) {
   if ((sensor_error_ == true) || (current_temperature_ == INT16_MIN)) {
     /* switch off heating if sensor does not provide values */
     if (actual_state_ == TH_HEAT) {
-      actual_state_ = TH_OFF;
+      setActualState(TH_OFF);
     }
   } else {  /* sensor is healthy */
     if (thermostat_mode_ == TH_HEAT) {  /* check if heating is allowed by user */
       if (filtered_temperature_ <= static_cast<int16_t>(target_temperature_ - thermostat_hysteresis_low_ )) {  /* check if measured temperature is lower than heating target */
         if (actual_state_ == TH_OFF) {  /* switch on heating if target temperature is higher than measured temperature */
-          actual_state_ = TH_HEAT;
+          setActualState(TH_HEAT);
           #ifdef CFG_DEBUG
           Serial.println("heating");
           #endif
         }
       } else if (filtered_temperature_ >= static_cast<int16_t>(target_temperature_ + thermostat_hysteresis_high_)) {  /* check if measured temperature is higher than heating target */
         if (actual_state_ == TH_HEAT) {  /* switch off heating if target temperature is lower than measured temperature */
-          actual_state_ = TH_OFF;
+          setActualState(TH_OFF);
           #ifdef CFG_DEBUG
           Serial.println("not heating");
           #endif
@@ -96,7 +96,7 @@ void Thermostat::loop(void) {
       }
     } else {
       /* disable heating if heating is set to not allowed by user */
-      actual_state_ = TH_OFF;
+      setActualState(TH_OFF);
     }
   }
 }
