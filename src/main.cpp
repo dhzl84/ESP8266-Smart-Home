@@ -1099,9 +1099,9 @@ void handleWebServerClient(void) {
   webpageTableAppend2Cols(String("MQTT Status"),          String((myMqttClient.connected()) == true ? "connected" : "disconnected"));
   webpageTableAppend2Cols(String("MQTT Connects"),        String(mqtt_connect_counter));
   webpageTableAppend2Cols(String("Local Time"),           String(time_buffer));
-  webpageTableAppend2Cols(String("Looptime mean"),        String(MyLooptime.get_time_duration_mean()));
-  webpageTableAppend2Cols(String("Looptime min"),         String(MyLooptime.get_time_duration_min()));
-  webpageTableAppend2Cols(String("Looptime max"),         String(MyLooptime.get_time_duration_max()));
+  webpageTableAppend2Cols(String("Looptime mean [&micro;s]"),   String(MyLooptime.get_time_duration_mean()));
+  webpageTableAppend2Cols(String("Looptime min [&micro;s]"),    String(MyLooptime.get_time_duration_min()));
+  webpageTableAppend2Cols(String("Looptime max [&micro;s]"),    String(MyLooptime.get_time_duration_max()));
   webpage +="</table>";
   /* Change Input Method */
   webpage +="<p><b>Change Input Method</b></p>";

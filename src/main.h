@@ -123,17 +123,17 @@ class DiffTime {
   ~DiffTime(void);
   void set_time_start(void);
   void set_time_end(void);
-  uint16_t get_time_duration(void);
-  uint16_t get_time_duration_mean(void);
-  uint16_t get_time_duration_min(void);
-  uint16_t get_time_duration_max(void);
+  uint32_t get_time_duration(void);
+  uint32_t get_time_duration_mean(void);
+  uint32_t get_time_duration_min(void);
+  uint32_t get_time_duration_max(void);
  private:
   uint32_t time_start_;
   uint32_t time_end_;
-  uint16_t time_duration_;
-  uint16_t time_duration_min_;
-  uint16_t time_duration_max_;
-  uint16_t time_duration_mean_;
+  uint32_t time_duration_;
+  uint32_t time_duration_min_;
+  uint32_t time_duration_max_;
+  uint32_t time_duration_mean_;
   uint32_t time_duration_mean_buffer_;
   uint16_t time_count_;
 };

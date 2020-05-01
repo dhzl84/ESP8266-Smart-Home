@@ -12,8 +12,8 @@
 
 #define FW (FW_PREFIX VERSION)
 
-#define BUILD_NUMBER "5ea042f4"
+#define BUILD_NUMBER "5eabce6b"
 
-#define BUILD_TIME "2020-04-22 13:13:24"
+#define BUILD_TIME "2020-05-01 07:23:23"
 
 #endif  /* VERSION_H_ */
