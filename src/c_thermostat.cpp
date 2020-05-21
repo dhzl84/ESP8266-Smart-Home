@@ -32,6 +32,7 @@ Thermostat::Thermostat()
     temperature_offset_(0), \
     temperature_factor_(100), \
     sensor_error_threshold_(3), \
+    outside_temperature_(INT16_MIN), \
     temperature_value_queue_filled_(false), \
     humidity_value_queue_filled_(false), \
     temperature_value_sample_id_(0), \
@@ -295,6 +296,14 @@ void Thermostat::setLastSensorReadFailed(bool value) {
       sensor_error_ = false;
     }
   }
+}
+
+void Thermostat::setOutsideTemperature(int16_t value) {
+  outside_temperature_ = value;
+}
+
+int16_t Thermostat::getOutsideTemperature(void) {
+  return outside_temperature_;
 }
 
 void Thermostat::setSensorCalibData(int16_t factor, int16_t offset, bool calib) {

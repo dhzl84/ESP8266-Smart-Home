@@ -14,6 +14,9 @@
   #define DEVICE_BINARY               "http://<domain or ip>/<name>.bin"
 */
 
+#define secondsToMilliseconds(s)  static_cast<uint32_t>(s*1000u)
+#define minutesToMilliseconds(m)  static_cast<uint32_t>(m*60000u)
+
 /* input_method */
 #define cROTARY_ENCODER 0
 #define cPUSH_BUTTONS   1
@@ -83,8 +86,8 @@ void updateEncoder(void);
 /* global scope functions */
 /*===================================================================================================================*/
 void homeAssistantDiscovery(void);
-void homeAssistantUndiscover(void);
-void homeAssistantUndiscoverObsolete(void);  /* DEPRECATED */
+void homeAssistantRemoveDiscovered(void);
+void homeAssistantRemoveDiscoveredObsolete(void);  /* DEPRECATED */
 void mqttPubState(void);
 void loadConfiguration(Configuration &config);  // NOLINT: pass by reference
 bool saveConfiguration(const Configuration &config);
@@ -120,21 +123,19 @@ class DiffTime {
   ~DiffTime(void);
   void set_time_start(void);
   void set_time_end(void);
-  uint16_t get_time_duration(void);
-  uint16_t get_time_duration_mean(void);
-  uint16_t get_time_duration_min(void);
-  uint16_t get_time_duration_max(void);
+  uint32_t get_time_duration(void);
+  uint32_t get_time_duration_mean(void);
+  uint32_t get_time_duration_min(void);
+  uint32_t get_time_duration_max(void);
  private:
   uint32_t time_start_;
   uint32_t time_end_;
-  uint16_t time_duration_;
-  uint16_t time_duration_min_;
-  uint16_t time_duration_max_;
-  uint16_t time_duration_mean_;
+  uint32_t time_duration_;
+  uint32_t time_duration_min_;
+  uint32_t time_duration_max_;
+  uint32_t time_duration_mean_;
+  uint32_t time_duration_mean_buffer_;
   uint16_t time_count_;
-  uint16_t time_duration_array_[1000];
 };
-
-bool get_local_time(struct tm * info);
 
 #endif  // MAIN_H_

@@ -236,13 +236,11 @@ DiffTime::DiffTime() \
   : time_start_(0), \
     time_end_(0), \
     time_duration_(0), \
-    time_duration_min_(UINT16_MAX), \
+    time_duration_min_(UINT32_MAX), \
     time_duration_max_(0), \
     time_duration_mean_(0), \
+    time_duration_mean_buffer_(0), \
     time_count_(0) {
-  for (uint16_t iter : time_duration_array_) {
-    time_duration_array_[iter] = 0;
-  }
 }
 
 DiffTime::~DiffTime() {
@@ -250,12 +248,12 @@ DiffTime::~DiffTime() {
 }
 
 void DiffTime::set_time_start(void) {
-  time_start_ = millis();
+  time_start_ = micros();
 }
 
 void DiffTime::set_time_end(void) {
-  time_end_ = millis();
-  time_duration_ = time_end_ - time_start_;
+  time_end_ = micros();
+  time_duration_ = (time_end_ - time_start_);
 
   if (time_duration_ > time_duration_max_) {
     time_duration_max_ = time_duration_;
@@ -264,15 +262,18 @@ void DiffTime::set_time_end(void) {
     time_duration_min_ = time_duration_;
   }
   if (time_count_ < 1000) {
-    time_duration_array_[time_count_] = time_duration_;
-    time_count_++;
-  } else {
-    time_count_ = 0;
-    for (uint16_t element : time_duration_array_) {
-      // cppcheck-suppress useStlAlgorithm ; accumulate is not available in <numeric>
-      time_duration_mean_ += time_duration_array_[element];
+    if ((time_duration_mean_buffer_ + time_duration_) > UINT32_MAX) {
+      /* avoid buffer overflow */
+      time_count_ = 0;
+      time_duration_mean_buffer_ = 0;
+    } else {
+      time_duration_mean_buffer_ += time_duration_;
+      time_count_++;
     }
-    time_duration_mean_ = time_duration_mean_ / 1000;
+  } else {
+    time_duration_mean_ = static_cast<uint32_t>(time_duration_mean_buffer_ / time_count_);
+    time_duration_mean_buffer_ = 0;
+    time_count_ = 0;
     #ifdef CFG_DEBUG_RUNTIME
     Serial.println("Duration (last 1000): " + String(static_cast<float>(time_duration_mean_)) + " ms");
     Serial.println("Duration min: " + String(time_duration_min_) + " ms");
@@ -281,18 +282,7 @@ void DiffTime::set_time_end(void) {
   }
 }
 
-uint16_t DiffTime::get_time_duration(void)      { return time_duration_; }
-uint16_t DiffTime::get_time_duration_mean(void) { return time_duration_mean_; }
-uint16_t DiffTime::get_time_duration_min(void)  { return time_duration_min_; }
-uint16_t DiffTime::get_time_duration_max(void)  { return time_duration_max_; }
-
-bool get_local_time(struct tm * info) {
-  time_t now;
-  bool ret = false;
-  time(&now);
-  localtime_r(&now, info);
-  if (info->tm_year > (2016 - 1900)) {
-    ret = true;
-  }
-  return ret;
-}
+uint32_t DiffTime::get_time_duration(void)      { return time_duration_; }
+uint32_t DiffTime::get_time_duration_mean(void) { return time_duration_mean_; }
+uint32_t DiffTime::get_time_duration_min(void)  { return time_duration_min_; }
+uint32_t DiffTime::get_time_duration_max(void)  { return time_duration_max_; }
