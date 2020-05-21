@@ -9,7 +9,7 @@
 
 mqttHelper::mqttHelper()
   : mqttTriggerDiscovery_(false), \
-    mqttTriggerUndiscover_(false), \
+    mqttTriggerRemoveDiscovered_(false), \
     mqttData_("/state"), \
     mqttUpdateFirmware_("/updateFirmware"), \
     mqttUpdateFirmwareAccepted_("/updateFirmwareAccepted"), \
@@ -29,7 +29,8 @@ mqttHelper::mqttHelper()
     mqttChangeSensorCalib_("/changeSensorCalib"), \
     mqttChangeHysteresis_("/changeHysteresis"), \
     mqttThermostatModeCmd_("/thermostatModeCmd"), \
-    mqttTargetTempCmd_("/targetTempCmd") {}
+    mqttTargetTempCmd_("/targetTempCmd"), \
+    mqttOutsideTemperature_("outsideTemperature") {}
 
 mqttHelper::~mqttHelper() {}
 
@@ -39,7 +40,7 @@ void mqttHelper::setup(String nodeId) {
 }
 
 void mqttHelper::buildBaseTopic(void) {
-  mqttGeneralBaseTopic_ =        mqttPrefix_ + mqttCompDevice_ + mqttNodeId_ + mqttObjectId_;  // used for all topics except discovery_enabled of the non climate components
+  mqttGeneralBaseTopic_ =        mqttPrefix_ + mqttCompDevice_ + mqttNodeId_ + mqttObjectId_;
 }
 
 String mqttHelper::buildStateJSON(String name, String temp, String humid, String hysteresis, String actState, String tarTemp, String sensError, String thermoMode, String calibration_factor, String calibration_offset, String ip, String firmware) {
@@ -246,10 +247,11 @@ String mqttHelper::getTopicTargetTempCmd(void)                    { return mqttG
 String mqttHelper::getTopicThermostatModeCmd(void)                { return mqttGeneralBaseTopic_ + mqttThermostatModeCmd_; }
 String mqttHelper::getTopicHassDiscoveryClimate(void)             { return mqttGeneralBaseTopic_ + mqttHassDiscoveryTopic_; }
 String mqttHelper::getTopicData(void)                             { return mqttGeneralBaseTopic_ + mqttData_; }
+String mqttHelper::getTopicOutsideTemperature(void)               { return mqttPrefix_ + mqttOutsideTemperature_; }
 bool   mqttHelper::getTriggerDiscovery(void)                      { return mqttTriggerDiscovery_; }
 void   mqttHelper::setTriggerDiscovery(bool discover)             { mqttTriggerDiscovery_ = discover; }
-bool   mqttHelper::getTriggerUndiscover(void)                     { return mqttTriggerUndiscover_; }
-void   mqttHelper::setTriggerUndiscover(bool undiscover)          { mqttTriggerUndiscover_ = undiscover; }
+bool   mqttHelper::getTriggerRemoveDiscovered(void)               { return mqttTriggerRemoveDiscovered_; }
+void   mqttHelper::setTriggerRemoveDiscovered(bool undiscover)    { mqttTriggerRemoveDiscovered_ = undiscover; }
 String mqttHelper::getTopicHassDiscoveryBinarySensor(BinarySensor_t binarySensor) {
   String topic = "void";
 

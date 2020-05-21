@@ -79,7 +79,6 @@ uint32_t onOffButtonSystemResetInterval = secondsToMilliseconds(5);
 uint32_t readSensorScheduled = 0;
 /* Display */
 #define drawTempYOffset       16
-#define drawTargetTempYOffset  0
 #define drawHeating drawXbm(0, drawTempYOffset, myThermo_width, myThermo_height, myThermo)
 /* BME 280 settings */
 BME280I2C::Settings settings(
@@ -373,7 +372,7 @@ void MQTT_CONNECT(void) {
       myMqttClient.onMessage(messageReceived);                                                        /* register callback */
       (void)myMqttClient.connect(myConfig.name, myConfig.mqtt_user, myConfig.mqtt_password);
 
-      homeAssistantUndiscoverObsolete();  /* for migration from 0.13.x to later versions only */ /* DEPRECATED */
+      homeAssistantRemoveDiscoveredObsolete();  /* for migration from 0.13.x to later versions only */ /* DEPRECATED */
       if (myConfig.discovery_enabled == true) {
         homeAssistantDiscovery();  /* make HA discover necessary devices */
       }
@@ -388,6 +387,7 @@ void MQTT_CONNECT(void) {
       (void)myMqttClient.subscribe(myMqttHelper.getTopicChangeHysteresis(),      MQTT_QOS);
       (void)myMqttClient.subscribe(myMqttHelper.getTopicChangeSensorCalib(),     MQTT_QOS);
       (void)myMqttClient.subscribe(myMqttHelper.getTopicSystemRestartRequest(),  MQTT_QOS);
+      (void)myMqttClient.subscribe(myMqttHelper.getTopicOutsideTemperature(),    MQTT_QOS);
     }
   }
 }
@@ -811,10 +811,18 @@ void DRAW_DISPLAY_MAIN(void) {
       myDisplay.drawString(128, drawTempYOffset, String(intToFloat(myThermostat.getFilteredTemperature()), 1));
     }
 
+    /* display outside temperature in top left corner if available, INT16_MIN is the initial value and pretty unlikely to be a real value */
+    if (myThermostat.getOutsideTemperature() != INT16_MIN) {
+      myDisplay.setTextAlignment(TEXT_ALIGN_LEFT);
+      myDisplay.setFont(Roboto_Condensed_16);
+      myDisplay.drawString(0, 0, String(intToFloat(myThermostat.getOutsideTemperature()), 1));
+    }
+
     /* do not display target temperature if heating is not allowed */
     if (myThermostat.getThermostatMode() == TH_HEAT) {
+      myDisplay.setTextAlignment(TEXT_ALIGN_RIGHT);
       myDisplay.setFont(Roboto_Condensed_16);
-      myDisplay.drawString(128, drawTargetTempYOffset, String(intToFloat(myThermostat.getTargetTemperature()), 1));
+      myDisplay.drawString(128, 0, String(intToFloat(myThermostat.getTargetTemperature()), 1));
 
       if (myThermostat.getActualState()) { /* heating */
         myDisplay.drawHeating;
@@ -824,8 +832,8 @@ void DRAW_DISPLAY_MAIN(void) {
   #ifdef CFG_DEBUG_DISPLAY_VERSION
   myDisplay.setTextAlignment(TEXT_ALIGN_LEFT);
   myDisplay.setFont(Roboto_Condensed_16);
-  myDisplay.drawString(0, drawTargetTempYOffset, String(VERSION));
-  myDisplay.drawString(0, 18, String(BUILD_NUMBER));
+  myDisplay.drawString(0, 16, String(VERSION));
+  myDisplay.drawString(0, 32, String(BUILD_NUMBER));
   myDisplay.drawString(0, 48, String("IPv4: " + (WiFi.localIP().toString()).substring(((WiFi.localIP().toString()).lastIndexOf(".") + 1), (WiFi.localIP().toString()).length())));
   myDisplay.setTextAlignment(TEXT_ALIGN_RIGHT);
   myDisplay.drawString(128, 48, String(time_buffer));
@@ -853,9 +861,9 @@ void MQTT_MAIN(void) {
       homeAssistantDiscovery();  /* make HA discover/update necessary devices at runtime e.g. after name change */
       myMqttHelper.setTriggerDiscovery(false);
     }
-    if (myMqttHelper.getTriggerUndiscover()) {
-      homeAssistantUndiscover();  /* make HA undiscover entities */
-      myMqttHelper.setTriggerUndiscover(false);
+    if (myMqttHelper.getTriggerRemoveDiscovered()) {
+      homeAssistantRemoveDiscovered();  /* make HA undiscover entities */
+      myMqttHelper.setTriggerRemoveDiscovered(false);
     }
   }
 }
@@ -997,18 +1005,18 @@ void homeAssistantDiscovery(void) {
 }
 
 /* Make Home Assistant forget the discovered entities in demand */
-void homeAssistantUndiscover(void) {
+void homeAssistantRemoveDiscovered(void) {
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryClimate(),                         String(""),         true, MQTT_QOS);    // make HA forget the climate component
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(kThermostatState),    String(""),         true, MQTT_QOS);    // make HA discover the binary_sensor for thermostat state
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kTemp),                     String(""),         true, MQTT_QOS);    // make HA forget the temperature sensor
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kHum),                      String(""),         true, MQTT_QOS);    // make HA forget the humidity sensor
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(kRestart),                  String(""),         true, MQTT_QOS);    // make HA forget the reset switch
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(kUpdate),                   String(""),         true, MQTT_QOS);    // make HA forget the update switch
-  homeAssistantUndiscoverObsolete();
+  homeAssistantRemoveDiscoveredObsolete();
 }
 
 /* DEPRECATED */
-void homeAssistantUndiscoverObsolete(void) {
+void homeAssistantRemoveDiscoveredObsolete(void) {
   /* for migration from 0.13.x to later versions only */
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(kSensFail),           String(""),         true, MQTT_QOS);    // make HA discover the binary_sensor for sensor failure
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kIP),                       String(""),         true, MQTT_QOS);    // make HA discover the IP sensor
@@ -1140,7 +1148,7 @@ void handleWebServerClient(void) {
   webpageTableAppend4Cols(String("update_server_address"),    String("url"),                                 String(myConfig.update_server_address),     String("Address of the update server"));
   webpageTableAppend4Cols(String("calibration_offset"),       String("Range: -50 .. +50, LSB: 0.1 &deg;C"),  String(myConfig.calibration_offset),        String("Offset calibration for temperature sensor."));
   webpageTableAppend4Cols(String("calibration_factor"),       String("Range: +50 .. +200, LSB: 1 %"),        String(myConfig.calibration_factor),        String("Linearity calibration for temperature sensor."));
-  webpageTableAppend4Cols(String("display_brightness"),       String("Range: 0 .. +255, LSB: 1 step"),       String(myConfig.display_brightness),        String("Brightness of OLAD display"));
+  webpageTableAppend4Cols(String("display_brightness"),       String("Range: 0 .. +255, LSB: 1 step"),       String(myConfig.display_brightness),        String("Brightness of OLED display"));
   webpageTableAppend4Cols(String("fetch_update"),             String("0 | 1"),                               String(fetch_update),                       String("Trigger download and install binary from update server: 1 = fetch; 0 = do nothing"));
   webpage +="</table>";
   /* Restart Device */
@@ -1170,7 +1178,7 @@ void handleWebServerClient(void) {
             if ((value.toInt() & 1) == true) {
               myMqttHelper.setTriggerDiscovery(true);
             } else if ((value.toInt() & 1) == false) {
-              myMqttHelper.setTriggerUndiscover(true);
+              myMqttHelper.setTriggerRemoveDiscovered(true);
             }
           } else if (key == "discovery_enabled") {
             if ((value.toInt() & 1) == true) {
@@ -1357,5 +1365,10 @@ void messageReceived(String &topic, String &payload) {  // NOLINT
     #endif
 
     myThermostat.setThermostatHysteresis(payload.toInt());
+  } else if (topic == myMqttHelper.getTopicOutsideTemperature()) {
+    #ifdef CFG_DEBUG
+    Serial.println("New outside temperature received: " + payload);
+    #endif
+    myThermostat.setOutsideTemperature(floatToInt(payload.toFloat()));
   }
 }

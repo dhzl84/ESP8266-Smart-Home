@@ -33,8 +33,8 @@ class mqttHelper {
   void   buildBaseTopic(void);
   void   setTriggerDiscovery(bool discover);
   bool   getTriggerDiscovery(void);
-  void   setTriggerUndiscover(bool undiscover);
-  bool   getTriggerUndiscover(void);
+  void   setTriggerRemoveDiscovered(bool undiscover);
+  bool   getTriggerRemoveDiscovered(void);
   String getTopicUpdateFirmware(void);
   String getTopicUpdateFirmwareAccepted(void);
   String getTopicChangeName(void);
@@ -54,10 +54,11 @@ class mqttHelper {
   String buildHassDiscoverySensor(String name, Sensor_t sensor);
   String buildHassDiscoverySwitch(String name, Switch_t switches);
   String getTopicData(void);
+  String getTopicOutsideTemperature(void);
 
  private:
   bool   mqttTriggerDiscovery_;
-  bool   mqttTriggerUndiscover_;
+  bool   mqttTriggerRemoveDiscovered_;
   String mqttData_;
   String mqttUpdateFirmware_;
   String mqttUpdateFirmwareAccepted_;
@@ -78,6 +79,7 @@ class mqttHelper {
   String mqttChangeHysteresis_;
   String mqttThermostatModeCmd_;
   String mqttTargetTempCmd_;
+  String mqttOutsideTemperature_;
 };
 
 #endif  // C_MQTT_H_

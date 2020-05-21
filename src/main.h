@@ -86,8 +86,8 @@ void updateEncoder(void);
 /* global scope functions */
 /*===================================================================================================================*/
 void homeAssistantDiscovery(void);
-void homeAssistantUndiscover(void);
-void homeAssistantUndiscoverObsolete(void);  /* DEPRECATED */
+void homeAssistantRemoveDiscovered(void);
+void homeAssistantRemoveDiscoveredObsolete(void);  /* DEPRECATED */
 void mqttPubState(void);
 void loadConfiguration(Configuration &config);  // NOLINT: pass by reference
 bool saveConfiguration(const Configuration &config);

@@ -66,6 +66,10 @@ class Thermostat {
   uint8_t getThermostatHysteresisHigh(void);
   uint8_t getThermostatHysteresisLow(void);
 
+  // outside temperature
+  void setOutsideTemperature(int16_t value);
+  int16_t getOutsideTemperature(void);
+
  private:
   // heating
   bool new_data_;
@@ -87,6 +91,8 @@ class Thermostat {
   int16_t temperature_offset_;
   int16_t temperature_factor_;
   uint8_t sensor_error_threshold_;
+  // outside temperature
+  int16_t outside_temperature_;
   // filter
   bool temperature_value_queue_filled_;
   bool humidity_value_queue_filled_;
