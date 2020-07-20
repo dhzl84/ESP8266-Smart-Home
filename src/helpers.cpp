@@ -50,7 +50,7 @@ bool TimeReached(uint32_t timer) {
 }
 
 void SetNextTimeInterval(volatile uint32_t *timer, const uint32_t step) {
-  *timer += step;
+  *timer = (millis() + step);
   const int32_t passed = TimePassedSince(*timer);
   if (passed < 0) { return; }   // Event has not yet happened, which is fine.
   if (static_cast<uint32_t>(passed) > step) {

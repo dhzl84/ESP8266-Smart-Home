@@ -1,7 +1,7 @@
 import datetime
 import calendar
 
-version = '0.16.0'
+version = '0.17.0'
 
 FILENAME_VERSION_H = 'src/version.h'
 
@@ -30,4 +30,4 @@ hf = """
 #endif  /* VERSION_H_ */
 """.format(version, str(hex_timestamp), dt)
 with open(FILENAME_VERSION_H, 'w+') as f:
-  f.write(hf)
+    f.write(hf)
