@@ -17,6 +17,9 @@
 #include <ESP8266mDNS.h>
 #include <ESP8266httpUpdate.h>
 #include <sntp.h>
+#include <FS.h>
+#include <LittleFS.h>
+#define FileSystem LittleFS
 #elif CFG_BOARD_ESP32
 #define BOARD "ESP32"
 #define DHT_PIN             GPIO_NUM_26 /* sensor */
@@ -31,6 +34,7 @@
 #include <ESPmDNS.h>
 #include <HTTPUpdate.h>
 #include <SPIFFS.h>
+#define FileSystem SPIFFS
 #include <rom/rtc.h>  /* for reset reasons */
 #else
 #error "Wrong device configured!"

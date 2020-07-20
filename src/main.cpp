@@ -33,7 +33,7 @@ uint32_t wifi_connect_counter = 0;
 uint32_t mqtt_connect_counter = 0;
 struct Configuration myConfig;
 #ifndef MQTT_QOS
-  #define MQTT_QOS 0 /* valid values are 0, 1 and 2 */
+  #define MQTT_QOS 1 /* valid values are 0, 1 and 2 */
 #endif
 uint32_t mqttReconnectTime       = 0;
 uint32_t mqttReconnectInterval   = secondsToMilliseconds(5); /* 5 s in milliseconds */
@@ -108,23 +108,26 @@ HTTPUpdate        myHttpUpdate;
 #else
 #endif
 MQTTClient        myMqttClient(2048); /* 2048 byte buffer */
-Bounce debounceOnOff = Bounce();
-Bounce debounceUp = Bounce();
-Bounce debounceDown = Bounce();
-DiffTime MyLooptime;
+Bounce            debounceOnOff = Bounce();
+Bounce            debounceUp = Bounce();
+Bounce            debounceDown = Bounce();
+DiffTime          MyLooptime;
 
+uint32_t display_enabled_temporary_reference_time = 0;
+#define  display_enabled_temporary_interval secondsToMilliseconds(10)
+bool     display_enabled_temporary = false;
 bool     systemRestartRequest = false;
 bool     requestSaveToSpiffs = false;
 bool     requestSaveToSpiffsWithRestart = false;
 uint32_t wifiReconnectTimer = secondsToMilliseconds(30);
 #define WIFI_RECONNECT_TIME 30
 
-#define  SPIFFS_MQTT_ID_FILE        String("/itsme")       // for migration only
-#define  SPIFFS_SENSOR_CALIB_FILE   String("/sensor")      // for migration only
-#define  SPIFFS_TARGET_TEMP_FILE    String("/targetTemp")  // for migration only
-#define  SPIFFS_WRITE_DEBOUNCE      secondsToMilliseconds(20) /* write target temperature to spiffs if it wasn't changed for 20 s (time in ms) */
-bool     SPIFFS_WRITTEN =           true;
-uint32_t SPIFFS_REFERENCE_TIME      = 0;
+#define  FS_MQTT_ID_FILE        String("/itsme")       // for migration only
+#define  FS_SENSOR_CALIB_FILE   String("/sensor")      // for migration only
+#define  FS_TARGET_TEMP_FILE    String("/targetTemp")  // for migration only
+#define  FS_WRITE_DEBOUNCE      secondsToMilliseconds(20) /* write target temperature to spiffs if it wasn't changed for 20 s (time in ms) */
+bool     FS_WRITTEN =           true;
+uint32_t FS_REFERENCE_TIME      = 0;
 
 /* Time */
 struct tm time_info;
@@ -139,7 +142,7 @@ void setup() {
   Serial.println("SETUP STARTED");
   #endif
   Wire.begin(SDA_PIN, SCL_PIN);   /* needed for I²C communication with display and BME280 */
-  SPIFFS_INIT();                  /* read stuff from SPIFFS */
+  FS_INIT();                  /* read stuff from FileSystem */
   GPIO_CONFIG();                  /* configure GPIOs */
 
   myThermostat.setup(RELAY_PIN,
@@ -153,8 +156,8 @@ void setup() {
   DISPLAY_INIT();  /* init Display */
   WIFI_CONNECT();  /* connect to WiFi */
   OTA_INIT();      /* init over the air update */
-  MQTT_CONNECT();  /* connect to MQTT host and build subscriptions, must be called after SPIFFS_INIT()*/
-  NTP();            /* init network time protocol, must be called after WIFI_CONNECT() and SPIFFS_INIT() */
+  MQTT_CONNECT();  /* connect to MQTT host and build subscriptions, must be called after FS_INIT()*/
+  NTP();            /* init network time protocol, must be called after WIFI_CONNECT() and FS_INIT() */
   MDNS.begin(myConfig.name);
 
   webServer.begin();
@@ -200,20 +203,20 @@ void setup() {
 /* functions called by setup()                                                                                       */
 /*===================================================================================================================*/
 
-void SPIFFS_INIT(void) {  // initializes the SPIFFS when first used and loads the configuration from SPIFFS to RAM
-  SPIFFS.begin();
+void FS_INIT(void) {  // initializes the FileSystem when first used and loads the configuration from FileSystem to RAM
+  FileSystem.begin();
 
-  if (!SPIFFS.exists("/formatted")) {
-    /* This code is only run once to format the SPIFFS before first usage */
+  if (!FileSystem.exists("/formatted")) {
+    /* This code is only run once to format the FileSystem before first usage */
     #ifdef CFG_DEBUG
-    Serial.println("Formatting SPIFFS, this takes some time");
+    Serial.println("Formatting FileSystem, this takes some time");
     #endif
-    SPIFFS.format();
+    FileSystem.format();
     #ifdef CFG_DEBUG
-    Serial.println("Formatting SPIFFS finished");
+    Serial.println("Formatting FileSystem finished");
     Serial.println("Open file '/formatted' in write mode");
     #endif
-    File f = SPIFFS.open("/formatted", "w");
+    File f = FileSystem.open("/formatted", "w");
     if (!f) {
       #ifdef CFG_DEBUG
       Serial.println("file open failed");
@@ -221,7 +224,7 @@ void SPIFFS_INIT(void) {  // initializes the SPIFFS when first used and loads th
     } else {
       f.close();
       delay(5000);
-      if (!SPIFFS.exists("/formatted")) {
+      if (!FileSystem.exists("/formatted")) {
         #ifdef CFG_DEBUG
         Serial.println("That didn't work!");
         #endif
@@ -233,7 +236,7 @@ void SPIFFS_INIT(void) {  // initializes the SPIFFS when first used and loads th
     }
   } else {
     #ifdef CFG_DEBUG
-    Serial.println("Found '/formatted' >> SPIFFS ready to use");
+    Serial.println("Found '/formatted' >> FileSystem ready to use");
     #endif
   }
   #ifdef CFG_DEBUG
@@ -242,14 +245,14 @@ void SPIFFS_INIT(void) {  // initializes the SPIFFS when first used and loads th
 
   #ifdef CFG_DEBUG
   #if CFG_BOARD_ESP8266
-  Dir dir = SPIFFS.openDir("/");
+  Dir dir = FileSystem.openDir("/");
   while (dir.next()) {
-    Serial.print("SPIFFS file found: " + dir.fileName() + " - Size in byte: ");
+    Serial.print("FileSystem file found: " + dir.fileName() + " - Size in byte: ");
     File f = dir.openFile("r");
     Serial.println(f.size());
   }
   #elif CFG_BOARD_ESP32
-  listDir(SPIFFS, "/", 0);
+  listDir(FileSystem, "/", 0);
   #else
   #endif
   #endif  /* CFG_DEBUG */
@@ -324,7 +327,7 @@ void OTA_INIT(void) {
   ArduinoOTA.onStart([]() {
     myMqttClient.disconnect();
     OTA_UPDATE = TH_OTA_ACTIVE;
-    DRAW_DISPLAY_MAIN();
+    DISPLAY_MAIN();
     #ifdef CFG_DEBUG
     Serial.println("Start OTA");
     #endif
@@ -332,7 +335,7 @@ void OTA_INIT(void) {
 
   ArduinoOTA.onEnd([]() {
     OTA_UPDATE = TH_OTA_FINISHED;
-    DRAW_DISPLAY_MAIN();
+    DISPLAY_MAIN();
     #ifdef CFG_DEBUG
     Serial.println("\nEnd OTA");
     #endif
@@ -346,7 +349,7 @@ void OTA_INIT(void) {
 
   ArduinoOTA.onError([](ota_error_t error) {
     OTA_UPDATE = TH_OTA_ERROR;
-    DRAW_DISPLAY_MAIN();
+    DISPLAY_MAIN();
     #ifdef CFG_DEBUG
     Serial.printf("Error[%u]: ", error);
     if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
@@ -407,7 +410,7 @@ void loop() {
     SetNextTimeInterval(&loop100msMillis, loop100ms);
     HANDLE_SYSTEM_STATE();   /* handle connectivity and trigger reconnects */
     myThermostat.loop();     /* control relay for heating */
-    DRAW_DISPLAY_MAIN();     /* draw display each loop */
+    DISPLAY_MAIN();     /* draw display each loop */
     MQTT_MAIN();             /* handle MQTT each loop */
   }
   /* call every 500 ms */
@@ -419,7 +422,7 @@ void loop() {
   if (TimeReached(loop1000msMillis)) {
     SetNextTimeInterval(&loop1000msMillis, loop1000ms);
     SENSOR_MAIN();          /* get sensor data */
-    SPIFFS_MAIN();          /* check for new data and write SPIFFS is necessary */
+    FS_MAIN();          /* check for new data and write FileSystem is necessary */
     HANDLE_HTTP_UPDATE();   /* pull update from server if it was requested via MQTT*/
   }
 
@@ -435,13 +438,27 @@ void loop() {
     debounceDown.update();
   }
   if (debounceOnOff.fell()) {
-    myThermostat.toggleThermostatMode();
+    if (myConfig.display_enabled || display_enabled_temporary) {
+      myThermostat.toggleThermostatMode();
+    }
+    SetNextTimeInterval(&display_enabled_temporary_reference_time, display_enabled_temporary_interval);
   }
   if (debounceUp.fell()) {
-    myThermostat.increaseTargetTemperature(tempStep);
+    if (myConfig.display_enabled || display_enabled_temporary) {
+      myThermostat.increaseTargetTemperature(tempStep);
+    }
+    SetNextTimeInterval(&display_enabled_temporary_reference_time, display_enabled_temporary_interval);
   }
   if (debounceDown.fell()) {
-    myThermostat.decreaseTargetTemperature(tempStep);
+    if (myConfig.display_enabled || display_enabled_temporary) {
+      myThermostat.decreaseTargetTemperature(tempStep);
+    }
+    SetNextTimeInterval(&display_enabled_temporary_reference_time, display_enabled_temporary_interval);
+  }
+  if (TimeReached(display_enabled_temporary_reference_time)) {
+    display_enabled_temporary = false;
+  } else {
+    display_enabled_temporary = true;
   }
 
   webServer.handleClient();
@@ -485,7 +502,7 @@ void HANDLE_SYSTEM_STATE(void) {
 
   /* restart handling */
   if (systemRestartRequest == true) {
-    DRAW_DISPLAY_MAIN();
+    DISPLAY_MAIN();
     systemRestartRequest = false;
     #ifdef CFG_DEBUG
     Serial.println("Restarting in 3 seconds");
@@ -771,74 +788,74 @@ void SENSOR_MAIN() {
   }
 }
 
-void DRAW_DISPLAY_MAIN(void) {
+void DISPLAY_MAIN(void) {
   myDisplay.clear();
-
-  if (systemRestartRequest == true) {
-    myDisplay.setFont(Roboto_Condensed_16);
-    myDisplay.setTextAlignment(TEXT_ALIGN_CENTER);
-    myDisplay.drawString(64, 22, "Restart");
-  } else if (OTA_UPDATE != TH_OTA_IDLE) { /* OTA */
-    myDisplay.setFont(Roboto_Condensed_16);
-    myDisplay.setTextAlignment(TEXT_ALIGN_CENTER);
-    switch (OTA_UPDATE) {
-    case TH_OTA_ACTIVE:
+  if (myConfig.display_enabled || display_enabled_temporary) {
+    if (systemRestartRequest == true) {
+      myDisplay.setFont(Roboto_Condensed_16);
+      myDisplay.setTextAlignment(TEXT_ALIGN_CENTER);
+      myDisplay.drawString(64, 22, "Restart");
+    } else if (OTA_UPDATE != TH_OTA_IDLE) { /* OTA */
+      myDisplay.setFont(Roboto_Condensed_16);
+      myDisplay.setTextAlignment(TEXT_ALIGN_CENTER);
+      switch (OTA_UPDATE) {
+      case TH_OTA_ACTIVE:
+        myDisplay.drawString(64, 22, "Update");
+        break;
+      case TH_OTA_FINISHED:
+        myDisplay.drawString(64, 11, "Finished,");
+        myDisplay.drawString(64, 33, "restarting");
+        break;
+      case TH_OTA_ERROR:
+        myDisplay.drawString(64, 22, "Error");
+        break;
+      case TH_OTA_IDLE:
+        break;
+      }
+    } else if (fetch_update == true) { /* HTTP Update */
+      myDisplay.setFont(Roboto_Condensed_16);
+      myDisplay.setTextAlignment(TEXT_ALIGN_CENTER);
       myDisplay.drawString(64, 22, "Update");
-      break;
-    case TH_OTA_FINISHED:
-      myDisplay.drawString(64, 11, "Finished,");
-      myDisplay.drawString(64, 33, "restarting");
-      break;
-    case TH_OTA_ERROR:
-      myDisplay.drawString(64, 22, "Error");
-      break;
-    case TH_OTA_IDLE:
-      break;
-    }
-  } else if (fetch_update == true) { /* HTTP Update */
-    myDisplay.setFont(Roboto_Condensed_16);
-    myDisplay.setTextAlignment(TEXT_ALIGN_CENTER);
-    myDisplay.drawString(64, 22, "Update");
-  } else {
-    myDisplay.setTextAlignment(TEXT_ALIGN_RIGHT);
-    myDisplay.setFont(Roboto_Condensed_32);
-
-    if (myThermostat.getSensorError()) {
-      myDisplay.drawString(128, drawTempYOffset, "err");
-    } else if (myThermostat.getFilteredTemperature() == INT16_MIN) {
-      myDisplay.drawString(128, drawTempYOffset, "init");
     } else {
-      myDisplay.drawString(128, drawTempYOffset, String(intToFloat(myThermostat.getFilteredTemperature()), 1));
-    }
-
-    /* display outside temperature in top left corner if available, INT16_MIN is the initial value and pretty unlikely to be a real value */
-    if (myThermostat.getOutsideTemperature() != INT16_MIN) {
-      myDisplay.setTextAlignment(TEXT_ALIGN_LEFT);
-      myDisplay.setFont(Roboto_Condensed_16);
-      myDisplay.drawString(0, 0, String(intToFloat(myThermostat.getOutsideTemperature()), 1));
-    }
-
-    /* do not display target temperature if heating is not allowed */
-    if (myThermostat.getThermostatMode() == TH_HEAT) {
       myDisplay.setTextAlignment(TEXT_ALIGN_RIGHT);
-      myDisplay.setFont(Roboto_Condensed_16);
-      myDisplay.drawString(128, 0, String(intToFloat(myThermostat.getTargetTemperature()), 1));
+      myDisplay.setFont(Roboto_Condensed_32);
 
-      if (myThermostat.getActualState()) { /* heating */
-        myDisplay.drawHeating;
+      if (myThermostat.getSensorError()) {
+        myDisplay.drawString(128, drawTempYOffset, "err");
+      } else if (myThermostat.getFilteredTemperature() == INT16_MIN) {
+        myDisplay.drawString(128, drawTempYOffset, "init");
+      } else {
+        myDisplay.drawString(128, drawTempYOffset, String(intToFloat(myThermostat.getFilteredTemperature()), 1));
+      }
+
+      /* display outside temperature in top left corner if available, INT16_MIN is the initial value and pretty unlikely to be a real value */
+      if (myThermostat.getOutsideTemperature() != INT16_MIN) {
+        myDisplay.setTextAlignment(TEXT_ALIGN_LEFT);
+        myDisplay.setFont(Roboto_Condensed_16);
+        myDisplay.drawString(0, 0, String(intToFloat(myThermostat.getOutsideTemperature()), 1));
+      }
+
+      /* do not display target temperature if heating is not allowed */
+      if (myThermostat.getThermostatMode() == TH_HEAT) {
+        myDisplay.setTextAlignment(TEXT_ALIGN_RIGHT);
+        myDisplay.setFont(Roboto_Condensed_16);
+        myDisplay.drawString(128, 0, String(intToFloat(myThermostat.getTargetTemperature()), 1));
+
+        if (myThermostat.getActualState()) { /* heating */
+          myDisplay.drawHeating;
+        }
       }
     }
+    #ifdef CFG_DEBUG_DISPLAY_VERSION
+    myDisplay.setTextAlignment(TEXT_ALIGN_LEFT);
+    myDisplay.setFont(Roboto_Condensed_16);
+    myDisplay.drawString(0, 16, String(VERSION));
+    myDisplay.drawString(0, 32, String(BUILD_NUMBER));
+    myDisplay.drawString(0, 48, String("IPv4: " + (WiFi.localIP().toString()).substring(((WiFi.localIP().toString()).lastIndexOf(".") + 1), (WiFi.localIP().toString()).length())));
+    myDisplay.setTextAlignment(TEXT_ALIGN_RIGHT);
+    myDisplay.drawString(128, 48, String(time_buffer));
+    #endif
   }
-  #ifdef CFG_DEBUG_DISPLAY_VERSION
-  myDisplay.setTextAlignment(TEXT_ALIGN_LEFT);
-  myDisplay.setFont(Roboto_Condensed_16);
-  myDisplay.drawString(0, 16, String(VERSION));
-  myDisplay.drawString(0, 32, String(BUILD_NUMBER));
-  myDisplay.drawString(0, 48, String("IPv4: " + (WiFi.localIP().toString()).substring(((WiFi.localIP().toString()).lastIndexOf(".") + 1), (WiFi.localIP().toString()).length())));
-  myDisplay.setTextAlignment(TEXT_ALIGN_RIGHT);
-  myDisplay.drawString(128, 48, String(time_buffer));
-  #endif
-
   myDisplay.display();
 }
 
@@ -874,7 +891,7 @@ void HANDLE_HTTP_UPDATE(void) {
     myMqttClient.publish(myMqttHelper.getTopicUpdateFirmwareAccepted(), String(false), false, MQTT_QOS); /* publish accepted update with value false to reset the switch in Home Assistant */
     myMqttClient.loop();
 
-    DRAW_DISPLAY_MAIN();
+    DISPLAY_MAIN();
     fetch_update = false;
     #ifdef CFG_DEBUG
     Serial.println("Remote update started");
@@ -904,8 +921,8 @@ void HANDLE_HTTP_UPDATE(void) {
   }
 }
 
-void SPIFFS_MAIN(void) {
-  /* force SPIFFS write with restart, this is necessary for SW reconfiguration in certain cases like changing the input method or changing the decives name */
+void FS_MAIN(void) {
+  /* force FileSystem write with restart, this is necessary for SW reconfiguration in certain cases like changing the input method or changing the decives name */
 
   if (requestSaveToSpiffsWithRestart == true) {
     if (saveConfiguration(myConfig)) {
@@ -923,37 +940,37 @@ void SPIFFS_MAIN(void) {
       /* write failed, retry next loop */
     }
   }
-  /* avoid extensive writing to SPIFFS, therefore check if the target temperature didn't change for a certain time before writing. */
+  /* avoid extensive writing to FileSystem, therefore check if the target temperature didn't change for a certain time before writing. */
   if ( (myThermostat.getNewCalib()) || (myThermostat.getTargetTemperature() != myConfig.target_temperature) || (myThermostat.getThermostatHysteresis() != myConfig.temperature_hysteresis) || (myThermostat.getThermostatMode() != myConfig.thermostat_mode) ) {
-    SPIFFS_REFERENCE_TIME = millis();  // ToDo: handle wrap around
+    FS_REFERENCE_TIME = millis();  // ToDo: handle wrap around
     myConfig.target_temperature  = myThermostat.getTargetTemperature();
     myConfig.calibration_factor = myThermostat.getSensorCalibFactor();
     myConfig.calibration_offset = myThermostat.getSensorCalibOffset();
     myConfig.temperature_hysteresis  = myThermostat.getThermostatHysteresis();
     myConfig.thermostat_mode   = myThermostat.getThermostatMode();
     myThermostat.resetNewCalib();
-    SPIFFS_WRITTEN = false;
+    FS_WRITTEN = false;
     #ifdef CFG_DEBUG
-    Serial.println("SPIFFS to be stored after debounce time: " + String(SPIFFS_WRITE_DEBOUNCE));
+    Serial.println("FileSystem to be stored after debounce time: " + String(FS_WRITE_DEBOUNCE));
     #endif /* CFG_DEBUG */
   } else {
     /* no spiffs data changed this loop */
   }
-  if (SPIFFS_WRITTEN == true) {
-    /* do nothing, last change was already stored in SPIFFS */
-  } else { /* latest change not stored in SPIFFS */
-    if (SPIFFS_REFERENCE_TIME + SPIFFS_WRITE_DEBOUNCE < millis()) { /* check debounce */
+  if (FS_WRITTEN == true) {
+    /* do nothing, last change was already stored in FileSystem */
+  } else { /* latest change not stored in FileSystem */
+    if (FS_REFERENCE_TIME + FS_WRITE_DEBOUNCE < millis()) { /* check debounce */
       /* debounce expired -> write */
       if (saveConfiguration(myConfig)) {
-        SPIFFS_WRITTEN = true;
+        FS_WRITTEN = true;
       } else {
-        /* SPIFFS not written, retry next loop */
+        /* FileSystem not written, retry next loop */
         #ifdef CFG_DEBUG
-        Serial.println("SPIFFS write failed");
+        Serial.println("FileSystem write failed");
         #endif /* CFG_DEBUG */
       }
     } else {
-      /* debounce SPIFFS write */
+      /* debounce FileSystem write */
     }
   }
 }
@@ -965,33 +982,34 @@ void SPIFFS_MAIN(void) {
 void ICACHE_RAM_ATTR updateEncoder(void) {
   int16_t MSB = digitalRead(PHYS_INPUT_1_PIN);
   int16_t LSB = digitalRead(PHYS_INPUT_2_PIN);
-
   int16_t encoded = (MSB << 1) |LSB;  /* converting the 2 pin value to single number */
-
   int16_t sum  = (lastEncoded << 2) | encoded; /* adding it to the previous encoded value */
 
-  if (sum == 0b1101 || sum == 0b0100 || sum == 0b0010 || sum == 0b1011) { /* gray patterns for rotation to right */
-    rotaryEncoderDirectionInts += rotRight; /* count rotation interrupts to left and right, this shall make the encoder routine more robust against bouncing */
-  }
-  if (sum == 0b1110 || sum == 0b0111 || sum == 0b0001 || sum == 0b1000) { /* gray patterns for rotation to left */
-    rotaryEncoderDirectionInts += rotLeft;
-  }
-
-  if (encoded == 0b11) { /* if the encoder is in an end position, evaluate the number of interrupts to left/right. simple majority wins */
-    #ifdef CFG_DEBUG_ENCODER
-    Serial.println("Rotary encoder interrupts: " + String(rotaryEncoderDirectionInts));
-    #endif
-
-    if (rotaryEncoderDirectionInts > rotRight) { /* if there was a higher amount of interrupts to the right, consider the encoder was turned to the right */
-      myThermostat.increaseTargetTemperature(tempStep);
-    } else if (rotaryEncoderDirectionInts < rotLeft) { /* if there was a higher amount of interrupts to the left, consider the encoder was turned to the left */
-      myThermostat.decreaseTargetTemperature(tempStep);
-    } else {
-      /* do nothing here, left/right interrupts have occurred with same amount -> should never happen */
+  if (myConfig.display_enabled || display_enabled_temporary) {
+    if (sum == 0b1101 || sum == 0b0100 || sum == 0b0010 || sum == 0b1011) { /* gray patterns for rotation to right */
+      rotaryEncoderDirectionInts += rotRight; /* count rotation interrupts to left and right, this shall make the encoder routine more robust against bouncing */
     }
-    rotaryEncoderDirectionInts = rotInit; /* reset interrupt count for next sequence */
+    if (sum == 0b1110 || sum == 0b0111 || sum == 0b0001 || sum == 0b1000) { /* gray patterns for rotation to left */
+      rotaryEncoderDirectionInts += rotLeft;
+    }
+
+    if (encoded == 0b11) { /* if the encoder is in an end position, evaluate the number of interrupts to left/right. simple majority wins */
+      #ifdef CFG_DEBUG_ENCODER
+      Serial.println("Rotary encoder interrupts: " + String(rotaryEncoderDirectionInts));
+      #endif
+
+      if (rotaryEncoderDirectionInts > rotRight) { /* if there was a higher amount of interrupts to the right, consider the encoder was turned to the right */
+        myThermostat.increaseTargetTemperature(tempStep);
+      } else if (rotaryEncoderDirectionInts < rotLeft) { /* if there was a higher amount of interrupts to the left, consider the encoder was turned to the left */
+        myThermostat.decreaseTargetTemperature(tempStep);
+      } else {
+        /* do nothing here, left/right interrupts have occurred with same amount -> should never happen */
+      }
+      rotaryEncoderDirectionInts = rotInit; /* reset interrupt count for next sequence */
+    }
+    lastEncoded = encoded; /* store this value for next time */
   }
-  lastEncoded = encoded; /* store this value for next time */
+  SetNextTimeInterval(&display_enabled_temporary_reference_time, display_enabled_temporary_interval);
 }
 
 /* Home Assistant discovery_enabled on connect; used to define entities in HA to communicate with*/
@@ -1004,7 +1022,7 @@ void homeAssistantDiscovery(void) {
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(kUpdate),                   myMqttHelper.buildHassDiscoverySwitch(String(myConfig.name),  kUpdate),                      true, MQTT_QOS);    // make HA discover the update switch
 }
 
-/* Make Home Assistant forget the discovered entities in demand */
+/* Make Home Assistant forget the discovered entities on demand */
 void homeAssistantRemoveDiscovered(void) {
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryClimate(),                         String(""),         true, MQTT_QOS);    // make HA forget the climate component
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(kThermostatState),    String(""),         true, MQTT_QOS);    // make HA discover the binary_sensor for thermostat state
@@ -1139,15 +1157,21 @@ void handleWebServerClient(void) {
   webpage +="<input type='text' name='cmd' value='key:value'>&nbsp;<input type='submit' value='Submit'>";
   webpage +="</form>";
   webpage +="<p><b>Commands</b></p>";
-  /* TABLE */
+  /* COMMANDS TABLE */
   webpage +="<table style='font-size: 12px'>";
   webpageTableAppend4Cols(String("<b>Key</b>"),               String("<b>Value</b>"),                        String("<b>Current Value</b>"),             String("<b>Description</b>"));
   webpageTableAppend4Cols(String("discover"),                 String("0 | 1"),                               String("void"),                             String("MQTT OnDemand discovery_enabled: 1 = discover; 0 = undiscover"));
   webpageTableAppend4Cols(String("discovery_enabled"),        String("0 | 1"),                               String(myConfig.discovery_enabled),         String("MQTT Autodiscovery: 1 = enabled; 0 = disabled"));
   webpageTableAppend4Cols(String("name"),                     String("string"),                              String(myConfig.name),                      String("Define a name for this device"));
-  webpageTableAppend4Cols(String("update_server_address"),    String("url"),                                 String(myConfig.update_server_address),     String("Address of the update server"));
+  webpageTableAppend4Cols(String("mqtt_server_address"),      String("string"),                              String(myConfig.mqtt_host),                 String("Address of the MQTT server"));
+  webpageTableAppend4Cols(String("mqtt_server_port"),         String("1 .. 65535"),                          String(myConfig.mqtt_port),                 String("Port of the MQTT server"));
+  webpageTableAppend4Cols(String("mqtt_user"),                String("string"),                              String(myConfig.mqtt_user),                 String("MQTT user"));
+  webpageTableAppend4Cols(String("mqtt_pwd"),                 String("string"),                              String("***"),                              String("MQTT password"));
+  webpageTableAppend4Cols(String("mqtt_pub_cycle"),           String("Range: 1 .. 255, LSB: 1 min"),         String(myConfig.mqtt_publish_cycle),        String("Publish cycle for MQTT messages in minutes"));
+  webpageTableAppend4Cols(String("update_server_address"),    String("string"),                              String(myConfig.update_server_address),     String("Address of the update server"));
   webpageTableAppend4Cols(String("calibration_offset"),       String("Range: -50 .. +50, LSB: 0.1 &deg;C"),  String(myConfig.calibration_offset),        String("Offset calibration for temperature sensor."));
   webpageTableAppend4Cols(String("calibration_factor"),       String("Range: +50 .. +200, LSB: 1 %"),        String(myConfig.calibration_factor),        String("Linearity calibration for temperature sensor."));
+  webpageTableAppend4Cols(String("display_enabled"),          String("0 | 1"),                               String(myConfig.display_enabled),           String("Display always on or only on user interaction"));
   webpageTableAppend4Cols(String("display_brightness"),       String("Range: 0 .. +255, LSB: 1 step"),       String(myConfig.display_brightness),        String("Brightness of OLED display"));
   webpageTableAppend4Cols(String("fetch_update"),             String("0 | 1"),                               String(fetch_update),                       String("Trigger download and install binary from update server: 1 = fetch; 0 = do nothing"));
   webpage +="</table>";
@@ -1194,12 +1218,12 @@ void handleWebServerClient(void) {
               if (myConfig.discovery_enabled == true) {
                 requestSaveToSpiffsWithRestart = true;
                 #ifdef CFG_DEBUG
-                Serial.println("Request SPIFFS write with restart.");
+                Serial.println("Request FileSystem write with restart.");
                 #endif
               } else {
                 requestSaveToSpiffs = true;
                 #ifdef CFG_DEBUG
-                Serial.println("Request SPIFFS write.");
+                Serial.println("Request FileSystem write.");
                 #endif
               }
             } else {
@@ -1210,7 +1234,7 @@ void handleWebServerClient(void) {
           } else if (key == "update_server_address") {
             if ( (value != "") && (value != myConfig.update_server_address) ) {
               #ifdef CFG_DEBUG
-              Serial.println("Request SPIFFS write.");
+              Serial.println("Request FileSystem write.");
               #endif
               strlcpy(myConfig.update_server_address, value.c_str(), sizeof(myConfig.update_server_address));
               requestSaveToSpiffs = true;
@@ -1223,7 +1247,7 @@ void handleWebServerClient(void) {
             uint8_t u8_value = (uint8_t) value.toInt();
             if ((u8_value != myConfig.calibration_factor) && (u8_value >= 50) && (u8_value <= 200)) {
               #ifdef CFG_DEBUG
-              Serial.println("Request SPIFFS write.");
+              Serial.println("Request FileSystem write.");
               #endif
               myConfig.calibration_factor = int16_t(u8_value);
               requestSaveToSpiffs = true;
@@ -1236,7 +1260,7 @@ void handleWebServerClient(void) {
             int16_t i16_value = (int16_t) value.toInt();
             if ((i16_value != myConfig.calibration_offset) && (i16_value >= -50) && (i16_value <= 50)) {
               #ifdef CFG_DEBUG
-              Serial.println("Request SPIFFS write.");
+              Serial.println("Request FileSystem write.");
               #endif
               myConfig.calibration_offset = int16_t(i16_value);
               requestSaveToSpiffs = true;
@@ -1249,7 +1273,7 @@ void handleWebServerClient(void) {
             uint8_t u8_value = (uint8_t) value.toInt();
             if ((u8_value != myConfig.display_brightness) && (u8_value <= 255)) {
               #ifdef CFG_DEBUG
-              Serial.println("Request SPIFFS write.");
+              Serial.println("Request FileSystem write.");
               #endif
               myConfig.display_brightness = u8_value;
               requestSaveToSpiffsWithRestart = true;
@@ -1265,13 +1289,86 @@ void handleWebServerClient(void) {
               Serial.println("HTTP Update triggered via webpage");
               #endif
             }
+          } else if (key == "display_enabled") {
+            if ((value.toInt() & 1) == true) {
+              myConfig.display_enabled = true;
+              #ifdef CFG_DEBUG
+              Serial.println("Display enabled via webpage");
+              #endif
+            } else if ((value.toInt() & 1) == false) {
+              myConfig.display_enabled = false;
+              #ifdef CFG_DEBUG
+              Serial.println("Display disabled via webpage");
+              #endif
+            }
+            requestSaveToSpiffs = true;
+          } else if (key == "mqtt_server_address") {
+            if ( (value != "") && (value != myConfig.mqtt_host) ) {
+              strlcpy(myConfig.mqtt_host, value.c_str(), sizeof(myConfig.mqtt_host));
+              requestSaveToSpiffs = true;
+              #ifdef CFG_DEBUG
+              Serial.println("New MQTT server configured.");
+              #endif
+            } else {
+              #ifdef CFG_DEBUG
+              Serial.println("Configuration unchanged, do nothing");
+              #endif
+            }
+          } else if (key == "mqtt_server_port") {
+            if ( (value.toInt() != myConfig.mqtt_port) && (value.toInt() > 0) && (value.toInt() <= UINT16_MAX) ) {
+              myConfig.mqtt_port = value.toInt();
+              requestSaveToSpiffs = true;
+              #ifdef CFG_DEBUG
+              Serial.println("New MQTT port configured.");
+              #endif
+            } else {
+              #ifdef CFG_DEBUG
+              Serial.println("Configuration unchanged, do nothing");
+              #endif
+            }
+          } else if (key == "mqtt_user") {
+            if ( (value != "") && (value != myConfig.mqtt_user) ) {
+              strlcpy(myConfig.mqtt_user, value.c_str(), sizeof(myConfig.mqtt_user));
+              requestSaveToSpiffs = true;
+              #ifdef CFG_DEBUG
+              Serial.println("New MQTT user configured.");
+              #endif
+            } else {
+              #ifdef CFG_DEBUG
+              Serial.println("Configuration unchanged, do nothing");
+              #endif
+            }
+          } else if (key == "mqtt_pwd") {
+            if ( (value != "") && (value != myConfig.mqtt_password) ) {
+              strlcpy(myConfig.mqtt_password, value.c_str(), sizeof(myConfig.mqtt_password));
+              requestSaveToSpiffs = true;
+              #ifdef CFG_DEBUG
+              Serial.println("New MQTT password configured.");
+              #endif
+            } else {
+              #ifdef CFG_DEBUG
+              Serial.println("Configuration unchanged, do nothing");
+              #endif
+            }
+          } else if (key == "mqtt_pub_cycle") {
+            if ( (value.toInt() != myConfig.mqtt_publish_cycle) && (value.toInt() > 0) && (value.toInt() <= UINT8_MAX) ) {
+              myConfig.mqtt_publish_cycle = value.toInt();
+              requestSaveToSpiffs = true;
+              #ifdef CFG_DEBUG
+              Serial.println("New MQTT pyblish cycle configured.");
+              #endif
+            } else {
+              #ifdef CFG_DEBUG
+              Serial.println("Configuration unchanged, do nothing");
+              #endif
+            }
           }
         }
       }
       if (webServer.argName(i) == "InputMethod") {  /* check for dedicated arguments */
         if (webServer.arg(i) != String(myConfig.input_method) && (webServer.arg(i).toInt() >= 0) && (webServer.arg(i).toInt() < 2)) { /* check range and if changed at all */
           #ifdef CFG_DEBUG
-          Serial.println("Request SPIFFS write with restart.");
+          Serial.println("Request FileSystem write with restart.");
           #endif
           myConfig.input_method = static_cast<bool>(webServer.arg(i).toInt());
           requestSaveToSpiffsWithRestart = true;
@@ -1284,7 +1381,7 @@ void handleWebServerClient(void) {
       if (webServer.argName(i) == "Sensor") {  /* check for dedicated arguments */
         if (webServer.arg(i) != String(myConfig.sensor_type) && (webServer.arg(i).toInt() >= 0) && (webServer.arg(i).toInt() < 2)) { /* check range and if changed at all */
           #ifdef CFG_DEBUG
-          Serial.println("Request SPIFFS write with restart.");
+          Serial.println("Request FileSystem write with restart.");
           #endif
           myConfig.sensor_type = webServer.arg(i).toInt();
           requestSaveToSpiffsWithRestart = true;
@@ -1299,7 +1396,7 @@ void handleWebServerClient(void) {
 }
 
 void handleHttpReset(void) {
-  systemRestartRequest = true;
+  requestSaveToSpiffsWithRestart = true;
   handleWebServerClient();
 }
 

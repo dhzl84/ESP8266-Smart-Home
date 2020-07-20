@@ -21,9 +21,10 @@
   "mqttPubCycle":"5",
   "sensor":"0"
   "dispBrightn":"50",
-  "discovery":"false"
-  "utcOffset":"1"
-  "dst":"0"
+  "discovery":0
+  "utcOffset":1
+  "dst":0,
+  "dispEna":1
 }
 */
 
@@ -32,7 +33,7 @@
 // Loads the configuration from a file
 void loadConfiguration(Configuration &config) { // NOLINT: pass by reference
   // Open file for reading
-  File file = SPIFFS.open(filename, "r");
+  File file = FileSystem.open(filename, "r");
 
   // Allocate the memory pool on the stack.
   // Don't forget to change the capacity to match your JSON document.
@@ -82,6 +83,7 @@ void loadConfiguration(Configuration &config) { // NOLINT: pass by reference
   config.discovery_enabled =                    jsonDoc["discovery"]             | false;
   config.utc_offset =                           jsonDoc["utcOffset"]             | 1;
   config.daylight_saving_time =                 jsonDoc["dst"]                   | false;
+  config.display_enabled =                      jsonDoc["dispEna"]               | true;
 }
 
 // Saves the Configuration to a file
@@ -91,9 +93,9 @@ bool saveConfiguration(const Configuration &config) {
   StaticJsonDocument<768> jsonDoc;
   StaticJsonDocument<768> jsonDocNew;
 
-  if (SPIFFS.exists(filename)) {
+  if (FileSystem.exists(filename)) {
     // Delete existing file, otherwise the configuration is appended to the file
-    File file = SPIFFS.open(filename, "r");
+    File file = FileSystem.open(filename, "r");
 
     DeserializationError error = deserializeJson(jsonDoc, file);
 
@@ -105,10 +107,10 @@ bool saveConfiguration(const Configuration &config) {
     }
 
     #ifdef CFG_DEBUG
-    Serial.println("SPIFFS content:");
+    Serial.println("FileSystem content:");
     serializeJsonPretty(jsonDoc, Serial);
     Serial.println();
-    Serial.println("Check SPIFFS vs. current config, 0 is equal, 1 is diff.");
+    Serial.println("Check FileSystem vs. current config, 0 is equal, 1 is diff.");
     Serial.print((config.name ==                    jsonDoc["name"]) ? false : true);
     Serial.print((config.thermostat_mode ==         jsonDoc["mode"]) ? false : true);
     Serial.print((config.ssid ==                    jsonDoc["ssid"]) ? false : true);
@@ -130,10 +132,11 @@ bool saveConfiguration(const Configuration &config) {
     Serial.print((config.discovery_enabled ==       jsonDoc["discovery"]) ? false : true);
     Serial.print((config.utc_offset ==              jsonDoc["utcOffset"]) ? false : true);
     Serial.print((config.daylight_saving_time ==    jsonDoc["dst"]) ? false : true);
+    Serial.print((config.display_enabled ==         jsonDoc["dispEna"]) ? false : true);
     Serial.println();
     #endif /* CFG_DEBUG */
 
-    /* check if SPIFFS content is equal to avoid delete and write */
+    /* check if FileSystem content is equal to avoid delete and write */
 
     writeFile |= (config.name ==                    jsonDoc["name"]) ? false : true;
     writeFile |= (config.thermostat_mode ==         jsonDoc["mode"]) ? false : true;
@@ -156,6 +159,7 @@ bool saveConfiguration(const Configuration &config) {
     writeFile |= (config.discovery_enabled ==       jsonDoc["discovery"]) ? false : true;
     writeFile |= (config.utc_offset ==              jsonDoc["utcOffset"]) ? false : true;
     writeFile |= (config.daylight_saving_time ==    jsonDoc["dst"]) ? false : true;
+    writeFile |= (config.display_enabled ==         jsonDoc["dispEna"]) ? false : true;
 
     file.close();
   } else {
@@ -163,19 +167,19 @@ bool saveConfiguration(const Configuration &config) {
     writeFile = true;
   }
 
-  /* if SPIFFS content differs current configuration, delete SPIFFS and write new content*/
+  /* if FileSystem content differs current configuration, delete FileSystem and write new content*/
   if (writeFile == true) {
-    if (SPIFFS.remove(filename)) {
+    if (FileSystem.remove(filename)) {
       #ifdef CFG_DEBUG
-      Serial.println("Removing SPIFFS file succeeded");
+      Serial.println("Removing FileSystem file succeeded");
       #endif /* CFG_DEBUG */
     } else {
       #ifdef CFG_DEBUG
-      Serial.println("Removing SPIFFS file failed");
+      Serial.println("Removing FileSystem file failed");
       #endif /* CFG_DEBUG */
     }
 
-    File file = SPIFFS.open(filename, "w");
+    File file = FileSystem.open(filename, "w");
 
     jsonDocNew["name"] =                   config.name;
     jsonDocNew["mode"] =                   config.thermostat_mode;
@@ -198,6 +202,7 @@ bool saveConfiguration(const Configuration &config) {
     jsonDocNew["discovery"] =              config.discovery_enabled;
     jsonDocNew["utcOffset"] =              config.utc_offset;
     jsonDocNew["dst"] =                    config.daylight_saving_time;
+    jsonDocNew["dispEna"] =                config.display_enabled;
 
     // Serialize JSON to file
     if (serializeJson(jsonDocNew, file) == 0) {
@@ -207,7 +212,7 @@ bool saveConfiguration(const Configuration &config) {
       #endif /* CFG_DEBUG */
     } else {
       #ifdef CFG_DEBUG
-      Serial.println("new SPIFFS content:");
+      Serial.println("new FileSystem content:");
       serializeJsonPretty(jsonDocNew, Serial);
       Serial.println();
       #endif /* CFG_DEBUG */
@@ -215,18 +220,18 @@ bool saveConfiguration(const Configuration &config) {
     file.close();
   } else {
     #ifdef CFG_DEBUG
-    Serial.println("SPIFFS content equals current config, no SPIFFS write necessary");
+    Serial.println("FileSystem content equals current config, no FileSystem write necessary");
     #endif /* CFG_DEBUG */
   }
   return ret;
 }
 
-/* read SPIFFS */
+/* read FileSystem */
 String readSpiffs(String file) {
   String fileContent = "";
 
-  if (SPIFFS.exists(file)) {
-    File f = SPIFFS.open(file, "r");
+  if (FileSystem.exists(file)) {
+    File f = FileSystem.open(file, "r");
     if (!f) {
       #ifdef CFG_DEBUG
       Serial.println("oh no, failed to open file: " + file);

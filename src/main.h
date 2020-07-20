@@ -50,6 +50,7 @@ struct Configuration {
   bool          discovery_enabled;
   int8_t        utc_offset;                   /* UTC offset in hours, no fractions supported */
   bool          daylight_saving_time;
+  bool          display_enabled;
 };
 
 /*===================================================================================================================*/
@@ -57,7 +58,7 @@ struct Configuration {
 /*===================================================================================================================*/
 /* setup */
 void GPIO_CONFIG(void);
-void SPIFFS_INIT(void);
+void FS_INIT(void);
 void DISPLAY_INIT(void);
 void WIFI_CONNECT(void);
 void MQTT_CONNECT(void);
@@ -66,9 +67,9 @@ void SENSOR_INIT(void);
 /* loop */
 void HANDLE_SYSTEM_STATE(void);
 void SENSOR_MAIN(void);
-void DRAW_DISPLAY_MAIN(void);
+void DISPLAY_MAIN(void);
 void MQTT_MAIN(void);
-void SPIFFS_MAIN(void);
+void FS_MAIN(void);
 void HANDLE_HTTP_UPDATE(void);
 void NTP(void);
 /* callback */
