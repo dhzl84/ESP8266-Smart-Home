@@ -1076,7 +1076,7 @@ void updateTimeBuffer(void) {
   strftime(time_buffer, sizeof(time_buffer), time_format, &time_info);
 }
 
-void handleWebServerClient(void) {
+String buildHtml(void) {
   float rssiInPercent = WiFi.RSSI();
   rssiInPercent = isnan(rssiInPercent) ? -100.0 : min(max(2 * (rssiInPercent + 100.0), 0.0), 100.0);
 
@@ -1184,6 +1184,12 @@ void handleWebServerClient(void) {
   }
   webpage +="</body>\n";
   webpage +="</html>\n";
+
+  return webpage
+}
+
+void handleWebServerClient(void) {
+  String webpage = buildHtml();
 
   webServer.send(200, "text/html", webpage);  /* Send a response to the client asking for input */
 
