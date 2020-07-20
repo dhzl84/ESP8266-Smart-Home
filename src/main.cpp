@@ -1185,7 +1185,7 @@ String buildHtml(void) {
   webpage +="</body>\n";
   webpage +="</html>\n";
 
-  return webpage
+  return webpage;
 }
 
 void handleWebServerClient(void) {

@@ -1,7 +1,7 @@
 import datetime
 import calendar
 
-version = '0.17.0'
+version = '0.18.x'
 
 FILENAME_VERSION_H = 'src/version.h'
 
