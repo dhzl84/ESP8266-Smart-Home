@@ -2,7 +2,7 @@
 #ifndef VERSION_H_
 #define VERSION_H_
 
-#define VERSION "0.17.0"
+#define VERSION "0.18.0"
 
 #if defined CFG_DEBUG
 #define FW_PREFIX "d"
@@ -12,8 +12,8 @@
 
 #define FW (FW_PREFIX VERSION)
 
-#define BUILD_NUMBER "5f160fa8"
+#define BUILD_NUMBER "5f69f231"
 
-#define BUILD_TIME "2020-07-20 21:42:00"
+#define BUILD_TIME "2020-09-22 12:46:41"
 
 #endif  /* VERSION_H_ */

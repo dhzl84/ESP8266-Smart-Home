@@ -381,7 +381,6 @@ void MQTT_CONNECT(void) {
       }
 
       myMqttClient.publish(myMqttHelper.getTopicLastWill(),             "online", true,  MQTT_QOS);   /* publish online in will topic */
-      myMqttClient.publish(myMqttHelper.getTopicSystemRestartRequest(), "0",      false, MQTT_QOS);   /* publish restart = false on connect */
       /* subscribe topics */
       (void)myMqttClient.subscribe(myMqttHelper.getTopicTargetTempCmd(),         MQTT_QOS);
       (void)myMqttClient.subscribe(myMqttHelper.getTopicThermostatModeCmd(),     MQTT_QOS);
@@ -410,7 +409,7 @@ void loop() {
     SetNextTimeInterval(&loop100msMillis, loop100ms);
     HANDLE_SYSTEM_STATE();   /* handle connectivity and trigger reconnects */
     myThermostat.loop();     /* control relay for heating */
-    DISPLAY_MAIN();     /* draw display each loop */
+    DISPLAY_MAIN();          /* draw display each loop */
     MQTT_MAIN();             /* handle MQTT each loop */
   }
   /* call every 500 ms */
@@ -503,6 +502,7 @@ void HANDLE_SYSTEM_STATE(void) {
   /* restart handling */
   if (systemRestartRequest == true) {
     DISPLAY_MAIN();
+    myMqttClient.publish(myMqttHelper.getTopicSystemRestartRequest(), "0",      false, MQTT_QOS);   /* publish restart = false on connect */
     systemRestartRequest = false;
     #ifdef CFG_DEBUG
     Serial.println("Restarting in 3 seconds");
@@ -879,7 +879,7 @@ void MQTT_MAIN(void) {
       myMqttHelper.setTriggerDiscovery(false);
     }
     if (myMqttHelper.getTriggerRemoveDiscovered()) {
-      homeAssistantRemoveDiscovered();  /* make HA undiscover entities */
+      homeAssistantRemoveDiscovered();  /* make HA remove entities */
       myMqttHelper.setTriggerRemoveDiscovered(false);
     }
   }
@@ -1160,7 +1160,7 @@ String buildHtml(void) {
   /* COMMANDS TABLE */
   webpage +="<table style='font-size: 12px'>";
   webpageTableAppend4Cols(String("<b>Key</b>"),               String("<b>Value</b>"),                        String("<b>Current Value</b>"),             String("<b>Description</b>"));
-  webpageTableAppend4Cols(String("discover"),                 String("0 | 1"),                               String("void"),                             String("MQTT OnDemand discovery_enabled: 1 = discover; 0 = undiscover"));
+  webpageTableAppend4Cols(String("discover"),                 String("0 | 1"),                               String("void"),                             String("MQTT OnDemand discovery_enabled: 1 = discover; 0 = remove"));
   webpageTableAppend4Cols(String("discovery_enabled"),        String("0 | 1"),                               String(myConfig.discovery_enabled),         String("MQTT Autodiscovery: 1 = enabled; 0 = disabled"));
   webpageTableAppend4Cols(String("name"),                     String("string"),                              String(myConfig.name),                      String("Define a name for this device"));
   webpageTableAppend4Cols(String("mqtt_server_address"),      String("string"),                              String(myConfig.mqtt_host),                 String("Address of the MQTT server"));
