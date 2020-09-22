@@ -251,7 +251,7 @@ String mqttHelper::getTopicOutsideTemperature(void)               { return mqttP
 bool   mqttHelper::getTriggerDiscovery(void)                      { return mqttTriggerDiscovery_; }
 void   mqttHelper::setTriggerDiscovery(bool discover)             { mqttTriggerDiscovery_ = discover; }
 bool   mqttHelper::getTriggerRemoveDiscovered(void)               { return mqttTriggerRemoveDiscovered_; }
-void   mqttHelper::setTriggerRemoveDiscovered(bool undiscover)    { mqttTriggerRemoveDiscovered_ = undiscover; }
+void   mqttHelper::setTriggerRemoveDiscovered(bool remove)    { mqttTriggerRemoveDiscovered_ = remove; }
 String mqttHelper::getTopicHassDiscoveryBinarySensor(BinarySensor_t binarySensor) {
   String topic = "void";
 

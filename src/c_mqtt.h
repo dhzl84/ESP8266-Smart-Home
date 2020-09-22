@@ -33,7 +33,7 @@ class mqttHelper {
   void   buildBaseTopic(void);
   void   setTriggerDiscovery(bool discover);
   bool   getTriggerDiscovery(void);
-  void   setTriggerRemoveDiscovered(bool undiscover);
+  void   setTriggerRemoveDiscovered(bool remove);
   bool   getTriggerRemoveDiscovered(void);
   String getTopicUpdateFirmware(void);
   String getTopicUpdateFirmwareAccepted(void);
