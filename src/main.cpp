@@ -502,7 +502,8 @@ void HANDLE_SYSTEM_STATE(void) {
   /* restart handling */
   if (systemRestartRequest == true) {
     DISPLAY_MAIN();
-    myMqttClient.publish(myMqttHelper.getTopicSystemRestartRequest(), "0",      false, MQTT_QOS);   /* publish restart = false on connect */
+    myMqttClient.publish(myMqttHelper.getTopicSystemRestartRequest(), "false",      false, MQTT_QOS);   /* publish restart = false on connect */
+    myMqttClient.loop();
     systemRestartRequest = false;
     #ifdef CFG_DEBUG
     Serial.println("Restarting in 3 seconds");
@@ -846,14 +847,19 @@ void DISPLAY_MAIN(void) {
         }
       }
     }
+
+    /* display current time */
+    myDisplay.setFont(Roboto_Condensed_16);
+    myDisplay.setTextAlignment(TEXT_ALIGN_LEFT);
+    myDisplay.drawString(0, 48, String(time_buffer));
+
     #ifdef CFG_DEBUG_DISPLAY_VERSION
     myDisplay.setTextAlignment(TEXT_ALIGN_LEFT);
     myDisplay.setFont(Roboto_Condensed_16);
     myDisplay.drawString(0, 16, String(VERSION));
     myDisplay.drawString(0, 32, String(BUILD_NUMBER));
-    myDisplay.drawString(0, 48, String("IPv4: " + (WiFi.localIP().toString()).substring(((WiFi.localIP().toString()).lastIndexOf(".") + 1), (WiFi.localIP().toString()).length())));
     myDisplay.setTextAlignment(TEXT_ALIGN_RIGHT);
-    myDisplay.drawString(128, 48, String(time_buffer));
+    myDisplay.drawString(128, 48, String("IPv4: " + (WiFi.localIP().toString()).substring(((WiFi.localIP().toString()).lastIndexOf(".") + 1), (WiFi.localIP().toString()).length())));
     #endif
   }
   myDisplay.display();
