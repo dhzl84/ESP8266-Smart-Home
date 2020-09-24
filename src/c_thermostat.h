@@ -2,6 +2,7 @@
 #define C_THERMOSTAT_H_
 
 #include "Arduino.h"
+#include "main.h"
 
 #ifndef MINIMUM_TARGET_TEMP
   #define MINIMUM_TARGET_TEMP (uint8_t)150  // 15.0 °C

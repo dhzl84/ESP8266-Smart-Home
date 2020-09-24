@@ -4,6 +4,11 @@
 #include "config.h"
 #include "version.h"
 
+#include "serial.h"
+
+#define mySerial Serial
+// #define mySerial webserial
+
 /* the config.h file contains your personal configuration of the parameters below: 
   #define WIFI_SSID                   "xxx"
   #define WIFI_PWD                    "xxx"
