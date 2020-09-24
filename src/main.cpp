@@ -15,7 +15,7 @@
 #include "MQTTClient.h"
 #include <Bounce2.h>
 #include "time.h"
-
+#include "webserver.h"
 /*===================================================================================================================*/
 /* GPIO config */
 /*===================================================================================================================*/
@@ -100,10 +100,8 @@ Thermostat        myThermostat;
 WiFiClient        myWiFiClient;
 mqttHelper        myMqttHelper;
 #if CFG_BOARD_ESP8266
-ESP8266WebServer  webServer(80);
 ESP8266HTTPUpdate myHttpUpdate;
 #elif CFG_BOARD_ESP32
-WebServer         webServer(80);
 HTTPUpdate        myHttpUpdate;
 #else
 #endif
@@ -160,10 +158,10 @@ void setup() {
   NTP();            /* init network time protocol, must be called after WIFI_CONNECT() and FS_INIT() */
   MDNS.begin(myConfig.name);
 
-  webServer.begin();
-  webServer.on("/", handleWebServerClient);
-  webServer.on("/restart", handleHttpReset);
+  webServer.onNotFound(notFound);
 
+  webServer.begin();
+  
 /* button debounce */
   debounceOnOff.attach(PHYS_INPUT_3_PIN);
   debounceOnOff.interval(buttonDebounceInterval);
@@ -460,7 +458,6 @@ void loop() {
     display_enabled_temporary = true;
   }
 
-  webServer.handleClient();
   myMqttClient.loop();
   ArduinoOTA.handle();
 
@@ -522,8 +519,8 @@ void NTP(void) {
     Serial.printf("%s ", server);
   }
   Serial.println();
-  Serial.println("UTC Offset: " + String(myConfig.utc_offset));
-  Serial.println("DST : " + String(myConfig.daylight_saving_time));
+  Serial.println("UTC Offset from file system: " + String(myConfig.utc_offset));
+  Serial.println("DST from file system: " + String(myConfig.daylight_saving_time));
   #endif  /* CFG_DEBUG_SNTP */
 
   /* UTC and DST are defined in hours, configTime expects seconds, thus multiply with 3600 */
@@ -545,7 +542,10 @@ void NTP(void) {
     }
 
     for (uint8_t server_id = 0; server_id < 3 ; server_id++) {
-      if (sntp_getreachability(server_id)) {
+      Serial.print(ntp_server[server_id]);
+      Serial.print(" : ");
+      Serial.println(sntp_getreachability(server_id));
+      if (!sntp_getreachability(server_id)) {
         #ifdef CFG_DEBUG_SNTP
         Serial.printf("NTP Server %s not reachable!\n", ntp_server[server_id]);
         #endif  /* CFG_DEBUG_SNTP */
@@ -572,7 +572,7 @@ void NTP(void) {
 
   // calculate if the last Sunday is still to come
   // positive values: last sunday is still to come
-  // zero: is is Sunday
+  // zero: it is Sunday
   // negative values: last sunday is already gone
   int8_t day_of_dst_change = ((31 - (time_info.tm_mday - 1)) - time_info.tm_wday > 0);
 
