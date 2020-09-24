@@ -77,15 +77,15 @@ bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor)
     *factor = (sensorCalib.substring(pos+1)).toInt();
   } else {
     #ifdef CFG_DEBUG
-    mySerial.println("Malformed sensor calibration string >> calibration update denied");
+    Serial.println("Malformed sensor calibration string >> calibration update denied");
     #endif
   }
 
   #ifdef CFG_DEBUG
-  mySerial.println("Delimiter: " + delimiter);
-  mySerial.println("Position of delimiter: " + String(pos));
-  mySerial.println("Offset: " + String(*offset));
-  mySerial.println("Factor: " + String(*factor));
+  Serial.println("Delimiter: " + delimiter);
+  Serial.println("Position of delimiter: " + String(pos));
+  Serial.println("Offset: " + String(*offset));
+  Serial.println("Factor: " + String(*factor));
   #endif
   return ret;
 }
@@ -103,7 +103,7 @@ String millisFormatted(void) {
 
   (void) snprintf(char_buffer, sizeof(char_buffer), "%uT %02u:%02u:%02u", d, h, m, s);
   #ifdef CFG_DEBUG
-  mySerial.println(char_buffer);
+  Serial.println(char_buffer);
   #endif  // CFG_DEBUG
 
   return String(char_buffer);
@@ -158,7 +158,7 @@ bool splitHtmlCommand(String sInput, String *key, String *value) {
     *value = (sInput.substring(pos+1));
   } else {
     #ifdef CFG_DEBUG
-    mySerial.println("Malformed HTML Command string");
+    Serial.println("Malformed HTML Command string");
     #endif
   }
   return ret;
@@ -178,31 +178,31 @@ String getEspChipId(void) {
 
 #if CFG_BOARD_ESP32
 void listDir(fs::FS &fs, const char * dirname, uint8_t levels) {  // NOLINT
-  mySerial.printf("Listing directory: %s\r\n", dirname);
+  Serial.printf("Listing directory: %s\r\n", dirname);
 
   File root = fs.open(dirname);
   if (!root) {
-    mySerial.println("- failed to open directory");
+    Serial.println("- failed to open directory");
     return;
   }
   if (!root.isDirectory()) {
-    mySerial.println(" - not a directory");
+    Serial.println(" - not a directory");
     return;
   }
 
   File file = root.openNextFile();
   while (file == true) {
     if (file.isDirectory()) {
-      mySerial.print("  DIR : ");
-      mySerial.println(file.name());
+      Serial.print("  DIR : ");
+      Serial.println(file.name());
       if (levels) {
         listDir(fs, file.name(), levels -1);
       }
     } else {
-      mySerial.print("  FILE: ");
-      mySerial.print(file.name());
-      mySerial.print("\tSIZE: ");
-      mySerial.println(file.size());
+      Serial.print("  FILE: ");
+      Serial.print(file.name());
+      Serial.print("\tSIZE: ");
+      Serial.println(file.size());
     }
     file = root.openNextFile();
   }
@@ -275,9 +275,9 @@ void DiffTime::set_time_end(void) {
     time_duration_mean_buffer_ = 0;
     time_count_ = 0;
     #ifdef CFG_DEBUG_RUNTIME
-    mySerial.println("Duration (last 1000): " + String(static_cast<float>(time_duration_mean_)) + " ms");
-    mySerial.println("Duration min: " + String(time_duration_min_) + " ms");
-    mySerial.println("Duration max: " + String(time_duration_max_) + " ms");
+    Serial.println("Duration (last 1000): " + String(static_cast<float>(time_duration_mean_)) + " ms");
+    Serial.println("Duration min: " + String(time_duration_min_) + " ms");
+    Serial.println("Duration max: " + String(time_duration_max_) + " ms");
     #endif /* CFG_DEBUG */
   }
 }

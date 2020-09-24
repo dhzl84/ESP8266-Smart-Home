@@ -82,14 +82,14 @@ void Thermostat::loop(void) {
         if (actual_state_ == TH_OFF) {  /* switch on heating if target temperature is higher than measured temperature */
           setActualState(TH_HEAT);
           #ifdef CFG_DEBUG
-          mySerial.println("heating");
+          Serial.println("heating");
           #endif
         }
       } else if (filtered_temperature_ >= static_cast<int16_t>(target_temperature_ + thermostat_hysteresis_high_)) {  /* check if measured temperature is higher than heating target */
         if (actual_state_ == TH_HEAT) {  /* switch off heating if target temperature is lower than measured temperature */
           setActualState(TH_OFF);
           #ifdef CFG_DEBUG
-          mySerial.println("not heating");
+          Serial.println("not heating");
           #endif
         }
       } else {

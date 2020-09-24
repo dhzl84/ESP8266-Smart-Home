@@ -138,8 +138,8 @@ char time_buffer[6];  /* hold the current time in format "%H:%M" */
 /*===================================================================================================================*/
 void setup() {
   #ifdef CFG_DEBUG
-  mySerial.begin(115200);
-  mySerial.println("SETUP STARTED");
+  Serial.begin(115200);
+  Serial.println("SETUP STARTED");
   #endif
   Wire.begin(SDA_PIN, SCL_PIN);   /* needed for I²C communication with display and BME280 */
   FS_INIT();                  /* read stuff from FileSystem */
@@ -181,19 +181,19 @@ void setup() {
 
   #ifdef CFG_DEBUG
   #if CFG_BOARD_ESP8266
-  mySerial.printf("Vcc: %f", (ESP.getVcc() / 1000.0f));
-  mySerial.printf("Reset Reason: %s\n", ESP.getResetReason().c_str());
-  mySerial.printf("lash Size: %d\n", ESP.getFlashChipRealSize());
+  Serial.printf("Vcc: %f", (ESP.getVcc() / 1000.0f));
+  Serial.printf("Reset Reason: %s\n", ESP.getResetReason().c_str());
+  Serial.printf("lash Size: %d\n", ESP.getFlashChipRealSize());
   #elif CFG_BOARD_ESP32
-  mySerial.println("CPU Frequency: " + String(ESP.getCpuFreqMHz()));
-  mySerial.println("CPU 0 reset reason: " + getEspResetReason(rtc_get_reset_reason(0)));
-  mySerial.println("CPU 1 reset reason: " + getEspResetReason(rtc_get_reset_reason(1)));
+  Serial.println("CPU Frequency: " + String(ESP.getCpuFreqMHz()));
+  Serial.println("CPU 0 reset reason: " + getEspResetReason(rtc_get_reset_reason(0)));
+  Serial.println("CPU 1 reset reason: " + getEspResetReason(rtc_get_reset_reason(1)));
   #else
   #endif
-  mySerial.println("Sketch Size: " + String(ESP.getSketchSize()));
-  mySerial.println("Free for Sketch: " + String(ESP.getFreeSketchSpace()));
-  mySerial.println("Free Heap: " + String(ESP.getFreeHeap()));
-  mySerial.println("SETUP COMPLETE - ENTER LOOP");
+  Serial.println("Sketch Size: " + String(ESP.getSketchSize()));
+  Serial.println("Free for Sketch: " + String(ESP.getFreeSketchSpace()));
+  Serial.println("Free Heap: " + String(ESP.getFreeHeap()));
+  Serial.println("SETUP COMPLETE - ENTER LOOP");
   #endif
 
   SENSOR_MAIN();  /* acquire first sensor data before staring loop() to avoid false value reporting due to current temperature, etc. being the init value until first sensor value is read */
@@ -209,47 +209,47 @@ void FS_INIT(void) {  // initializes the FileSystem when first used and loads th
   if (!FileSystem.exists("/formatted")) {
     /* This code is only run once to format the FileSystem before first usage */
     #ifdef CFG_DEBUG
-    mySerial.println("Formatting FileSystem, this takes some time");
+    Serial.println("Formatting FileSystem, this takes some time");
     #endif
     FileSystem.format();
     #ifdef CFG_DEBUG
-    mySerial.println("Formatting FileSystem finished");
-    mySerial.println("Open file '/formatted' in write mode");
+    Serial.println("Formatting FileSystem finished");
+    Serial.println("Open file '/formatted' in write mode");
     #endif
     File f = FileSystem.open("/formatted", "w");
     if (!f) {
       #ifdef CFG_DEBUG
-      mySerial.println("file open failed");
+      Serial.println("file open failed");
       #endif
     } else {
       f.close();
       delay(5000);
       if (!FileSystem.exists("/formatted")) {
         #ifdef CFG_DEBUG
-        mySerial.println("That didn't work!");
+        Serial.println("That didn't work!");
         #endif
       } else {
         #ifdef CFG_DEBUG
-        mySerial.println("Cool, working!");
+        Serial.println("Cool, working!");
         #endif
       }
     }
   } else {
     #ifdef CFG_DEBUG
-    mySerial.println("Found '/formatted' >> FileSystem ready to use");
+    Serial.println("Found '/formatted' >> FileSystem ready to use");
     #endif
   }
   #ifdef CFG_DEBUG
-  mySerial.println("Check if I remember who I am ... ");
+  Serial.println("Check if I remember who I am ... ");
   #endif
 
   #ifdef CFG_DEBUG
   #if CFG_BOARD_ESP8266
   Dir dir = FileSystem.openDir("/");
   while (dir.next()) {
-    mySerial.print("FileSystem file found: " + dir.fileName() + " - Size in byte: ");
+    Serial.print("FileSystem file found: " + dir.fileName() + " - Size in byte: ");
     File f = dir.openFile("r");
-    mySerial.println(f.size());
+    Serial.println(f.size());
   }
   #elif CFG_BOARD_ESP32
   listDir(FileSystem, "/", 0);
@@ -260,7 +260,7 @@ void FS_INIT(void) {  // initializes the FileSystem when first used and loads th
   loadConfiguration(myConfig);  // load config
 
   #ifdef CFG_DEBUG
-  mySerial.println("My name is: " + String(myConfig.name));
+  Serial.println("My name is: " + String(myConfig.name));
   #endif
 }
 
@@ -273,7 +273,7 @@ void GPIO_CONFIG(void) {  /* initialize encoder / push button pins */
 
 void DISPLAY_INIT(void) {
   #ifdef CFG_DEBUG
-  mySerial.println("Initialize display");
+  Serial.println("Initialize display");
   #endif
   myDisplay.init();
   myDisplay.flipScreenVertically();
@@ -291,7 +291,7 @@ void WIFI_CONNECT(void) {
   wifi_connect_counter++;
   if (WiFi.status() != WL_CONNECTED) {
     #ifdef CFG_DEBUG
-    mySerial.println("Initialize WiFi ");
+    Serial.println("Initialize WiFi ");
     #endif
 
     WiFi.mode(WIFI_STA);
@@ -307,17 +307,17 @@ void WIFI_CONNECT(void) {
     /* try to connect to WiFi, proceed offline if not connecting here*/
     if (WiFi.waitForConnectResult() != WL_CONNECTED) {
       #ifdef CFG_DEBUG
-      mySerial.println("Failed to connect to WiFi, continue offline");
+      Serial.println("Failed to connect to WiFi, continue offline");
       #endif
     }
   }
 
   #ifdef CFG_DEBUG
-  mySerial.println("WiFi Status: "+ wifiStatusToString(WiFi.status()));
-  WiFi.printDiag(mySerial);
-  mySerial.println("Local IP: "+ WiFi.localIP().toString());
-  mySerial.println("Gateway IP: " + WiFi.gatewayIP().toString());
-  mySerial.println("DNS IP: " + WiFi.dnsIP().toString());
+  Serial.println("WiFi Status: "+ wifiStatusToString(WiFi.status()));
+  WiFi.printDiag(Serial);
+  Serial.println("Local IP: "+ WiFi.localIP().toString());
+  Serial.println("Gateway IP: " + WiFi.gatewayIP().toString());
+  Serial.println("DNS IP: " + WiFi.dnsIP().toString());
   #endif
 }
 
@@ -329,7 +329,7 @@ void OTA_INIT(void) {
     OTA_UPDATE = TH_OTA_ACTIVE;
     DISPLAY_MAIN();
     #ifdef CFG_DEBUG
-    mySerial.println("Start OTA");
+    Serial.println("Start OTA");
     #endif
   });
 
@@ -337,13 +337,13 @@ void OTA_INIT(void) {
     OTA_UPDATE = TH_OTA_FINISHED;
     DISPLAY_MAIN();
     #ifdef CFG_DEBUG
-    mySerial.println("\nEnd OTA");
+    Serial.println("\nEnd OTA");
     #endif
   });
 
   ArduinoOTA.onProgress([](uint16_t progress, uint16_t total) {
     #ifdef CFG_DEBUG
-    mySerial.printf("Progress: %u%%\r", (progress / (total / 100)));
+    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
     #endif
   });
 
@@ -351,12 +351,12 @@ void OTA_INIT(void) {
     OTA_UPDATE = TH_OTA_ERROR;
     DISPLAY_MAIN();
     #ifdef CFG_DEBUG
-    mySerial.printf("Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR) mySerial.println("Auth Failed");
-    else if (error == OTA_BEGIN_ERROR) mySerial.println("Begin Failed");
-    else if (error == OTA_CONNECT_ERROR) mySerial.println("Connect Failed");
-    else if (error == OTA_RECEIVE_ERROR) mySerial.println("Receive Failed");
-    else if (error == OTA_END_ERROR) mySerial.println("End Failed");
+    Serial.printf("Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+    else if (error == OTA_END_ERROR) Serial.println("End Failed");
     #endif
     systemRestartRequest = true;
   });
@@ -476,7 +476,7 @@ void HANDLE_SYSTEM_STATE(void) {
     SetNextTimeInterval(&wifiReconnectTimer, (secondsToMilliseconds(WIFI_RECONNECT_TIME)));
     if (WiFi.status() != WL_CONNECTED) {
       #ifdef CFG_DEBUG
-      mySerial.println("Lost WiFi; Status: "+ String(WiFi.status()));
+      Serial.println("Lost WiFi; Status: "+ String(WiFi.status()));
       #endif
       /* try to come online, debounced to avoid reconnect each loop*/
       WIFI_CONNECT();
@@ -485,9 +485,9 @@ void HANDLE_SYSTEM_STATE(void) {
   /* check if button is pushed for 10 seconds to request a reset */
   if (LOW == digitalRead(PHYS_INPUT_3_PIN)) {
     #ifdef CFG_DEBUG_ENCODER
-    mySerial.println("Encoder Button pressed: "+ String(digitalRead(PHYS_INPUT_3_PIN)));
-    mySerial.println("Target Time: "+ String(onOffButtonSystemResetTime + onOffButtonSystemResetInterval));
-    mySerial.println("Current time: "+ String(millis()));
+    Serial.println("Encoder Button pressed: "+ String(digitalRead(PHYS_INPUT_3_PIN)));
+    Serial.println("Target Time: "+ String(onOffButtonSystemResetTime + onOffButtonSystemResetInterval));
+    Serial.println("Current time: "+ String(millis()));
     #endif
 
     if ((onOffButtonSystemResetTime + onOffButtonSystemResetInterval) < millis()) {
@@ -506,7 +506,7 @@ void HANDLE_SYSTEM_STATE(void) {
     myMqttClient.loop();
     systemRestartRequest = false;
     #ifdef CFG_DEBUG
-    mySerial.println("Restarting in 3 seconds");
+    Serial.println("Restarting in 3 seconds");
     #endif
     myMqttClient.disconnect();
     delay(secondsToMilliseconds(3));
@@ -517,13 +517,13 @@ void HANDLE_SYSTEM_STATE(void) {
 void NTP(void) {
   const char* ntp_server[] = { "fritz.box", "0.de.pool.ntp.org", "0.ch.pool.ntp.org" };  // WiFi.gatewayIP().toString().c_str()
   #ifdef CFG_DEBUG_SNTP
-  mySerial.print("NTP Servers: ");
+  Serial.print("NTP Servers: ");
   for (auto server : ntp_server) {
-    mySerial.printf("%s ", server);
+    Serial.printf("%s ", server);
   }
-  mySerial.println();
-  mySerial.println("UTC Offset: " + String(myConfig.utc_offset));
-  mySerial.println("DST : " + String(myConfig.daylight_saving_time));
+  Serial.println();
+  Serial.println("UTC Offset: " + String(myConfig.utc_offset));
+  Serial.println("DST : " + String(myConfig.daylight_saving_time));
   #endif  /* CFG_DEBUG_SNTP */
 
   /* UTC and DST are defined in hours, configTime expects seconds, thus multiply with 3600 */
@@ -539,7 +539,7 @@ void NTP(void) {
     millis_delta = millis() - ntp_start_time;
     if (millis_delta >= 1000) {
       #ifdef CFG_DEBUG_SNTP
-      mySerial.printf("Waiting for NTP-Answer %02u sec\n", millis_delta / 1000);
+      Serial.printf("Waiting for NTP-Answer %02u sec\n", millis_delta / 1000);
       #endif  /* CFG_DEBUG_SNTP */
       delay(975);
     }
@@ -547,7 +547,7 @@ void NTP(void) {
     for (uint8_t server_id = 0; server_id < 3 ; server_id++) {
       if (sntp_getreachability(server_id)) {
         #ifdef CFG_DEBUG_SNTP
-        mySerial.printf("NTP Server %s not reachable!\n", ntp_server[server_id]);
+        Serial.printf("NTP Server %s not reachable!\n", ntp_server[server_id]);
         #endif  /* CFG_DEBUG_SNTP */
       } else {
         server_reachable = true;
@@ -556,7 +556,7 @@ void NTP(void) {
   } while ((millis_delta <= (secondsToMilliseconds(30))) && !server_reachable);
 
   #ifdef CFG_DEBUG_SNTP
-  // mySerial.printf("SNTP connected to: %s\n", sntp_getserver());
+  // Serial.printf("SNTP connected to: %s\n", sntp_getserver());
   #endif  /* CFG_DEBUG_SNTP */
   #endif  /* CFG_BOARD_ESP8266 */
 
@@ -580,21 +580,21 @@ void NTP(void) {
     local_ntp_time_received = true;
   } else {
     #ifdef CFG_DEBUG
-    mySerial.println("Failed to obtain time from NTP");
+    Serial.println("Failed to obtain time from NTP");
     #endif /* CFG_DEBUG */
   }
 
   #ifdef CFG_DEBUG_SNTP
-  mySerial.println("DST: " + String(time_info.tm_isdst));
-  mySerial.println("YDay: " + String(time_info.tm_yday));
-  mySerial.println("WDay: " + String(time_info.tm_wday));
-  mySerial.println("Year: " + String(time_info.tm_year));
-  mySerial.println("Month: " + String(time_info.tm_mon));
-  mySerial.println("Day: " + String(time_info.tm_mday));
-  mySerial.println("Hour: " + String(time_info.tm_hour));
-  mySerial.println("Min: " + String(time_info.tm_min));
-  mySerial.println("Sec: " + String(time_info.tm_sec));
-  mySerial.println("Time: " + String(time_buffer));
+  Serial.println("DST: " + String(time_info.tm_isdst));
+  Serial.println("YDay: " + String(time_info.tm_yday));
+  Serial.println("WDay: " + String(time_info.tm_wday));
+  Serial.println("Year: " + String(time_info.tm_year));
+  Serial.println("Month: " + String(time_info.tm_mon));
+  Serial.println("Day: " + String(time_info.tm_mday));
+  Serial.println("Hour: " + String(time_info.tm_hour));
+  Serial.println("Min: " + String(time_info.tm_min));
+  Serial.println("Sec: " + String(time_info.tm_sec));
+  Serial.println("Time: " + String(time_buffer));
   #endif  /* CFG_DEBUG_SNTP */
 
   if (local_ntp_time_received == true) {
@@ -602,91 +602,91 @@ void NTP(void) {
     if (time_info.tm_mon > 2 && time_info.tm_mon < 9) {
       local_daylight_saving_time = 1;
       #ifdef CFG_DEBUG_SNTP
-      mySerial.println("April to September - DST: " + String(local_daylight_saving_time));
+      Serial.println("April to September - DST: " + String(local_daylight_saving_time));
       #endif  /* CFG_DEBUG_SNTP */
     // November to February is always not DST
     } else if (time_info.tm_mon > 9 || time_info.tm_mon < 2) {
       local_daylight_saving_time = 0;
       #ifdef CFG_DEBUG_SNTP
-      mySerial.println("November to February - DST: " + String(local_daylight_saving_time));
+      Serial.println("November to February - DST: " + String(local_daylight_saving_time));
       #endif  /* CFG_DEBUG_SNTP */
     // March
     } else if (time_info.tm_mon == 2) {
       #ifdef CFG_DEBUG_SNTP
-      mySerial.print("March");
+      Serial.print("March");
       #endif  /* CFG_DEBUG_SNTP */
       // DST coming
       if (day_of_dst_change > 0) {
         #ifdef CFG_DEBUG_SNTP
-        mySerial.print(" before DST change");
+        Serial.print(" before DST change");
         #endif  /* CFG_DEBUG_SNTP */
         local_daylight_saving_time = 0;
       // DST gone
       } else if (day_of_dst_change < 0) {
         #ifdef CFG_DEBUG_SNTP
-        mySerial.print(" after DST change");
+        Serial.print(" after DST change");
         #endif  /* CFG_DEBUG_SNTP */
         local_daylight_saving_time = 1;
       // DST change today
       } else {
         // UTC hour is 1 or later
         #ifdef CFG_DEBUG_SNTP
-        mySerial.print(" DST change today");
+        Serial.print(" DST change today");
         #endif  /* CFG_DEBUG_SNTP */
         if ((time_info.tm_hour - myConfig.utc_offset - static_cast<uint8_t>(myConfig.daylight_saving_time)) >= 1) {
           #ifdef CFG_DEBUG_SNTP
-          mySerial.print(" - pending");
+          Serial.print(" - pending");
           #endif  /* CFG_DEBUG_SNTP */
           local_daylight_saving_time = 1;
         // UTC hour is before 1
         } else {
           #ifdef CFG_DEBUG_SNTP
-          mySerial.print(" - done");
+          Serial.print(" - done");
           #endif  /* CFG_DEBUG_SNTP */
           local_daylight_saving_time = 0;
         }
       }
       #ifdef CFG_DEBUG_SNTP
-      mySerial.println("");
+      Serial.println("");
       #endif  /* CFG_DEBUG_SNTP */
     // October
     } else if (time_info.tm_mon == 9) {
       #ifdef CFG_DEBUG_SNTP
-      mySerial.print("October");
+      Serial.print("October");
       #endif  /* CFG_DEBUG_SNTP */
       // not DST coming
       if (day_of_dst_change > 0) {
         #ifdef CFG_DEBUG_SNTP
-        mySerial.print(" before DST change");
+        Serial.print(" before DST change");
         #endif  /* CFG_DEBUG_SNTP */
         local_daylight_saving_time = 1;
       // not DST gone
       } else if (day_of_dst_change < 0) {
         #ifdef CFG_DEBUG_SNTP
-        mySerial.print(" after DST change");
+        Serial.print(" after DST change");
         #endif  /* CFG_DEBUG_SNTP */
         local_daylight_saving_time = 0;
       // not DST change today
       } else {
         #ifdef CFG_DEBUG_SNTP
-        mySerial.print(" DST change today");
+        Serial.print(" DST change today");
         #endif  /* CFG_DEBUG_SNTP */
         // UTC hour is 1 or later
         if ((time_info.tm_hour - myConfig.utc_offset - static_cast<uint8_t>(myConfig.daylight_saving_time)) >= 1) {
           #ifdef CFG_DEBUG_SNTP
-          mySerial.print(" - pending");
+          Serial.print(" - pending");
           #endif  /* CFG_DEBUG_SNTP */
           local_daylight_saving_time = 0;
         // UTC hour is before 1
         } else {
           #ifdef CFG_DEBUG_SNTP
-          mySerial.print(" - done");
+          Serial.print(" - done");
           #endif  /* CFG_DEBUG_SNTP */
           local_daylight_saving_time = 1;
         }
       }
       #ifdef CFG_DEBUG_SNTP
-      mySerial.println("");
+      Serial.println("");
       #endif  /* CFG_DEBUG_SNTP */
     }
   }
@@ -694,9 +694,9 @@ void NTP(void) {
   // if actual DST differs from the stored one, change it, persist it and re-initialze NTP with new DST flag
   if (myConfig.daylight_saving_time != local_daylight_saving_time) {
     #ifdef CFG_DEBUG_SNTP
-    mySerial.println("DST change calculated");
-    mySerial.println("DST old: " + String(myConfig.daylight_saving_time));
-    mySerial.println("DST new: " + String(local_daylight_saving_time));
+    Serial.println("DST change calculated");
+    Serial.println("DST old: " + String(myConfig.daylight_saving_time));
+    Serial.println("DST new: " + String(local_daylight_saving_time));
     #endif  /* CFG_DEBUG_SNTP */
     myConfig.daylight_saving_time = local_daylight_saving_time;
     requestSaveToSpiffs = true;
@@ -710,17 +710,17 @@ void SENSOR_INIT() {
   if (myConfig.sensor_type == cBME280) {
     if (!myBME280.begin()) { /* init BMP sensor */
       #ifdef CFG_DEBUG
-      mySerial.println("Could not find a valid BME sensor!");
+      Serial.println("Could not find a valid BME sensor!");
       #endif
     } else {
       myBME280.setSettings(settings);
     }
   } else if (myConfig.sensor_type == cDHT22) {
       myDHT22.setup(DHT_PIN, DHTesp::DHT22); /* init DHT sensor */
-      mySerial.println("DHT22 init: " + String(myDHT22.getStatusString()));
+      Serial.println("DHT22 init: " + String(myDHT22.getStatusString()));
   } else {
       #ifdef CFG_DEBUG
-      mySerial.println("Sensor misconfiguration!");
+      Serial.println("Sensor misconfiguration!");
       #endif
   }
 }
@@ -748,7 +748,7 @@ void SENSOR_MAIN() {
     if (isnan(sensHumid) || isnan(sensTemp)) {
       myThermostat.setLastSensorReadFailed(true);   /* set failure flag and exit SENSOR_MAIN() */
       #ifdef CFG_DEBUG
-      mySerial.println("Failed to read from sensor! Failure counter: " + String(myThermostat.getSensorFailureCounter()));
+      Serial.println("Failed to read from sensor! Failure counter: " + String(myThermostat.getSensorFailureCounter()));
       #endif
     } else {
       myThermostat.setLastSensorReadFailed(false);   /* set no failure during read sensor */
@@ -756,19 +756,19 @@ void SENSOR_MAIN() {
       myThermostat.setCurrentTemperature((int16_t)(10* sensTemp));   /* read value and convert to one decimal precision integer */
 
       #ifdef CFG_DEBUG_SENSOR_VALUES
-      mySerial.print("Temperature: ");
-      mySerial.print(intToFloat(myThermostat.getCurrentTemperature()), 1);
-      mySerial.println(" *C ");
-      mySerial.print("Filtered temperature: ");
-      mySerial.print(intToFloat(myThermostat.getFilteredTemperature()), 1);
-      mySerial.println(" *C ");
+      Serial.print("Temperature: ");
+      Serial.print(intToFloat(myThermostat.getCurrentTemperature()), 1);
+      Serial.println(" *C ");
+      Serial.print("Filtered temperature: ");
+      Serial.print(intToFloat(myThermostat.getFilteredTemperature()), 1);
+      Serial.println(" *C ");
 
-      mySerial.print("Humidity: ");
-      mySerial.print(intToFloat(myThermostat.getCurrentHumidity()), 1);
-      mySerial.println(" %");
-      mySerial.print("Filtered humidity: ");
-      mySerial.print(intToFloat(myThermostat.getFilteredHumidity()), 1);
-      mySerial.println(" %");
+      Serial.print("Humidity: ");
+      Serial.print(intToFloat(myThermostat.getCurrentHumidity()), 1);
+      Serial.println(" %");
+      Serial.print("Filtered humidity: ");
+      Serial.print(intToFloat(myThermostat.getFilteredHumidity()), 1);
+      Serial.println(" %");
       #endif  /* CFG_DEBUG_SENSOR_VALUES */
 
       #ifdef CFG_PRINT_TEMPERATURE_QUEUE
@@ -776,12 +776,12 @@ void SENSOR_MAIN() {
         int16_t temperature;
         int16_t humidity;
         if ( (myTemperatureFilter.getRawSampleValue(i, &temperature)) && (myHumidityFilter.getRawSampleValue(i, &humidity)) ) {
-          mySerial.print("Sample ");
-          mySerial.print(i);
-          mySerial.print(": ");
-          mySerial.print(intToFloat(temperature), 1);
-          mySerial.print(", ");
-          mySerial.println(intToFloat(humidity), 1);
+          Serial.print("Sample ");
+          Serial.print(i);
+          Serial.print(": ");
+          Serial.print(intToFloat(temperature), 1);
+          Serial.print(", ");
+          Serial.println(intToFloat(humidity), 1);
         }
       }
       #endif
@@ -900,7 +900,7 @@ void HANDLE_HTTP_UPDATE(void) {
     DISPLAY_MAIN();
     fetch_update = false;
     #ifdef CFG_DEBUG
-    mySerial.println("Remote update started");
+    Serial.println("Remote update started");
     #endif
     WiFiClient client;
     t_httpUpdate_return ret = myHttpUpdate.update(client, myConfig.update_server_address, FW);
@@ -908,19 +908,19 @@ void HANDLE_HTTP_UPDATE(void) {
     switch (ret) {
     case HTTP_UPDATE_FAILED:
       #ifdef CFG_DEBUG
-      mySerial.printf("HTTP_UPDATE_FAILD Error (%d): %s \n", myHttpUpdate.getLastError(), myHttpUpdate.getLastErrorString().c_str());
+      Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s \n", myHttpUpdate.getLastError(), myHttpUpdate.getLastErrorString().c_str());
       #endif
       break;
 
     case HTTP_UPDATE_NO_UPDATES:
       #ifdef CFG_DEBUG
-      mySerial.println("HTTP_UPDATE_NO_UPDATES");
+      Serial.println("HTTP_UPDATE_NO_UPDATES");
       #endif
       break;
 
     case HTTP_UPDATE_OK:
       #ifdef CFG_DEBUG
-      mySerial.println("HTTP_UPDATE_OK");
+      Serial.println("HTTP_UPDATE_OK");
       #endif
       break;
     }
@@ -957,7 +957,7 @@ void FS_MAIN(void) {
     myThermostat.resetNewCalib();
     FS_WRITTEN = false;
     #ifdef CFG_DEBUG
-    mySerial.println("FileSystem to be stored after debounce time: " + String(FS_WRITE_DEBOUNCE));
+    Serial.println("FileSystem to be stored after debounce time: " + String(FS_WRITE_DEBOUNCE));
     #endif /* CFG_DEBUG */
   } else {
     /* no spiffs data changed this loop */
@@ -972,7 +972,7 @@ void FS_MAIN(void) {
       } else {
         /* FileSystem not written, retry next loop */
         #ifdef CFG_DEBUG
-        mySerial.println("FileSystem write failed");
+        Serial.println("FileSystem write failed");
         #endif /* CFG_DEBUG */
       }
     } else {
@@ -1001,7 +1001,7 @@ void ICACHE_RAM_ATTR updateEncoder(void) {
 
     if (encoded == 0b11) { /* if the encoder is in an end position, evaluate the number of interrupts to left/right. simple majority wins */
       #ifdef CFG_DEBUG_ENCODER
-      mySerial.println("Rotary encoder interrupts: " + String(rotaryEncoderDirectionInts));
+      Serial.println("Rotary encoder interrupts: " + String(rotaryEncoderDirectionInts));
       #endif
 
       if (rotaryEncoderDirectionInts > rotRight) { /* if there was a higher amount of interrupts to the right, consider the encoder was turned to the right */
@@ -1203,13 +1203,13 @@ void handleWebServerClient(void) {
   if (webServer.args() > 0) {  /* Arguments were received */
     for ( uint8_t i = 0; i < webServer.args(); i++ ) {
       #ifdef CFG_DEBUG
-      mySerial.println("HTTP arg(" + String(i) + "): " + webServer.argName(i) + " = " + webServer.arg(i));  /* Display each argument */
+      Serial.println("HTTP arg(" + String(i) + "): " + webServer.argName(i) + " = " + webServer.arg(i));  /* Display each argument */
       #endif /* CFG_DEBUG */
       if (webServer.argName(i) == "cmd") {  /* check for cmd */
         String key = "";
         String value = "";
         if (splitHtmlCommand(webServer.arg(i), &key, &value)) {
-          mySerial.println(key + " : " + value);
+          Serial.println(key + " : " + value);
           if (key == "discover") {
             if ((value.toInt() & 1) == true) {
               myMqttHelper.setTriggerDiscovery(true);
@@ -1230,87 +1230,87 @@ void handleWebServerClient(void) {
               if (myConfig.discovery_enabled == true) {
                 requestSaveToSpiffsWithRestart = true;
                 #ifdef CFG_DEBUG
-                mySerial.println("Request FileSystem write with restart.");
+                Serial.println("Request FileSystem write with restart.");
                 #endif
               } else {
                 requestSaveToSpiffs = true;
                 #ifdef CFG_DEBUG
-                mySerial.println("Request FileSystem write.");
+                Serial.println("Request FileSystem write.");
                 #endif
               }
             } else {
               #ifdef CFG_DEBUG
-              mySerial.println("Configuration unchanged, do nothing");
+              Serial.println("Configuration unchanged, do nothing");
               #endif
             }
           } else if (key == "update_server_address") {
             if ( (value != "") && (value != myConfig.update_server_address) ) {
               #ifdef CFG_DEBUG
-              mySerial.println("Request FileSystem write.");
+              Serial.println("Request FileSystem write.");
               #endif
               strlcpy(myConfig.update_server_address, value.c_str(), sizeof(myConfig.update_server_address));
               requestSaveToSpiffs = true;
             } else {
               #ifdef CFG_DEBUG
-              mySerial.println("Configuration unchanged, do nothing");
+              Serial.println("Configuration unchanged, do nothing");
               #endif
             }
           } else if (key == "calibration_factor") {
             uint8_t u8_value = (uint8_t) value.toInt();
             if ((u8_value != myConfig.calibration_factor) && (u8_value >= 50) && (u8_value <= 200)) {
               #ifdef CFG_DEBUG
-              mySerial.println("Request FileSystem write.");
+              Serial.println("Request FileSystem write.");
               #endif
               myConfig.calibration_factor = int16_t(u8_value);
               requestSaveToSpiffs = true;
             } else {
               #ifdef CFG_DEBUG
-              mySerial.println("Configuration unchanged, do nothing");
+              Serial.println("Configuration unchanged, do nothing");
               #endif
             }
           } else if (key == "calibration_offset") {
             int16_t i16_value = (int16_t) value.toInt();
             if ((i16_value != myConfig.calibration_offset) && (i16_value >= -50) && (i16_value <= 50)) {
               #ifdef CFG_DEBUG
-              mySerial.println("Request FileSystem write.");
+              Serial.println("Request FileSystem write.");
               #endif
               myConfig.calibration_offset = int16_t(i16_value);
               requestSaveToSpiffs = true;
             } else {
               #ifdef CFG_DEBUG
-              mySerial.println("Configuration unchanged, do nothing");
+              Serial.println("Configuration unchanged, do nothing");
               #endif
             }
           } else if (key == "display_brightness") {
             uint8_t u8_value = (uint8_t) value.toInt();
             if ((u8_value != myConfig.display_brightness) && (u8_value <= 255)) {
               #ifdef CFG_DEBUG
-              mySerial.println("Request FileSystem write.");
+              Serial.println("Request FileSystem write.");
               #endif
               myConfig.display_brightness = u8_value;
               requestSaveToSpiffsWithRestart = true;
             } else {
               #ifdef CFG_DEBUG
-              mySerial.println("Configuration unchanged, do nothing");
+              Serial.println("Configuration unchanged, do nothing");
               #endif
             }
           } else if (key == "fetch_update") {
             if ((value.toInt() & 1) == true) {
               fetch_update = true;
               #ifdef CFG_DEBUG
-              mySerial.println("HTTP Update triggered via webpage");
+              Serial.println("HTTP Update triggered via webpage");
               #endif
             }
           } else if (key == "display_enabled") {
             if ((value.toInt() & 1) == true) {
               myConfig.display_enabled = true;
               #ifdef CFG_DEBUG
-              mySerial.println("Display enabled via webpage");
+              Serial.println("Display enabled via webpage");
               #endif
             } else if ((value.toInt() & 1) == false) {
               myConfig.display_enabled = false;
               #ifdef CFG_DEBUG
-              mySerial.println("Display disabled via webpage");
+              Serial.println("Display disabled via webpage");
               #endif
             }
             requestSaveToSpiffs = true;
@@ -1319,11 +1319,11 @@ void handleWebServerClient(void) {
               strlcpy(myConfig.mqtt_host, value.c_str(), sizeof(myConfig.mqtt_host));
               requestSaveToSpiffs = true;
               #ifdef CFG_DEBUG
-              mySerial.println("New MQTT server configured.");
+              Serial.println("New MQTT server configured.");
               #endif
             } else {
               #ifdef CFG_DEBUG
-              mySerial.println("Configuration unchanged, do nothing");
+              Serial.println("Configuration unchanged, do nothing");
               #endif
             }
           } else if (key == "mqtt_server_port") {
@@ -1331,11 +1331,11 @@ void handleWebServerClient(void) {
               myConfig.mqtt_port = value.toInt();
               requestSaveToSpiffs = true;
               #ifdef CFG_DEBUG
-              mySerial.println("New MQTT port configured.");
+              Serial.println("New MQTT port configured.");
               #endif
             } else {
               #ifdef CFG_DEBUG
-              mySerial.println("Configuration unchanged, do nothing");
+              Serial.println("Configuration unchanged, do nothing");
               #endif
             }
           } else if (key == "mqtt_user") {
@@ -1343,11 +1343,11 @@ void handleWebServerClient(void) {
               strlcpy(myConfig.mqtt_user, value.c_str(), sizeof(myConfig.mqtt_user));
               requestSaveToSpiffs = true;
               #ifdef CFG_DEBUG
-              mySerial.println("New MQTT user configured.");
+              Serial.println("New MQTT user configured.");
               #endif
             } else {
               #ifdef CFG_DEBUG
-              mySerial.println("Configuration unchanged, do nothing");
+              Serial.println("Configuration unchanged, do nothing");
               #endif
             }
           } else if (key == "mqtt_pwd") {
@@ -1355,11 +1355,11 @@ void handleWebServerClient(void) {
               strlcpy(myConfig.mqtt_password, value.c_str(), sizeof(myConfig.mqtt_password));
               requestSaveToSpiffs = true;
               #ifdef CFG_DEBUG
-              mySerial.println("New MQTT password configured.");
+              Serial.println("New MQTT password configured.");
               #endif
             } else {
               #ifdef CFG_DEBUG
-              mySerial.println("Configuration unchanged, do nothing");
+              Serial.println("Configuration unchanged, do nothing");
               #endif
             }
           } else if (key == "mqtt_pub_cycle") {
@@ -1367,11 +1367,11 @@ void handleWebServerClient(void) {
               myConfig.mqtt_publish_cycle = value.toInt();
               requestSaveToSpiffs = true;
               #ifdef CFG_DEBUG
-              mySerial.println("New MQTT pyblish cycle configured.");
+              Serial.println("New MQTT pyblish cycle configured.");
               #endif
             } else {
               #ifdef CFG_DEBUG
-              mySerial.println("Configuration unchanged, do nothing");
+              Serial.println("Configuration unchanged, do nothing");
               #endif
             }
           }
@@ -1380,26 +1380,26 @@ void handleWebServerClient(void) {
       if (webServer.argName(i) == "InputMethod") {  /* check for dedicated arguments */
         if (webServer.arg(i) != String(myConfig.input_method) && (webServer.arg(i).toInt() >= 0) && (webServer.arg(i).toInt() < 2)) { /* check range and if changed at all */
           #ifdef CFG_DEBUG
-          mySerial.println("Request FileSystem write with restart.");
+          Serial.println("Request FileSystem write with restart.");
           #endif
           myConfig.input_method = static_cast<bool>(webServer.arg(i).toInt());
           requestSaveToSpiffsWithRestart = true;
         } else {
           #ifdef CFG_DEBUG
-          mySerial.println("Configuration unchanged, do nothing");
+          Serial.println("Configuration unchanged, do nothing");
           #endif
         }
       }
       if (webServer.argName(i) == "Sensor") {  /* check for dedicated arguments */
         if (webServer.arg(i) != String(myConfig.sensor_type) && (webServer.arg(i).toInt() >= 0) && (webServer.arg(i).toInt() < 2)) { /* check range and if changed at all */
           #ifdef CFG_DEBUG
-          mySerial.println("Request FileSystem write with restart.");
+          Serial.println("Request FileSystem write with restart.");
           #endif
           myConfig.sensor_type = webServer.arg(i).toInt();
           requestSaveToSpiffsWithRestart = true;
         } else {
           #ifdef CFG_DEBUG
-          mySerial.println("Configuration unchanged, do nothing");
+          Serial.println("Configuration unchanged, do nothing");
           #endif
         }
       }
@@ -1416,12 +1416,12 @@ void handleHttpReset(void) {
 // cppcheck-suppress constParameter ; messageReceived is a library function
 void messageReceived(String &topic, String &payload) {  // NOLINT
   #ifdef CFG_DEBUG
-  mySerial.println("received: " + topic + " : " + payload);
+  Serial.println("received: " + topic + " : " + payload);
   #endif
 
   if (topic == myMqttHelper.getTopicSystemRestartRequest()) {
     #ifdef CFG_DEBUG
-    mySerial.println("Restart request received with value: " + payload);
+    Serial.println("Restart request received with value: " + payload);
     #endif
     if ((payload == "true") || (payload == "1")) {
       systemRestartRequest = true;
@@ -1429,7 +1429,7 @@ void messageReceived(String &topic, String &payload) {  // NOLINT
   } else if (topic == myMqttHelper.getTopicUpdateFirmware()) { /* HTTP Update */
     if ((payload == "true") || (payload == "1")) {
       #ifdef CFG_DEBUG
-      mySerial.println("Firmware updated triggered via MQTT");
+      Serial.println("Firmware updated triggered via MQTT");
       #endif
       fetch_update = true;
     }
@@ -1448,18 +1448,18 @@ void messageReceived(String &topic, String &payload) {  // NOLINT
     }
   } else if (topic == myMqttHelper.getTopicChangeName()) {
     #ifdef CFG_DEBUG
-    mySerial.println("New name received: " + payload);
+    Serial.println("New name received: " + payload);
     #endif
     if (payload != myConfig.name) {
       #ifdef CFG_DEBUG
-      mySerial.println("Old name was: " + String(myConfig.name));
+      Serial.println("Old name was: " + String(myConfig.name));
       #endif
       strlcpy(myConfig.name, payload.c_str(), sizeof(myConfig.name));
       requestSaveToSpiffsWithRestart = true;
     }
   } else if (topic == myMqttHelper.getTopicChangeSensorCalib()) {
     #ifdef CFG_DEBUG
-    mySerial.println("New sensor calibration parameters received: " + payload);
+    Serial.println("New sensor calibration parameters received: " + payload);
     #endif
 
     int16_t offset;
@@ -1470,13 +1470,13 @@ void messageReceived(String &topic, String &payload) {  // NOLINT
     }
   } else if (topic == myMqttHelper.getTopicChangeHysteresis()) {
     #ifdef CFG_DEBUG
-    mySerial.println("New hysteresis parameter received: " + payload);
+    Serial.println("New hysteresis parameter received: " + payload);
     #endif
 
     myThermostat.setThermostatHysteresis(payload.toInt());
   } else if (topic == myMqttHelper.getTopicOutsideTemperature()) {
     #ifdef CFG_DEBUG
-    mySerial.println("New outside temperature received: " + payload);
+    Serial.println("New outside temperature received: " + payload);
     #endif
     myThermostat.setOutsideTemperature(floatToInt(payload.toFloat()));
   }

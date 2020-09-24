@@ -44,20 +44,20 @@ void loadConfiguration(Configuration &config) { // NOLINT: pass by reference
 
   if (error) {
     #ifdef CFG_DEBUG
-    mySerial.print(F("deserializeJson() failed with code "));
-    mySerial.println(error.c_str());
+    Serial.print(F("deserializeJson() failed with code "));
+    Serial.println(error.c_str());
     #endif /* CFG_DEBUG */
     return;
   } else {
-      serializeJsonPretty(jsonDoc, mySerial);
-      mySerial.println();
+      serializeJsonPretty(jsonDoc, Serial);
+      Serial.println();
   }
 
   file.close();
 
   if (jsonDoc.isNull()) {
     #ifdef CFG_DEBUG
-    mySerial.println("Failed to read file, using default configuration");
+    Serial.println("Failed to read file, using default configuration");
     #endif /* CFG_DEBUG */
   }
 
@@ -101,39 +101,39 @@ bool saveConfiguration(const Configuration &config) {
 
     if (error) {
         #ifdef CFG_DEBUG
-        mySerial.print(F("deserializeJson() failed with code "));
-        mySerial.println(error.c_str());
+        Serial.print(F("deserializeJson() failed with code "));
+        Serial.println(error.c_str());
         #endif
     }
 
     #ifdef CFG_DEBUG
-    mySerial.println("FileSystem content:");
-    serializeJsonPretty(jsonDoc, mySerial);
-    mySerial.println();
-    mySerial.println("Check FileSystem vs. current config, 0 is equal, 1 is diff.");
-    mySerial.print((config.name ==                    jsonDoc["name"]) ? false : true);
-    mySerial.print((config.thermostat_mode ==         jsonDoc["mode"]) ? false : true);
-    mySerial.print((config.ssid ==                    jsonDoc["ssid"]) ? false : true);
-    mySerial.print((config.wifi_password ==           jsonDoc["wifiPwd"]) ? false : true);
-    mySerial.print((config.mqtt_host ==               jsonDoc["mqttHost"]) ? false : true);
-    mySerial.print((config.mqtt_port ==               jsonDoc["mqttPort"]) ? false : true);
-    mySerial.print((config.mqtt_user ==               jsonDoc["mqttUser"]) ? false : true);
-    mySerial.print((config.mqtt_password ==           jsonDoc["mqttPwd"]) ? false : true);
-    mySerial.print((config.target_temperature ==      jsonDoc["tTemp"]) ? false : true);
-    mySerial.print((config.temperature_hysteresis ==  jsonDoc["tHyst"]) ? false : true);
-    mySerial.print((config.calibration_factor ==      jsonDoc["calibF"]) ? false : true);
-    mySerial.print((config.calibration_offset ==      jsonDoc["calibO"]) ? false : true);
-    mySerial.print((config.update_server_address ==   jsonDoc["updServer"]) ? false : true);
-    mySerial.print((config.sensor_update_interval ==  jsonDoc["sensUpdInterval"]) ? false : true);
-    mySerial.print((config.mqtt_publish_cycle ==      jsonDoc["mqttPubCycle"]) ? false : true);
-    mySerial.print((config.input_method ==            jsonDoc["inputMethod"]) ? false : true);
-    mySerial.print((config.sensor_type ==             jsonDoc["sensor"]) ? false : true);
-    mySerial.print((config.display_brightness ==      jsonDoc["dispBrightn"]) ? false : true);
-    mySerial.print((config.discovery_enabled ==       jsonDoc["discovery"]) ? false : true);
-    mySerial.print((config.utc_offset ==              jsonDoc["utcOffset"]) ? false : true);
-    mySerial.print((config.daylight_saving_time ==    jsonDoc["dst"]) ? false : true);
-    mySerial.print((config.display_enabled ==         jsonDoc["dispEna"]) ? false : true);
-    mySerial.println();
+    Serial.println("FileSystem content:");
+    serializeJsonPretty(jsonDoc, Serial);
+    Serial.println();
+    Serial.println("Check FileSystem vs. current config, 0 is equal, 1 is diff.");
+    Serial.print((config.name ==                    jsonDoc["name"]) ? false : true);
+    Serial.print((config.thermostat_mode ==         jsonDoc["mode"]) ? false : true);
+    Serial.print((config.ssid ==                    jsonDoc["ssid"]) ? false : true);
+    Serial.print((config.wifi_password ==           jsonDoc["wifiPwd"]) ? false : true);
+    Serial.print((config.mqtt_host ==               jsonDoc["mqttHost"]) ? false : true);
+    Serial.print((config.mqtt_port ==               jsonDoc["mqttPort"]) ? false : true);
+    Serial.print((config.mqtt_user ==               jsonDoc["mqttUser"]) ? false : true);
+    Serial.print((config.mqtt_password ==           jsonDoc["mqttPwd"]) ? false : true);
+    Serial.print((config.target_temperature ==      jsonDoc["tTemp"]) ? false : true);
+    Serial.print((config.temperature_hysteresis ==  jsonDoc["tHyst"]) ? false : true);
+    Serial.print((config.calibration_factor ==      jsonDoc["calibF"]) ? false : true);
+    Serial.print((config.calibration_offset ==      jsonDoc["calibO"]) ? false : true);
+    Serial.print((config.update_server_address ==   jsonDoc["updServer"]) ? false : true);
+    Serial.print((config.sensor_update_interval ==  jsonDoc["sensUpdInterval"]) ? false : true);
+    Serial.print((config.mqtt_publish_cycle ==      jsonDoc["mqttPubCycle"]) ? false : true);
+    Serial.print((config.input_method ==            jsonDoc["inputMethod"]) ? false : true);
+    Serial.print((config.sensor_type ==             jsonDoc["sensor"]) ? false : true);
+    Serial.print((config.display_brightness ==      jsonDoc["dispBrightn"]) ? false : true);
+    Serial.print((config.discovery_enabled ==       jsonDoc["discovery"]) ? false : true);
+    Serial.print((config.utc_offset ==              jsonDoc["utcOffset"]) ? false : true);
+    Serial.print((config.daylight_saving_time ==    jsonDoc["dst"]) ? false : true);
+    Serial.print((config.display_enabled ==         jsonDoc["dispEna"]) ? false : true);
+    Serial.println();
     #endif /* CFG_DEBUG */
 
     /* check if FileSystem content is equal to avoid delete and write */
@@ -171,11 +171,11 @@ bool saveConfiguration(const Configuration &config) {
   if (writeFile == true) {
     if (FileSystem.remove(filename)) {
       #ifdef CFG_DEBUG
-      mySerial.println("Removing FileSystem file succeeded");
+      Serial.println("Removing FileSystem file succeeded");
       #endif /* CFG_DEBUG */
     } else {
       #ifdef CFG_DEBUG
-      mySerial.println("Removing FileSystem file failed");
+      Serial.println("Removing FileSystem file failed");
       #endif /* CFG_DEBUG */
     }
 
@@ -208,19 +208,19 @@ bool saveConfiguration(const Configuration &config) {
     if (serializeJson(jsonDocNew, file) == 0) {
       ret = false;
       #ifdef CFG_DEBUG
-      mySerial.println("Failed to write to file");
+      Serial.println("Failed to write to file");
       #endif /* CFG_DEBUG */
     } else {
       #ifdef CFG_DEBUG
-      mySerial.println("new FileSystem content:");
-      serializeJsonPretty(jsonDocNew, mySerial);
-      mySerial.println();
+      Serial.println("new FileSystem content:");
+      serializeJsonPretty(jsonDocNew, Serial);
+      Serial.println();
       #endif /* CFG_DEBUG */
     }
     file.close();
   } else {
     #ifdef CFG_DEBUG
-    mySerial.println("FileSystem content equals current config, no FileSystem write necessary");
+    Serial.println("FileSystem content equals current config, no FileSystem write necessary");
     #endif /* CFG_DEBUG */
   }
   return ret;
@@ -234,7 +234,7 @@ String readSpiffs(String file) {
     File f = FileSystem.open(file, "r");
     if (!f) {
       #ifdef CFG_DEBUG
-      mySerial.println("oh no, failed to open file: " + file);
+      Serial.println("oh no, failed to open file: " + file);
       #endif
       /* TODO: Error handling */
     } else {
@@ -243,7 +243,7 @@ String readSpiffs(String file) {
 
       #ifdef CFG_DEBUG
       if (fileContent == "") {
-        mySerial.println("File " + file + " is empty");
+        Serial.println("File " + file + " is empty");
       }
       #endif
     }
