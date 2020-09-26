@@ -1180,6 +1180,7 @@ String buildHtml(void) {
   webpageTableAppend4Cols(String("display_enabled"),          String("0 | 1"),                               String(myConfig.display_enabled),           String("Display always on or only on user interaction"));
   webpageTableAppend4Cols(String("display_brightness"),       String("Range: 0 .. +255, LSB: 1 step"),       String(myConfig.display_brightness),        String("Brightness of OLED display"));
   webpageTableAppend4Cols(String("fetch_update"),             String("0 | 1"),                               String(fetch_update),                       String("Trigger download and install binary from update server: 1 = fetch; 0 = do nothing"));
+  webpageTableAppend4Cols(String("utc_offset"),               String("-12 .. +12"),                          String(myConfig.utc_offset),                String("UTC offset for time calculation, only integers allowed"));
   webpage +="</table>";
   /* Restart Device */
   webpage +="<p><b>Restart Device</b></p>";
@@ -1368,6 +1369,18 @@ void handleWebServerClient(void) {
               requestSaveToSpiffs = true;
               #ifdef CFG_DEBUG
               Serial.println("New MQTT pyblish cycle configured.");
+              #endif
+            } else {
+              #ifdef CFG_DEBUG
+              Serial.println("Configuration unchanged, do nothing");
+              #endif
+            }
+          } else if (key == "utc_offset") {
+            if ( (value.toInt() != myConfig.utc_offset) && (value.toInt() >= -12) && (value.toInt() <= +12) ) {
+              myConfig.utc_offset = value.toInt();
+              requestSaveToSpiffs = true;
+              #ifdef CFG_DEBUG
+              Serial.println("New UTC offset configured.");
               #endif
             } else {
               #ifdef CFG_DEBUG
