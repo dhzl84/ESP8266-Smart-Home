@@ -5,26 +5,28 @@
 /*
 {
   "name":"ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-  "state":"true",
-  "tTemp":"200",
-  "tHyst":"4",
-  "calibF":"100",                           // factor in percent
-  "calibO":"0",                             // offset in 0.1 *C    
+  "state":true,
+  "tTemp":200,
+  "tHyst":4,
+  "calibF":100,                           // factor in percent
+  "calibO":0,                             // offset in 0.1 *C    
   "ssid":"xxxxxxxxxxxxxxxx",
   "wifiPwd":"xxxxxxxxxxxxxxxxx",
   "mqttHost":"123.456.789.012",
-  "mqttPort":"1234",
+  "mqttPort":1234,
   "mqttUser":"xxxxxxxxxxxxx",
   "mqttPwd":"xxxxxxxxxxxxx",
   "updServer":"http://192.168.178.12:88/firmware/thermostat/firmware.bin",
-  "sensUpdInterval":"20",
-  "mqttPubCycle":"5",
+  "sensUpdInterval":20,
+  "mqttPubCycle":5,
   "sensor":"0"
-  "dispBrightn":"50",
-  "discovery":0
+  "dispBrightn":1,
+  "discovery":false
   "utcOffset":1
-  "dst":0,
-  "dispEna":1
+  "dst":false,
+  "dispEna":true
+  "log2ser":true
+  "log2mqtt":true
 }
 */
 
@@ -79,11 +81,13 @@ void loadConfiguration(Configuration &config) { // NOLINT: pass by reference
   config.mqtt_publish_cycle =                   jsonDoc["mqttPubCycle"]          | 5;
   config.input_method =                         jsonDoc["inputMethod"]           | false;
   config.sensor_type =                          jsonDoc["sensor"]                | cDHT22;
-  config.display_brightness =                   jsonDoc["dispBrightn"]           | 100;
+  config.display_brightness =                   jsonDoc["dispBrightn"]           | 1;
   config.discovery_enabled =                    jsonDoc["discovery"]             | false;
   config.utc_offset =                           jsonDoc["utcOffset"]             | 1;
   config.daylight_saving_time =                 jsonDoc["dst"]                   | false;
   config.display_enabled =                      jsonDoc["dispEna"]               | true;
+  config.log_to_serial =                        jsonDoc["log2ser"]               | true;
+  config.log_to_mqtt =                          jsonDoc["log2mqtt"]              | true;
 }
 
 // Saves the Configuration to a file
@@ -132,7 +136,8 @@ bool saveConfiguration(const Configuration &config) {
     Serial.print((config.discovery_enabled ==       jsonDoc["discovery"]) ? false : true);
     Serial.print((config.utc_offset ==              jsonDoc["utcOffset"]) ? false : true);
     Serial.print((config.daylight_saving_time ==    jsonDoc["dst"]) ? false : true);
-    Serial.print((config.display_enabled ==         jsonDoc["dispEna"]) ? false : true);
+    Serial.print((config.log_to_serial ==           jsonDoc["log2ser"]) ? false : true);
+    Serial.print((config.log_to_mqtt ==             jsonDoc["log2mqtt"]) ? false : true);
     Serial.println();
     #endif /* CFG_DEBUG */
 
@@ -160,7 +165,8 @@ bool saveConfiguration(const Configuration &config) {
     writeFile |= (config.utc_offset ==              jsonDoc["utcOffset"]) ? false : true;
     writeFile |= (config.daylight_saving_time ==    jsonDoc["dst"]) ? false : true;
     writeFile |= (config.display_enabled ==         jsonDoc["dispEna"]) ? false : true;
-
+    writeFile |= (config.log_to_serial ==           jsonDoc["log2ser"]) ? false : true;
+    writeFile |= (config.log_to_mqtt ==             jsonDoc["log2mqtt"]) ? false : true;
     file.close();
   } else {
     /* file does not exist */
@@ -203,7 +209,8 @@ bool saveConfiguration(const Configuration &config) {
     jsonDocNew["utcOffset"] =              config.utc_offset;
     jsonDocNew["dst"] =                    config.daylight_saving_time;
     jsonDocNew["dispEna"] =                config.display_enabled;
-
+    jsonDocNew["log2ser"] =                config.log_to_serial;
+    jsonDocNew["log2mqtt"] =               config.log_to_mqtt;
     // Serialize JSON to file
     if (serializeJson(jsonDocNew, file) == 0) {
       ret = false;

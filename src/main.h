@@ -51,6 +51,8 @@ struct Configuration {
   int8_t        utc_offset;                   /* UTC offset in hours, no fractions supported */
   bool          daylight_saving_time;
   bool          display_enabled;
+  bool          log_to_serial;
+  bool          log_to_mqtt;
 };
 
 /*===================================================================================================================*/

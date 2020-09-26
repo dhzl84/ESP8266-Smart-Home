@@ -581,7 +581,7 @@ void NTP(void) {
   if (time_info.tm_year >= (2016 - 1900)) {
     local_ntp_time_received = true;
   } else {
-    #ifdef CFG_DEBUG
+    #ifdef CFG_DEBUG_SNTP
     ntp_log += ("\nFailed to obtain time from NTP");
     #endif /* CFG_DEBUG */
   }
@@ -710,7 +710,10 @@ void NTP(void) {
   }
   updateTimeBuffer();
 
+  #ifdef CFG_DEBUG_SNTP
   myLogger.print(ntp_log);
+  #endif  /* CFG_DEBUG_SNTP */
+
 }
 
 void SENSOR_INIT() {
@@ -1188,6 +1191,8 @@ String buildHtml(void) {
   webpageTableAppend4Cols(String("display_brightness"),       String("Range: 0 .. +255, LSB: 1 step"),       String(myConfig.display_brightness),        String("Brightness of OLED display"));
   webpageTableAppend4Cols(String("fetch_update"),             String("0 | 1"),                               String(fetch_update),                       String("Trigger download and install binary from update server: 1 = fetch; 0 = do nothing"));
   webpageTableAppend4Cols(String("utc_offset"),               String("-12 .. +12"),                          String(myConfig.utc_offset),                String("UTC offset for time calculation, only integers allowed"));
+  webpageTableAppend4Cols(String("log_to_serial"),            String("0 | 1"),                               String(myConfig.log_to_serial),             String("Output logs to serial"));
+  webpageTableAppend4Cols(String("log_to_mqtt"),              String("0 | 1"),                               String(myConfig.log_to_mqtt),               String("Output logs to MQTT"));
   webpage +="</table>";
   /* Restart Device */
   webpage +="<p><b>Restart Device</b></p>";
