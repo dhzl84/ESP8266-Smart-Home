@@ -3,6 +3,10 @@
 
 #include "Arduino.h"
 
+#ifndef MQTT_QOS
+  #define MQTT_QOS 1 /* valid values are 0, 1 and 2 */
+#endif
+
 typedef enum {
   kTemp,
   kHum,
@@ -48,6 +52,7 @@ class mqttHelper {
   String getTopicHassDiscoveryBinarySensor(BinarySensor_t binarySensor);
   String getTopicHassDiscoverySensor(Sensor_t sensor);
   String getTopicHassDiscoverySwitch(Switch_t switches);
+  String getTopicLog(void);
   String buildStateJSON(String name, String temp, String humid, String hysteresis, String actState, String tarTemp, String sensError, String thermoMode, String calibration_factor, String calibration_offset, String ip, String firmware);
   String buildHassDiscoveryClimate(String name, String firmware, String model);
   String buildHassDiscoveryBinarySensor(String name, BinarySensor_t binarySensor);
@@ -80,6 +85,7 @@ class mqttHelper {
   String mqttThermostatModeCmd_;
   String mqttTargetTempCmd_;
   String mqttOutsideTemperature_;
+  String mqttLog_;
 };
 
 #endif  // C_MQTT_H_

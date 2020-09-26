@@ -30,7 +30,8 @@ mqttHelper::mqttHelper()
     mqttChangeHysteresis_("/changeHysteresis"), \
     mqttThermostatModeCmd_("/thermostatModeCmd"), \
     mqttTargetTempCmd_("/targetTempCmd"), \
-    mqttOutsideTemperature_("outsideTemperature") {}
+    mqttOutsideTemperature_("outsideTemperature"), \
+    mqttLog_("/log") {}
 
 mqttHelper::~mqttHelper() {}
 
@@ -249,6 +250,7 @@ String mqttHelper::getTopicThermostatModeCmd(void)                { return mqttG
 String mqttHelper::getTopicHassDiscoveryClimate(void)             { return mqttGeneralBaseTopic_ + mqttHassDiscoveryTopic_; }
 String mqttHelper::getTopicData(void)                             { return mqttGeneralBaseTopic_ + mqttData_; }
 String mqttHelper::getTopicOutsideTemperature(void)               { return mqttPrefix_ + mqttOutsideTemperature_; }
+String mqttHelper::getTopicLog(void)                              { return mqttGeneralBaseTopic_ + mqttLog_; }
 bool   mqttHelper::getTriggerDiscovery(void)                      { return mqttTriggerDiscovery_; }
 void   mqttHelper::setTriggerDiscovery(bool discover)             { mqttTriggerDiscovery_ = discover; }
 bool   mqttHelper::getTriggerRemoveDiscovered(void)               { return mqttTriggerRemoveDiscovered_; }

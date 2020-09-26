@@ -7,14 +7,15 @@
 #include <Wire.h> /* for BME280 */
 #include <SPI.h>  /* for BME280 */
 #include <BME280I2C.h>
+#include "MQTTClient.h"
 #include "user_fonts.h"
 #include <SSD1306.h>
 #include "main.h"
 #include "c_mqtt.h"
 #include "c_thermostat.h"
-#include "MQTTClient.h"
 #include <Bounce2.h>
 #include "time.h"
+#include "c_logger.h"
 
 /*===================================================================================================================*/
 /* GPIO config */
@@ -32,9 +33,6 @@ ADC_MODE(ADC_VCC);             /* measure Vcc */
 uint32_t wifi_connect_counter = 0;
 uint32_t mqtt_connect_counter = 0;
 struct Configuration myConfig;
-#ifndef MQTT_QOS
-  #define MQTT_QOS 1 /* valid values are 0, 1 and 2 */
-#endif
 uint32_t mqttReconnectTime       = 0;
 uint32_t mqttReconnectInterval   = secondsToMilliseconds(5); /* 5 s in milliseconds */
 uint32_t mqttPubCycleTime        = 0;
@@ -98,7 +96,9 @@ BME280I2C         myBME280(settings);
 SSD1306           myDisplay(0x3c, SDA_PIN, SCL_PIN);
 Thermostat        myThermostat;
 WiFiClient        myWiFiClient;
+MQTTClient        myMqttClient(2048); /* 2048 byte buffer */
 mqttHelper        myMqttHelper;
+logger            myLogger(&myMqttClient, &myMqttHelper);
 #if CFG_BOARD_ESP8266
 ESP8266WebServer  webServer(80);
 ESP8266HTTPUpdate myHttpUpdate;
@@ -107,7 +107,6 @@ WebServer         webServer(80);
 HTTPUpdate        myHttpUpdate;
 #else
 #endif
-MQTTClient        myMqttClient(2048); /* 2048 byte buffer */
 Bounce            debounceOnOff = Bounce();
 Bounce            debounceUp = Bounce();
 Bounce            debounceDown = Bounce();
@@ -139,7 +138,7 @@ char time_buffer[6];  /* hold the current time in format "%H:%M" */
 void setup() {
   #ifdef CFG_DEBUG
   Serial.begin(115200);
-  Serial.println("SETUP STARTED");
+  myLogger.print("SETUP STARTED");
   #endif
   Wire.begin(SDA_PIN, SCL_PIN);   /* needed for I²C communication with display and BME280 */
   FS_INIT();                  /* read stuff from FileSystem */
@@ -181,7 +180,7 @@ void setup() {
 
   #ifdef CFG_DEBUG
   #if CFG_BOARD_ESP8266
-  Serial.printf("Vcc: %f", (ESP.getVcc() / 1000.0f));
+  myLogger.print("Vcc: %f" + String(ESP.getVcc() / 1000.0f));
   Serial.printf("Reset Reason: %s\n", ESP.getResetReason().c_str());
   Serial.printf("lash Size: %d\n", ESP.getFlashChipRealSize());
   #elif CFG_BOARD_ESP32
@@ -502,7 +501,7 @@ void HANDLE_SYSTEM_STATE(void) {
   /* restart handling */
   if (systemRestartRequest == true) {
     DISPLAY_MAIN();
-    myMqttClient.publish(myMqttHelper.getTopicSystemRestartRequest(), "false",      false, MQTT_QOS);   /* publish restart = false on connect */
+    myMqttClient.publish(myMqttHelper.getTopicSystemRestartRequest(), "false", false, MQTT_QOS);  /* reset switch in HA */
     myMqttClient.loop();
     systemRestartRequest = false;
     #ifdef CFG_DEBUG
@@ -515,15 +514,15 @@ void HANDLE_SYSTEM_STATE(void) {
 }
 
 void NTP(void) {
-  const char* ntp_server[] = { "fritz.box", "0.de.pool.ntp.org", "0.ch.pool.ntp.org" };  // WiFi.gatewayIP().toString().c_str()
+  const char* ntp_server[] = { "fritz.box", "pool.ntp.org", "0.pool.ntp.org" };
   #ifdef CFG_DEBUG_SNTP
-  Serial.print("NTP Servers: ");
+  String ntp_log = "NTP LOG:";
+  ntp_log += "\nServers: ";
   for (auto server : ntp_server) {
-    Serial.printf("%s ", server);
+    ntp_log += "\n " + String(server);
   }
-  Serial.println();
-  Serial.println("UTC Offset: " + String(myConfig.utc_offset));
-  Serial.println("DST : " + String(myConfig.daylight_saving_time));
+  ntp_log += "\nUTC Offset from local config: " + String(myConfig.utc_offset);
+  ntp_log += "\nDST from local config: " + String(myConfig.daylight_saving_time);
   #endif  /* CFG_DEBUG_SNTP */
 
   /* UTC and DST are defined in hours, configTime expects seconds, thus multiply with 3600 */
@@ -539,18 +538,21 @@ void NTP(void) {
     millis_delta = millis() - ntp_start_time;
     if (millis_delta >= 1000) {
       #ifdef CFG_DEBUG_SNTP
-      Serial.printf("Waiting for NTP-Answer %02u sec\n", millis_delta / 1000);
+      ntp_log += ("\nWaiting for NTP-Answer " + String(millis_delta / 1000) + " sec");
       #endif  /* CFG_DEBUG_SNTP */
       delay(975);
     }
 
     for (uint8_t server_id = 0; server_id < 3 ; server_id++) {
       if (sntp_getreachability(server_id)) {
+        server_reachable = true;
         #ifdef CFG_DEBUG_SNTP
-        Serial.printf("NTP Server %s not reachable!\n", ntp_server[server_id]);
+        ntp_log += ("\nNTP Server " + String(ntp_server[server_id]) + " reachable!");
         #endif  /* CFG_DEBUG_SNTP */
       } else {
-        server_reachable = true;
+        #ifdef CFG_DEBUG_SNTP
+        ntp_log += ("\nNTP Server " + String(ntp_server[server_id]) + " not reachable!");
+        #endif  /* CFG_DEBUG_SNTP */
       }
     }
   } while ((millis_delta <= (secondsToMilliseconds(30))) && !server_reachable);
@@ -580,21 +582,24 @@ void NTP(void) {
     local_ntp_time_received = true;
   } else {
     #ifdef CFG_DEBUG
-    Serial.println("Failed to obtain time from NTP");
+    ntp_log += ("\nFailed to obtain time from NTP");
     #endif /* CFG_DEBUG */
   }
 
   #ifdef CFG_DEBUG_SNTP
-  Serial.println("DST: " + String(time_info.tm_isdst));
-  Serial.println("YDay: " + String(time_info.tm_yday));
-  Serial.println("WDay: " + String(time_info.tm_wday));
-  Serial.println("Year: " + String(time_info.tm_year));
-  Serial.println("Month: " + String(time_info.tm_mon));
-  Serial.println("Day: " + String(time_info.tm_mday));
-  Serial.println("Hour: " + String(time_info.tm_hour));
-  Serial.println("Min: " + String(time_info.tm_min));
-  Serial.println("Sec: " + String(time_info.tm_sec));
-  Serial.println("Time: " + String(time_buffer));
+  ntp_log += ("\nTime Info received from NTP server:");
+  ntp_log += ("\n DST: " + String(time_info.tm_isdst));
+  ntp_log += ("\n YDay: " + String(time_info.tm_yday));
+  ntp_log += ("\n WDay: " + String(time_info.tm_wday));
+  ntp_log += ("\n Year: " + String(time_info.tm_year));
+  ntp_log += ("\n Month: " + String(time_info.tm_mon));
+  ntp_log += ("\n Day: " + String(time_info.tm_mday));
+  ntp_log += ("\n Hour: " + String(time_info.tm_hour));
+  ntp_log += ("\n Min: " + String(time_info.tm_min));
+  ntp_log += ("\n Sec: " + String(time_info.tm_sec));
+  ntp_log += ("\n Time: " + String(time_buffer));
+
+  ntp_log += "\nDST calculation:\n";
   #endif  /* CFG_DEBUG_SNTP */
 
   if (local_ntp_time_received == true) {
@@ -602,91 +607,91 @@ void NTP(void) {
     if (time_info.tm_mon > 2 && time_info.tm_mon < 9) {
       local_daylight_saving_time = 1;
       #ifdef CFG_DEBUG_SNTP
-      Serial.println("April to September - DST: " + String(local_daylight_saving_time));
+      ntp_log += (" April to September - DST: " + String(local_daylight_saving_time));
       #endif  /* CFG_DEBUG_SNTP */
     // November to February is always not DST
     } else if (time_info.tm_mon > 9 || time_info.tm_mon < 2) {
       local_daylight_saving_time = 0;
       #ifdef CFG_DEBUG_SNTP
-      Serial.println("November to February - DST: " + String(local_daylight_saving_time));
+      ntp_log += (" November to February - DST: " + String(local_daylight_saving_time));
       #endif  /* CFG_DEBUG_SNTP */
     // March
     } else if (time_info.tm_mon == 2) {
       #ifdef CFG_DEBUG_SNTP
-      Serial.print("March");
+      ntp_log += (" March");
       #endif  /* CFG_DEBUG_SNTP */
       // DST coming
       if (day_of_dst_change > 0) {
         #ifdef CFG_DEBUG_SNTP
-        Serial.print(" before DST change");
+        ntp_log += (" before DST change");
         #endif  /* CFG_DEBUG_SNTP */
         local_daylight_saving_time = 0;
       // DST gone
       } else if (day_of_dst_change < 0) {
         #ifdef CFG_DEBUG_SNTP
-        Serial.print(" after DST change");
+        ntp_log += (" after DST change");
         #endif  /* CFG_DEBUG_SNTP */
         local_daylight_saving_time = 1;
       // DST change today
       } else {
         // UTC hour is 1 or later
         #ifdef CFG_DEBUG_SNTP
-        Serial.print(" DST change today");
+        ntp_log += (" DST change today");
         #endif  /* CFG_DEBUG_SNTP */
         if ((time_info.tm_hour - myConfig.utc_offset - static_cast<uint8_t>(myConfig.daylight_saving_time)) >= 1) {
           #ifdef CFG_DEBUG_SNTP
-          Serial.print(" - pending");
+          ntp_log += (" - pending");
           #endif  /* CFG_DEBUG_SNTP */
           local_daylight_saving_time = 1;
         // UTC hour is before 1
         } else {
           #ifdef CFG_DEBUG_SNTP
-          Serial.print(" - done");
+          ntp_log += (" - done");
           #endif  /* CFG_DEBUG_SNTP */
           local_daylight_saving_time = 0;
         }
       }
       #ifdef CFG_DEBUG_SNTP
-      Serial.println("");
+      ntp_log += "\n";
       #endif  /* CFG_DEBUG_SNTP */
     // October
     } else if (time_info.tm_mon == 9) {
       #ifdef CFG_DEBUG_SNTP
-      Serial.print("October");
+      ntp_log += (" October");
       #endif  /* CFG_DEBUG_SNTP */
       // not DST coming
       if (day_of_dst_change > 0) {
         #ifdef CFG_DEBUG_SNTP
-        Serial.print(" before DST change");
+        ntp_log += (" before DST change");
         #endif  /* CFG_DEBUG_SNTP */
         local_daylight_saving_time = 1;
       // not DST gone
       } else if (day_of_dst_change < 0) {
         #ifdef CFG_DEBUG_SNTP
-        Serial.print(" after DST change");
+        ntp_log += (" after DST change");
         #endif  /* CFG_DEBUG_SNTP */
         local_daylight_saving_time = 0;
       // not DST change today
       } else {
         #ifdef CFG_DEBUG_SNTP
-        Serial.print(" DST change today");
+        ntp_log += (" DST change today");
         #endif  /* CFG_DEBUG_SNTP */
         // UTC hour is 1 or later
         if ((time_info.tm_hour - myConfig.utc_offset - static_cast<uint8_t>(myConfig.daylight_saving_time)) >= 1) {
           #ifdef CFG_DEBUG_SNTP
-          Serial.print(" - pending");
+          ntp_log += (" - pending");
           #endif  /* CFG_DEBUG_SNTP */
           local_daylight_saving_time = 0;
         // UTC hour is before 1
         } else {
           #ifdef CFG_DEBUG_SNTP
-          Serial.print(" - done");
+          ntp_log += (" - done");
           #endif  /* CFG_DEBUG_SNTP */
           local_daylight_saving_time = 1;
         }
       }
       #ifdef CFG_DEBUG_SNTP
-      Serial.println("");
+      ntp_log += "\n";
       #endif  /* CFG_DEBUG_SNTP */
     }
   }
@@ -694,9 +699,9 @@ void NTP(void) {
   // if actual DST differs from the stored one, change it, persist it and re-initialze NTP with new DST flag
   if (myConfig.daylight_saving_time != local_daylight_saving_time) {
     #ifdef CFG_DEBUG_SNTP
-    Serial.println("DST change calculated");
-    Serial.println("DST old: " + String(myConfig.daylight_saving_time));
-    Serial.println("DST new: " + String(local_daylight_saving_time));
+    ntp_log += ("DST change calculated");
+    ntp_log += ("DST old: " + String(myConfig.daylight_saving_time));
+    ntp_log += ("DST new: " + String(local_daylight_saving_time));
     #endif  /* CFG_DEBUG_SNTP */
     myConfig.daylight_saving_time = local_daylight_saving_time;
     requestSaveToSpiffs = true;
@@ -704,6 +709,8 @@ void NTP(void) {
     configTime((myConfig.utc_offset * 3600), (static_cast<uint8_t>(myConfig.daylight_saving_time) * 3600), ntp_server[0], ntp_server[1], ntp_server[2]);
   }
   updateTimeBuffer();
+
+  myLogger.print(ntp_log);
 }
 
 void SENSOR_INIT() {
