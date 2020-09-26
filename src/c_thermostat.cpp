@@ -24,15 +24,16 @@ Thermostat::Thermostat()
     thermostat_hysteresis_low_(2), \
     sensor_error_(false), \
     new_calib_(0), \
-    current_temperature_(INT16_MIN), \
+    current_temperature_(0), \
     current_humidity_(0), \
-    filtered_temperature_(INT16_MIN), \
+    filtered_temperature_(0), \
     filtered_humidity_(0), \
-    sensor_failure_counter_(0), \
+    sensor_failure_counter_(SENSOR_FAILURE_COUNTER_INIT_VALUE), \
     temperature_offset_(0), \
     temperature_factor_(100), \
     sensor_error_threshold_(3), \
-    outside_temperature_(INT16_MIN), \
+    outside_temperature_(0), \
+    outside_temperature_received_(false), \
     temperature_value_queue_filled_(false), \
     humidity_value_queue_filled_(false), \
     temperature_value_sample_id_(0), \
@@ -70,8 +71,8 @@ void Thermostat::setup(uint8_t gpio, uint8_t tarTemp, int16_t calibFactor, int16
 }
 
 void Thermostat::loop(void) {
-  /* prevent heating if sensor has a confirmed error or no value was received yet */
-  if ((sensor_error_ == true) || (current_temperature_ == INT16_MIN)) {
+  /* prevent heating if sensor has a confirmed error */
+  if (sensor_error_ == true) {
     /* switch off heating if sensor does not provide values */
     if (actual_state_ == TH_HEAT) {
       setActualState(TH_OFF);
@@ -102,22 +103,23 @@ void Thermostat::loop(void) {
   }
 }
 
-bool    Thermostat::getActualState(void)              { return actual_state_; }
-uint8_t Thermostat::getTargetTemperature(void)        { return target_temperature_; }
-bool    Thermostat::getNewData()                      { return new_data_; }
-bool    Thermostat::getThermostatMode()               { return thermostat_mode_; }
-int16_t Thermostat::getSensorFailureCounter(void)     { return sensor_failure_counter_; }
-int16_t Thermostat::getCurrentTemperature(void)       { return current_temperature_; }
-int16_t Thermostat::getCurrentHumidity(void)          { return current_humidity_; }
-int16_t Thermostat::getFilteredTemperature(void)      { return filtered_temperature_; }
-int16_t Thermostat::getFilteredHumidity(void)         { return filtered_humidity_; }
-bool    Thermostat::getSensorError(void)              { return sensor_error_; }
-bool    Thermostat::getNewCalib(void)                 { return new_calib_; }
-int16_t Thermostat::getSensorCalibOffset(void)        { return temperature_offset_; }
-int16_t Thermostat::getSensorCalibFactor(void)        { return temperature_factor_; }
-uint8_t Thermostat::getThermostatHysteresis(void)     { return thermostat_hysteresis_; }
-uint8_t Thermostat::getThermostatHysteresisHigh(void) { return thermostat_hysteresis_high_; }
-uint8_t Thermostat::getThermostatHysteresisLow(void)  { return thermostat_hysteresis_low_; }
+bool    Thermostat::getActualState(void)                  { return actual_state_; }
+uint8_t Thermostat::getTargetTemperature(void)            { return target_temperature_; }
+bool    Thermostat::getNewData()                          { return new_data_; }
+bool    Thermostat::getThermostatMode()                   { return thermostat_mode_; }
+int16_t Thermostat::getSensorFailureCounter(void)         { return sensor_failure_counter_; }
+int16_t Thermostat::getCurrentTemperature(void)           { return current_temperature_; }
+int16_t Thermostat::getCurrentHumidity(void)              { return current_humidity_; }
+int16_t Thermostat::getFilteredTemperature(void)          { return filtered_temperature_; }
+int16_t Thermostat::getFilteredHumidity(void)             { return filtered_humidity_; }
+bool    Thermostat::getSensorError(void)                  { return sensor_error_; }
+bool    Thermostat::getNewCalib(void)                     { return new_calib_; }
+int16_t Thermostat::getSensorCalibOffset(void)            { return temperature_offset_; }
+int16_t Thermostat::getSensorCalibFactor(void)            { return temperature_factor_; }
+uint8_t Thermostat::getThermostatHysteresis(void)         { return thermostat_hysteresis_; }
+uint8_t Thermostat::getThermostatHysteresisHigh(void)     { return thermostat_hysteresis_high_; }
+uint8_t Thermostat::getThermostatHysteresisLow(void)      { return thermostat_hysteresis_low_; }
+bool    Thermostat::getOutsideTemperatureReceived(void)   { return outside_temperature_received_; }
 
 void Thermostat::setThermostatHysteresis(uint8_t hysteresis) {
   /*
@@ -276,12 +278,14 @@ void Thermostat::setCurrentHumidity(int16_t value) {
 void Thermostat::setLastSensorReadFailed(bool value) {
   /* filter sensor read failure here to avoid switching back and forth for single failure events */
   if (value == true) {
-    if (sensor_failure_counter_ < UINT8_MAX) {
+    if ( (sensor_failure_counter_ < INT8_MAX) && (sensor_failure_counter_ != SENSOR_FAILURE_COUNTER_INIT_VALUE) ) {
       sensor_failure_counter_++;
     }
   } else {
-    if (sensor_failure_counter_ > 0u) {
+    if (sensor_failure_counter_ > 0) {
       sensor_failure_counter_--;
+    } else if (sensor_failure_counter_ == SENSOR_FAILURE_COUNTER_INIT_VALUE) {
+      sensor_failure_counter_ = 0;
     }
   }
 
@@ -291,7 +295,7 @@ void Thermostat::setLastSensorReadFailed(bool value) {
       sensor_error_ = true;
     }
   } else {
-    if (sensor_failure_counter_ == 0u) {
+    if (sensor_failure_counter_ == 0) {
       new_data_ = true;
       sensor_error_ = false;
     }
@@ -300,6 +304,7 @@ void Thermostat::setLastSensorReadFailed(bool value) {
 
 void Thermostat::setOutsideTemperature(int16_t value) {
   outside_temperature_ = value;
+  outside_temperature_received_ = true;
 }
 
 int16_t Thermostat::getOutsideTemperature(void) {

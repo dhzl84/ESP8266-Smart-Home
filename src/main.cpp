@@ -79,7 +79,7 @@ uint32_t onOffButtonSystemResetInterval = secondsToMilliseconds(5);
 uint32_t readSensorScheduled = 0;
 /* Display */
 #define drawTempYOffset       16
-#define drawHeating drawXbm(0, drawTempYOffset, myThermo_width, myThermo_height, myThermo)
+
 /* BME 280 settings */
 BME280I2C::Settings settings(
   BME280::OSR_X1,
@@ -818,19 +818,33 @@ void DISPLAY_MAIN(void) {
       myDisplay.setTextAlignment(TEXT_ALIGN_CENTER);
       myDisplay.drawString(64, 22, "Update");
     } else {
+      /* display current time */
+      myDisplay.setFont(Roboto_Condensed_16);
+      myDisplay.setTextAlignment(TEXT_ALIGN_LEFT);
+      myDisplay.drawString(0, 48, String(time_buffer));
+
+      #ifdef CFG_DEBUG_DISPLAY_VERSION
+      // myDisplay.setTextAlignment(TEXT_ALIGN_LEFT);
+      // myDisplay.setFont(Roboto_Condensed_16);
+      myDisplay.drawString(0, 16, String(VERSION));
+      myDisplay.drawString(0, 32, String(BUILD_NUMBER));
+      myDisplay.setTextAlignment(TEXT_ALIGN_RIGHT);
+      myDisplay.drawString(128, 48, String("IPv4: " + (WiFi.localIP().toString()).substring(((WiFi.localIP().toString()).lastIndexOf(".") + 1), (WiFi.localIP().toString()).length())));
+      #endif
+
       myDisplay.setTextAlignment(TEXT_ALIGN_RIGHT);
       myDisplay.setFont(Roboto_Condensed_32);
 
       if (myThermostat.getSensorError()) {
         myDisplay.drawString(128, drawTempYOffset, "err");
-      } else if (myThermostat.getFilteredTemperature() == INT16_MIN) {
+      } else if (myThermostat.getSensorFailureCounter() == -1) {
         myDisplay.drawString(128, drawTempYOffset, "init");
       } else {
         myDisplay.drawString(128, drawTempYOffset, String(intToFloat(myThermostat.getFilteredTemperature()), 1));
       }
 
-      /* display outside temperature in top left corner if available, INT16_MIN is the initial value and pretty unlikely to be a real value */
-      if (myThermostat.getOutsideTemperature() != INT16_MIN) {
+      /* display outside temperature in top left corner */
+      if (myThermostat.getOutsideTemperatureReceived() == true) {
         myDisplay.setTextAlignment(TEXT_ALIGN_LEFT);
         myDisplay.setFont(Roboto_Condensed_16);
         myDisplay.drawString(0, 0, String(intToFloat(myThermostat.getOutsideTemperature()), 1));
@@ -843,24 +857,10 @@ void DISPLAY_MAIN(void) {
         myDisplay.drawString(128, 0, String(intToFloat(myThermostat.getTargetTemperature()), 1));
 
         if (myThermostat.getActualState()) { /* heating */
-          myDisplay.drawHeating;
+          myDisplay.drawXbm(80, 0, myThermo_width, myThermo_height, myThermo);
         }
       }
     }
-
-    /* display current time */
-    myDisplay.setFont(Roboto_Condensed_16);
-    myDisplay.setTextAlignment(TEXT_ALIGN_LEFT);
-    myDisplay.drawString(0, 48, String(time_buffer));
-
-    #ifdef CFG_DEBUG_DISPLAY_VERSION
-    myDisplay.setTextAlignment(TEXT_ALIGN_LEFT);
-    myDisplay.setFont(Roboto_Condensed_16);
-    myDisplay.drawString(0, 16, String(VERSION));
-    myDisplay.drawString(0, 32, String(BUILD_NUMBER));
-    myDisplay.setTextAlignment(TEXT_ALIGN_RIGHT);
-    myDisplay.drawString(128, 48, String("IPv4: " + (WiFi.localIP().toString()).substring(((WiFi.localIP().toString()).lastIndexOf(".") + 1), (WiFi.localIP().toString()).length())));
-    #endif
   }
   myDisplay.display();
 }

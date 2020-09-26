@@ -26,6 +26,8 @@
 #define TH_HEAT true
 #define TH_OFF  false
 
+#define SENSOR_FAILURE_COUNTER_INIT_VALUE -1
+
 class Thermostat {
  public:
   Thermostat(void);
@@ -69,6 +71,7 @@ class Thermostat {
   // outside temperature
   void setOutsideTemperature(int16_t value);
   int16_t getOutsideTemperature(void);
+  bool    getOutsideTemperatureReceived(void);
 
  private:
   // heating
@@ -87,12 +90,13 @@ class Thermostat {
   int16_t current_humidity_;
   int16_t filtered_temperature_;
   int16_t filtered_humidity_;
-  uint8_t sensor_failure_counter_;
+  int8_t  sensor_failure_counter_;
   int16_t temperature_offset_;
   int16_t temperature_factor_;
   uint8_t sensor_error_threshold_;
   // outside temperature
   int16_t outside_temperature_;
+  bool    outside_temperature_received_;
   // filter
   bool temperature_value_queue_filled_;
   bool humidity_value_queue_filled_;
