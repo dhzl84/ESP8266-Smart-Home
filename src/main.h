@@ -114,7 +114,7 @@ String wifiStatusToString(wl_status_t status);
 bool splitHtmlCommand(String sInput, String *key, String *value);
 void updateTimeBuffer(void);
 String getEspChipId(void);
-
+bool is_daylight_saving_time(int year, int month, int day, int hour, int8_t tzHours);
 #if CFG_BOARD_ESP32
 void listDir(fs::FS &fs, const char * dirname, uint8_t levels);  // NOLINT
 String getEspResetReason(RESET_REASON reason);

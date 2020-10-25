@@ -286,3 +286,23 @@ uint32_t DiffTime::get_time_duration(void)      { return time_duration_; }
 uint32_t DiffTime::get_time_duration_mean(void) { return time_duration_mean_; }
 uint32_t DiffTime::get_time_duration_min(void)  { return time_duration_min_; }
 uint32_t DiffTime::get_time_duration_max(void)  { return time_duration_max_; }
+
+// European Daylight Savings Time calculation by "jurs" for German Arduino Forum
+// input parameters: "normal time" for year, month, day, hour and tzHours (0=UTC, 1=MEZ)
+// return value: returns true during Daylight Saving Time, false otherwise
+bool is_daylight_saving_time(int year, int month, int day, int hour, int8_t tzHours) {
+  boolean return_value = false;
+
+  if (month < 3 || month > 10) {
+    return_value = false;  // keine Sommerzeit in Jan, Feb, Nov, Dez
+  }
+  if (month > 3 && month < 10) {
+    return_value = true;  // Sommerzeit in Apr, Mai, Jun, Jul, Aug, Sep
+  }
+  if (((month == 3) && ((hour + 24 * day) >= (1 + tzHours + 24*(31 - (5 * year / 4 + 4) % 7)))) || ((month == 10) && ((hour + 24 * day) < (1 + tzHours + 24 * (31 - (5 * year / 4 + 1) % 7))))) {
+    return_value = true;
+  } else {
+    return_value = false;
+  }
+  return return_value;
+}

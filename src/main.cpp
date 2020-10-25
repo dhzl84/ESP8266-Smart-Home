@@ -563,20 +563,8 @@ void NTP(void) {
   #endif  /* CFG_BOARD_ESP8266 */
 
   // In the EU, EFTA and associated countries, European Summer Time begins at 01:00 UTC/WET (02:00 CET, 03:00 EET) on the last Sunday in March and ends at 01:00 UTC (02:00 WEST, 03:00 CEST, 04:00 EEST) on the last Sunday in October each year */
-  // Sunday: time_info.tm_wday == 7
-  // Last Sunday: time_info.tm_mday >= 25 (must be in the range of 25th to 31st)
-  // March: time_info.tm_mon == 2
-  // Hour: time_info.tm_hour - myConfig.utc_offset == 1
 
-  // variable used for determination of actual DST
-  bool local_daylight_saving_time = myConfig.daylight_saving_time;
   bool local_ntp_time_received = false;
-
-  // calculate if the last Sunday is still to come
-  // positive values: last sunday is still to come
-  // zero: is is Sunday
-  // negative values: last sunday is already gone
-  int8_t day_of_dst_change = ((31 - (time_info.tm_mday - 1)) - time_info.tm_wday > 0);
 
   if (time_info.tm_year >= (2016 - 1900)) {
     local_ntp_time_received = true;
@@ -586,9 +574,10 @@ void NTP(void) {
     #endif /* CFG_DEBUG */
   }
 
+  bool local_daylight_saving_time = is_daylight_saving_time((time_info.tm_year + 1900), time_info.tm_mon, time_info.tm_wday, time_info.tm_hour, myConfig.utc_offset);
+
   #ifdef CFG_DEBUG_SNTP
   ntp_log += ("\nTime Info received from NTP server:");
-  ntp_log += ("\n DST: " + String(time_info.tm_isdst));
   ntp_log += ("\n YDay: " + String(time_info.tm_yday));
   ntp_log += ("\n WDay: " + String(time_info.tm_wday));
   ntp_log += ("\n Year: " + String(time_info.tm_year));
@@ -598,110 +587,15 @@ void NTP(void) {
   ntp_log += ("\n Min: " + String(time_info.tm_min));
   ntp_log += ("\n Sec: " + String(time_info.tm_sec));
   ntp_log += ("\n Time: " + String(time_buffer));
-
-  ntp_log += "\nDST calculation:\n";
+  ntp_log += ("\n DST: " + String(local_daylight_saving_time));
   #endif  /* CFG_DEBUG_SNTP */
 
-  if (local_ntp_time_received == true) {
-    // April to September is always DST
-    if (time_info.tm_mon > 2 && time_info.tm_mon < 9) {
-      local_daylight_saving_time = 1;
-      #ifdef CFG_DEBUG_SNTP
-      ntp_log += (" April to September - DST: " + String(local_daylight_saving_time));
-      #endif  /* CFG_DEBUG_SNTP */
-    // November to February is always not DST
-    } else if (time_info.tm_mon > 9 || time_info.tm_mon < 2) {
-      local_daylight_saving_time = 0;
-      #ifdef CFG_DEBUG_SNTP
-      ntp_log += (" November to February - DST: " + String(local_daylight_saving_time));
-      #endif  /* CFG_DEBUG_SNTP */
-    // March
-    } else if (time_info.tm_mon == 2) {
-      #ifdef CFG_DEBUG_SNTP
-      ntp_log += (" March");
-      #endif  /* CFG_DEBUG_SNTP */
-      // DST coming
-      if (day_of_dst_change > 0) {
-        #ifdef CFG_DEBUG_SNTP
-        ntp_log += (" before DST change");
-        #endif  /* CFG_DEBUG_SNTP */
-        local_daylight_saving_time = 0;
-      // DST gone
-      } else if (day_of_dst_change < 0) {
-        #ifdef CFG_DEBUG_SNTP
-        ntp_log += (" after DST change");
-        #endif  /* CFG_DEBUG_SNTP */
-        local_daylight_saving_time = 1;
-      // DST change today
-      } else {
-        // UTC hour is 1 or later
-        #ifdef CFG_DEBUG_SNTP
-        ntp_log += (" DST change today");
-        #endif  /* CFG_DEBUG_SNTP */
-        if ((time_info.tm_hour - myConfig.utc_offset - static_cast<uint8_t>(myConfig.daylight_saving_time)) >= 1) {
-          #ifdef CFG_DEBUG_SNTP
-          ntp_log += (" - pending");
-          #endif  /* CFG_DEBUG_SNTP */
-          local_daylight_saving_time = 1;
-        // UTC hour is before 1
-        } else {
-          #ifdef CFG_DEBUG_SNTP
-          ntp_log += (" - done");
-          #endif  /* CFG_DEBUG_SNTP */
-          local_daylight_saving_time = 0;
-        }
-      }
-      #ifdef CFG_DEBUG_SNTP
-      ntp_log += "\n";
-      #endif  /* CFG_DEBUG_SNTP */
-    // October
-    } else if (time_info.tm_mon == 9) {
-      #ifdef CFG_DEBUG_SNTP
-      ntp_log += (" October");
-      #endif  /* CFG_DEBUG_SNTP */
-      // not DST coming
-      if (day_of_dst_change > 0) {
-        #ifdef CFG_DEBUG_SNTP
-        ntp_log += (" before DST change");
-        #endif  /* CFG_DEBUG_SNTP */
-        local_daylight_saving_time = 1;
-      // not DST gone
-      } else if (day_of_dst_change < 0) {
-        #ifdef CFG_DEBUG_SNTP
-        ntp_log += (" after DST change");
-        #endif  /* CFG_DEBUG_SNTP */
-        local_daylight_saving_time = 0;
-      // not DST change today
-      } else {
-        #ifdef CFG_DEBUG_SNTP
-        ntp_log += (" DST change today");
-        #endif  /* CFG_DEBUG_SNTP */
-        // UTC hour is 1 or later
-        if ((time_info.tm_hour - myConfig.utc_offset - static_cast<uint8_t>(myConfig.daylight_saving_time)) >= 1) {
-          #ifdef CFG_DEBUG_SNTP
-          ntp_log += (" - pending");
-          #endif  /* CFG_DEBUG_SNTP */
-          local_daylight_saving_time = 0;
-        // UTC hour is before 1
-        } else {
-          #ifdef CFG_DEBUG_SNTP
-          ntp_log += (" - done");
-          #endif  /* CFG_DEBUG_SNTP */
-          local_daylight_saving_time = 1;
-        }
-      }
-      #ifdef CFG_DEBUG_SNTP
-      ntp_log += "\n";
-      #endif  /* CFG_DEBUG_SNTP */
-    }
-  }
-
   // if actual DST differs from the stored one, change it, persist it and re-initialze NTP with new DST flag
-  if (myConfig.daylight_saving_time != local_daylight_saving_time) {
+  if ((local_ntp_time_received == true) & (myConfig.daylight_saving_time != local_daylight_saving_time)) {
     #ifdef CFG_DEBUG_SNTP
-    ntp_log += ("DST change calculated");
-    ntp_log += ("DST old: " + String(myConfig.daylight_saving_time));
-    ntp_log += ("DST new: " + String(local_daylight_saving_time));
+    ntp_log += ("\nDST change calculated:");
+    ntp_log += ("\nDST old: " + String(myConfig.daylight_saving_time));
+    ntp_log += ("\nDST new: " + String(local_daylight_saving_time));
     #endif  /* CFG_DEBUG_SNTP */
     myConfig.daylight_saving_time = local_daylight_saving_time;
     requestSaveToSpiffs = true;
