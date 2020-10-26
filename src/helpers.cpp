@@ -295,11 +295,9 @@ bool is_daylight_saving_time(int year, int month, int day, int hour, int8_t tzHo
 
   if (month < 3 || month > 10) {
     return_value = false;  // keine Sommerzeit in Jan, Feb, Nov, Dez
-  }
-  if (month > 3 && month < 10) {
+  } else if (month > 3 && month < 10) {
     return_value = true;  // Sommerzeit in Apr, Mai, Jun, Jul, Aug, Sep
-  }
-  if (((month == 3) && ((hour + 24 * day) >= (1 + tzHours + 24*(31 - (5 * year / 4 + 4) % 7)))) || ((month == 10) && ((hour + 24 * day) < (1 + tzHours + 24 * (31 - (5 * year / 4 + 1) % 7))))) {
+  } else if (((month == 3) && ((hour + 24 * day) >= (1 + tzHours + 24*(31 - (5 * year / 4 + 4) % 7)))) || ((month == 10) && ((hour + 24 * day) < (1 + tzHours + 24 * (31 - (5 * year / 4 + 1) % 7))))) {
     return_value = true;
   } else {
     return_value = false;

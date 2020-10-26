@@ -588,7 +588,7 @@ void NTP(void) {
   #endif  /* CFG_DEBUG_SNTP */
 
   // if actual DST differs from the stored one, change it, persist it and re-initialze NTP with new DST flag
-  if ((local_ntp_time_received == true) & (myConfig.daylight_saving_time != local_daylight_saving_time)) {
+  if ((local_ntp_time_received == true) && (myConfig.daylight_saving_time != local_daylight_saving_time)) {
     #ifdef CFG_DEBUG_SNTP
     Serial.println("DST change calculated");
     Serial.println("DST old: " + String(myConfig.daylight_saving_time));
