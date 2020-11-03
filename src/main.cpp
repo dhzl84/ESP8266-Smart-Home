@@ -515,7 +515,7 @@ void HANDLE_SYSTEM_STATE(void) {
 }
 
 void NTP(void) {
-  const char* ntp_server[] = { "fritz.box", "0.de.pool.ntp.org", "0.ch.pool.ntp.org" };  // WiFi.gatewayIP().toString().c_str()
+  const char* ntp_server[] = { "fritz.box", "fritz.box", "fritz.box" };  // WiFi.gatewayIP().toString().c_str()
   #ifdef CFG_DEBUG_SNTP
   Serial.print("NTP Servers: ");
   for (auto server : ntp_server) {
@@ -547,10 +547,13 @@ void NTP(void) {
     for (uint8_t server_id = 0; server_id < 3 ; server_id++) {
       if (sntp_getreachability(server_id)) {
         #ifdef CFG_DEBUG_SNTP
-        Serial.printf("NTP Server %s not reachable!\n", ntp_server[server_id]);
+        Serial.printf("NTP Server %i - '%s' not reachable!\n", server_id, ntp_server[server_id]);
         #endif  /* CFG_DEBUG_SNTP */
       } else {
         server_reachable = true;
+        #ifdef CFG_DEBUG_SNTP
+        Serial.printf("NTP Server %i - '%s' reachable!\n", server_id, ntp_server[server_id]);
+        #endif  /* CFG_DEBUG_SNTP */
       }
     }
   } while ((millis_delta <= (secondsToMilliseconds(30))) && !server_reachable);
@@ -572,7 +575,7 @@ void NTP(void) {
     #endif /* CFG_DEBUG */
   }
 
-  bool local_daylight_saving_time = is_daylight_saving_time((time_info.tm_year + 1900), time_info.tm_mon, time_info.tm_wday, time_info.tm_hour, myConfig.utc_offset);
+  bool local_daylight_saving_time = is_daylight_saving_time((time_info.tm_year + 1900), (time_info.tm_mon + 1), time_info.tm_mday, time_info.tm_hour, myConfig.utc_offset);
 
   #ifdef CFG_DEBUG_SNTP
   Serial.println("DST: " + String(local_daylight_saving_time));
