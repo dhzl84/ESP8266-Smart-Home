@@ -1,4 +1,6 @@
 .pioenvs
+.pio
+.vscode
 .piolibdeps
 src/config.h
 .vscode

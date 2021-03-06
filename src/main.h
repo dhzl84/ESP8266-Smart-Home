@@ -84,6 +84,5 @@ bool TimeReached(uint32_t timer);
 void SetNextTimeInterval(uint32_t& timer, const uint32_t step);  // NOLINT: pass by reference
 bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor);
 char* millisFormatted(void);
-void trc(String msg);
 
 #endif  // MAIN_H_
