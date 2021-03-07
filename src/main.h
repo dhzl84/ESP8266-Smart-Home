@@ -28,13 +28,13 @@ struct configuration {
   int16_t calibO;
   char    ssid[64];
   char    wifiPwd[64];
-  char    mqttHost[64];
-  int16_t mqttPort;
-  char    mqttUser[64];
-  char    mqttPwd[64];
-  char    updServer[256];
+  char    mqtt_host[64];
+  int16_t mqtt_port;
+  char    mqtt_user[64];
+  char    mqtt_password[64];
+  char    update_server_address[256];
   int16_t sensUpdInterval;
-  int16_t mqttPubCycleInterval;
+  int16_t mqtt_publish_cycle;
 };
 
 /*===================================================================================================================*/
@@ -81,8 +81,16 @@ String boolToStringHeatOff(bool boolean);
 int32_t TimeDifference(uint32_t prev, uint32_t next);
 int32_t TimePassedSince(uint32_t timestamp);
 bool TimeReached(uint32_t timer);
-void SetNextTimeInterval(uint32_t& timer, const uint32_t step);  // NOLINT: pass by reference
+void SetNextTimeInterval(volatile uint32_t *timer, const uint32_t step);
 bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor);
-char* millisFormatted(void);
+/* MACRO to append another line of the webpage table (2 columns) */
+#define webpageTableAppend2Cols(key, value) (webpage +="<tr><td>" + key + ":</td><td>"+ value + "</td></tr>");
+/* MACRO to append another line of the webpage table (4 columns) */
+#define webpageTableAppend4Cols(key, value, current_value, description) (webpage +="<tr><td>" + key + "</td><td>"+ value + "</td><td>"+ current_value + "</td><td>" + description + "</td></tr>");
+String millisFormatted(void);
+String wifiStatusToString(wl_status_t status);
+bool splitHtmlCommand(String sInput, String *key, String *value);
+void updateTimeBuffer(void);
+String getEspChipId(void);
 
 #endif  // MAIN_H_

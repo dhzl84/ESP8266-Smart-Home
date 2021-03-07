@@ -48,7 +48,7 @@ class mqttHelper {
   String getTopicData(void);
 
  private:
-  bool   nameChanged;
+  bool   requestSaveToSpiffs;
   bool   triggerDiscovery;
   String mqttData;
   String mqttUpdateFirmware;

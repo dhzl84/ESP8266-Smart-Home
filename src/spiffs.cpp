@@ -10,13 +10,13 @@
   "calibO":"20",
   "ssid":"xxxxxxxxxxxxxxxx",
   "wifiPwd":"xxxxxxxxxxxxxxxxx",
-  "mqttHost":"123.456.789.012",
-  "mqttPort":"1234",
-  "mqttUser":"xxxxxxxxxxxxx",
-  "mqttPwd":"xxxxxxxxxxxxx",
-  "updServer":"http://192.168.178.12:88/firmware/thermostat/firmware.bin",
+  "mqtt_host":"123.456.789.012",
+  "mqtt_port":"1234",
+  "mqtt_user":"xxxxxxxxxxxxx",
+  "mqtt_password":"xxxxxxxxxxxxx",
+  "update_server_address":"http://192.168.178.12:88/firmware/thermostat/firmware.bin",
   "sensUpdInterval":"20",
-  "mqttPubCycleInterval":"5"
+  "mqtt_publish_cycle":"5"
 }
 */
 
@@ -48,11 +48,11 @@ void loadConfiguration(configuration &config) { // NOLINT: pass by reference
   strlcpy(config.name,          root["name"]                  | "unknown",         sizeof(config.name));
   strlcpy(config.ssid,          root["ssid"]                  | WIFI_SSID,         sizeof(config.ssid));
   strlcpy(config.wifiPwd,       root["wifiPwd"]               | WIFI_PWD ,         sizeof(config.wifiPwd));
-  strlcpy(config.mqttHost,      root["mqttHost"]              | LOCAL_MQTT_HOST,   sizeof(config.mqttHost));
-  config.mqttPort =             root["mqttPort"]              | LOCAL_MQTT_PORT;
-  strlcpy(config.mqttUser,      root["mqttUser"]              | LOCAL_MQTT_USER,   sizeof(config.mqttUser));
-  strlcpy(config.mqttPwd,       root["mqttPwd"]               | LOCAL_MQTT_PWD,    sizeof(config.mqttPwd));
-  strlcpy(config.updServer,     root["updServer"]             | DEVICE_BINARY,     sizeof(config.updServer));
+  strlcpy(config.mqtt_host,      root["mqtt_host"]              | LOCAL_MQTT_HOST,   sizeof(config.mqtt_host));
+  config.mqtt_port =             root["mqtt_port"]              | LOCAL_MQTT_PORT;
+  strlcpy(config.mqtt_user,      root["mqtt_user"]              | LOCAL_MQTT_USER,   sizeof(config.mqtt_user));
+  strlcpy(config.mqtt_password,       root["mqtt_password"]               | LOCAL_MQTT_PWD,    sizeof(config.mqtt_password));
+  strlcpy(config.update_server_address,     root["update_server_address"]             | DEVICE_BINARY,     sizeof(config.update_server_address));
 }
 
 // Saves the configuration to a file
@@ -74,11 +74,11 @@ bool saveConfiguration(const configuration &config) {
     Serial.print((config.name ==                 root["name"]) ? false : true);
     Serial.print((config.ssid ==                 root["ssid"]) ? false : true);
     Serial.print((config.wifiPwd ==              root["wifiPwd"]) ? false : true);
-    Serial.print((config.mqttHost ==             root["mqttHost"]) ? false : true);
-    Serial.print((config.mqttPort ==             root["mqttPort"]) ? false : true);
-    Serial.print((config.mqttUser ==             root["mqttUser"]) ? false : true);
-    Serial.print((config.mqttPwd ==              root["mqttPwd"]) ? false : true);
-    Serial.print((config.updServer ==            root["updServer"]) ? false : true);
+    Serial.print((config.mqtt_host ==             root["mqtt_host"]) ? false : true);
+    Serial.print((config.mqtt_port ==             root["mqtt_port"]) ? false : true);
+    Serial.print((config.mqtt_user ==             root["mqtt_user"]) ? false : true);
+    Serial.print((config.mqtt_password ==              root["mqtt_password"]) ? false : true);
+    Serial.print((config.update_server_address ==            root["update_server_address"]) ? false : true);
     Serial.println();
     #endif /* CFG_DEBUG */
 
@@ -86,11 +86,11 @@ bool saveConfiguration(const configuration &config) {
     writeFile |= (config.name ==                 root["name"]) ? false : true;
     writeFile |= (config.ssid ==                 root["ssid"]) ? false : true;
     writeFile |= (config.wifiPwd ==              root["wifiPwd"]) ? false : true;
-    writeFile |= (config.mqttHost ==             root["mqttHost"]) ? false : true;
-    writeFile |= (config.mqttPort ==             root["mqttPort"]) ? false : true;
-    writeFile |= (config.mqttUser ==             root["mqttUser"]) ? false : true;
-    writeFile |= (config.mqttPwd ==              root["mqttPwd"]) ? false : true;
-    writeFile |= (config.updServer ==            root["updServer"]) ? false : true;
+    writeFile |= (config.mqtt_host ==             root["mqtt_host"]) ? false : true;
+    writeFile |= (config.mqtt_port ==             root["mqtt_port"]) ? false : true;
+    writeFile |= (config.mqtt_user ==             root["mqtt_user"]) ? false : true;
+    writeFile |= (config.mqtt_password ==              root["mqtt_password"]) ? false : true;
+    writeFile |= (config.update_server_address ==            root["update_server_address"]) ? false : true;
 
     file.close();
   } else {
@@ -109,11 +109,11 @@ bool saveConfiguration(const configuration &config) {
     root["name"] =                   config.name;
     root["ssid"] =                   config.ssid;
     root["wifiPwd"] =                config.wifiPwd;
-    root["mqttHost"] =               config.mqttHost;
-    root["mqttPort"] =               config.mqttPort;
-    root["mqttUser"] =               config.mqttUser;
-    root["mqttPwd"] =                config.mqttPwd;
-    root["updServer"] =              config.updServer;
+    root["mqtt_host"] =               config.mqtt_host;
+    root["mqtt_port"] =               config.mqtt_port;
+    root["mqtt_user"] =               config.mqtt_user;
+    root["mqtt_password"] =                config.mqtt_password;
+    root["update_server_address"] =              config.update_server_address;
 
     // Serialize JSON to file
     if (root.printTo(file) == 0) {

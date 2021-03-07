@@ -1,9 +1,10 @@
 #include "main.h"
 
-float    intToFloat(int16_t intValue)     { return (static_cast<float>(intValue/10.0)); }
+float    intToFloat(int16_t intValue)     { return (static_cast<float>(intValue/10.0f)); }
 int16_t  floatToInt(float floatValue)     { return (static_cast<int16_t>(floatValue * 10)); }
 String boolToStringOnOff(bool boolean)    { return (boolean == true ? "on" : "off"); }
 String boolToStringHeatOff(bool boolean)  { return (boolean == true ? "heat" : "off"); }
+String sensErrorToString(bool boolean)    { return (boolean == true ? "error" : "ok"); }
 
 /* Thanks to Tasmota  for timer functions */
 int32_t TimeDifference(uint32_t prev, uint32_t next) {
@@ -48,17 +49,17 @@ bool TimeReached(uint32_t timer) {
   return (passed >= 0);
 }
 
-void SetNextTimeInterval(uint32_t& timer, const uint32_t step) {  //NOLINT: pass by reference
-  timer += step;
-  const int32_t passed = TimePassedSince(timer);
+void SetNextTimeInterval(volatile uint32_t *timer, const uint32_t step) {
+  *timer = (millis() + step);
+  const int32_t passed = TimePassedSince(*timer);
   if (passed < 0) { return; }   // Event has not yet happened, which is fine.
   if (static_cast<uint32_t>(passed) > step) {
     // No need to keep running behind, start again.
-    timer = millis() + step;
+    *timer = millis() + step;
     return;
   }
   // Try to get in sync again.
-  timer = millis() + (step - passed);
+  *timer = millis() + (step - passed);
 }
 
 /* sensor calibration parameters are received and stored as a string <offset>;<factor> */
@@ -89,21 +90,88 @@ bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor)
   return ret;
 }
 
-char* millisFormatted(void) {
-  static char str[16];
-  uint32_t t = millis()/1000;
+String millisFormatted(void) {
+  char char_buffer[16];
+  uint32_t t = millis()/1000u;
 
-  uint32_t d = t / 86400;
+  uint32_t d = t / 86400u;
   t = t % 86400;
-  uint32_t h = t / 3600;
+  uint32_t h = t / 3600u;
   t = t % 3600;
   uint16_t m = t / 60;
   uint16_t s = t % 60;
 
-  snprintf(str, sizeof(str), "%uT %02u:%02u:%02u", d, h, m, s);
+  (void) snprintf(char_buffer, sizeof(char_buffer), "%uT %02u:%02u:%02u", d, h, m, s);
   #ifdef CFG_DEBUG
-  Serial.println(str);
+  Serial.println(char_buffer);
   #endif  // CFG_DEBUG
+
+  return String(char_buffer);
+}
+
+String wifiStatusToString(wl_status_t status) {
+  String ret;
+
+  switch (status) {
+    case WL_IDLE_STATUS:
+      ret = "WL_IDLE_STATUS";
+      break;
+    case WL_NO_SSID_AVAIL:
+      ret = "WL_NO_SSID_AVAIL";
+      break;
+    case WL_SCAN_COMPLETED:
+      ret = "WL_SCAN_COMPLETED";
+      break;
+    case WL_CONNECTED:
+      ret = "WL_CONNECTED";
+      break;
+    case WL_CONNECT_FAILED:
+      ret = "WL_CONNECT_FAILED";
+      break;
+    case WL_CONNECTION_LOST:
+      ret = "WL_CONNECTION_LOST";
+      break;
+    case WL_DISCONNECTED:
+      ret = "WL_DISCONNECTED";
+      break;
+    case WL_NO_SHIELD:
+      ret = "WL_NO_SHIELD";
+      break;
+    default:
+      ret = "value unknown";
+      break;
+  }
+  return ret;
+}
+
+bool splitHtmlCommand(String sInput, String *key, String *value) {
+  bool ret = false;
+  String delimiter = ":";
+  size_t pos = 0;
+
+  pos = (sInput.indexOf(delimiter));
+
+  /* don't accept empty substring or strings without delimiter */
+  if ((pos > 0) && (pos < UINT32_MAX)) {
+    ret = true;
+    *key = (sInput.substring(0, pos));
+    *value = (sInput.substring(pos+1));
+  } else {
+    #ifdef CFG_DEBUG
+    Serial.println("Malformed HTML Command string");
+    #endif
+  }
+  return ret;
+}
+
+String getEspChipId(void) {
+  #if CFG_BOARD_ESP32
+    String str = (String(uint32_t(ESP.getEfuseMac() & 0x0000FFFF00000000), HEX) + String(uint32_t(ESP.getEfuseMac() & 0x00000000FFFFFFFF), HEX));
+  #elif CFG_BOARD_ESP8266
+    String str = String(ESP.getChipId(), HEX);
+  #else
+    String str = "undefined";
+  #endif  /* CFG_BOARD_ESP32 */
 
   return str;
 }

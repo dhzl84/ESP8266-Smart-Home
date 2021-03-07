@@ -49,7 +49,7 @@ uint32_t loop100msMillis  = 22; /* start loops with some offset to avoid calling
 uint32_t loop500msMillis  = 44; /* start loops with some offset to avoid calling all loops every second */
 uint32_t loop1000msMillis = 66; /* start loops with some offset to avoid calling all loops every second */
 /* HTTP Update */
-bool fetchUpdate = false;       /* global variable used to decide whether an update shall be fetched from server or not */
+bool fetch_update = false;       /* global variable used to decide whether an update shall be fetched from server or not */
 /* OTA */
 typedef enum otaUpdate { TH_OTA_IDLE, TH_OTA_ACTIVE, TH_OTA_FINISHED, TH_OTA_ERROR } OtaUpdate_t;       /* global variable used to change display in case OTA update is initiated */
 OtaUpdate_t OTA_UPDATE = TH_OTA_IDLE;
@@ -65,7 +65,7 @@ ESP8266WebServer  webServer(80);
 PubSubClient      myMqttClient(LOCAL_MQTT_HOST, LOCAL_MQTT_PORT, messageReceived, myWiFiClient);
 
 bool     systemRestartRequest = false;
-bool     nameChanged = false;
+bool     requestSaveToSpiffs = false;
 uint32_t wifiReconnectTimer = 30000;
 
 #define  SPIFFS_MQTT_ID_FILE        String("/itsme")
@@ -253,7 +253,7 @@ void MQTT_CONNECT(void) {
     if (!myMqttClient.connected()) {
       myMqttClient.disconnect();
       myMqttClient.setCallback(messageReceived);
-      (void)myMqttClient.connect(myConfig.name, myConfig.mqttUser, myConfig.mqttPwd, myMqttHelper.getTopicLastWill().c_str(), MQTT_QOS, true, "offline");
+      (void)myMqttClient.connect(myConfig.name, myConfig.mqtt_user, myConfig.mqtt_password, myMqttHelper.getTopicLastWill().c_str(), MQTT_QOS, true, "offline");
 
       homeAssistantDiscovery();  /* make HA discover necessary devices */
 
@@ -275,21 +275,21 @@ void MQTT_CONNECT(void) {
 void loop() {
   /* call every 50 ms */
   if (TimeReached(loop50msMillis)) {
-    SetNextTimeInterval(loop50msMillis, loop50ms);
+    SetNextTimeInterval(&loop50msMillis, loop50ms);
     /* nothing yet */
   }
   /* call every 100 ms */
   if (TimeReached(loop100msMillis)) {
-    SetNextTimeInterval(loop100msMillis, loop100ms);
+    SetNextTimeInterval(&loop100msMillis, loop100ms);
   }
   /* call every 500 ms */
   if (TimeReached(loop500msMillis)) {
-    SetNextTimeInterval(loop500msMillis, loop500ms);
+    SetNextTimeInterval(&loop500msMillis, loop500ms);
     /* nothing yet */
   }
   /* call every second */
   if (TimeReached(loop1000msMillis)) {
-    SetNextTimeInterval(loop1000msMillis, loop1000ms);
+    SetNextTimeInterval(&loop1000msMillis, loop1000ms);
     SPIFFS_MAIN();          /* check for new data and write SPIFFS is necessary */
     HANDLE_HTTP_UPDATE();   /* pull update from server if it was requested via MQTT*/
   }
@@ -307,7 +307,6 @@ void loop() {
 
   webServer.handleClient();
   myMqttClient.loop();
-  delay(10);
   ArduinoOTA.handle();
 }
 
@@ -317,7 +316,7 @@ void loop() {
 void HANDLE_SYSTEM_STATE(void) {
   /* check WiFi connection every 30 seconds*/
   if (TimeReached(wifiReconnectTimer)) {
-    SetNextTimeInterval(wifiReconnectTimer, (WIFI_RECONNECT_TIME * secondsToMillisecondsFactor));
+    SetNextTimeInterval(&wifiReconnectTimer, (WIFI_RECONNECT_TIME * secondsToMillisecondsFactor));
     if (WiFi.status() != WL_CONNECTED) {
       #ifdef CFG_DEBUG
       Serial.println("Lost WiFi; Status: "+ String(WiFi.status()));
@@ -340,7 +339,7 @@ void HANDLE_SYSTEM_STATE(void) {
 void MQTT_MAIN(void) {
   if (myMqttClient.connected() != true) {
     if (TimeReached(mqttReconnectTime)) {  /* try reconnect to MQTT broker after mqttReconnectTime expired */
-        SetNextTimeInterval(mqttReconnectTime, mqttReconnectInterval); /* reset interval */
+        SetNextTimeInterval(&mqttReconnectTime, mqttReconnectInterval); /* reset interval */
         MQTT_CONNECT();
     } else {
       /* just wait */
@@ -357,15 +356,15 @@ void MQTT_MAIN(void) {
 }
 
 void HANDLE_HTTP_UPDATE(void) {
-  if (fetchUpdate == true) {
+  if (fetch_update == true) {
     /* publish and loop here before fetching the update */
     myMqttClient.publish(myMqttHelper.getTopicUpdateFirmwareAccepted().c_str(), "false", false); /* publish accepted update with value false to reset the switch in Home Assistant */
     myMqttClient.loop();
 
-    fetchUpdate = false;
+    fetch_update = false;
     Serial.println("Remote update started");
     WiFiClient client;
-    t_httpUpdate_return ret = ESPhttpUpdate.update(client, myConfig.updServer, FW);
+    t_httpUpdate_return ret = ESPhttpUpdate.update(client, myConfig.update_server_address, FW);
 
     switch (ret) {
     case HTTP_UPDATE_FAILED:
@@ -384,10 +383,10 @@ void HANDLE_HTTP_UPDATE(void) {
 }
 
 void SPIFFS_MAIN(void) {
-  if (nameChanged == true) {
+  if (requestSaveToSpiffs == true) {
       if (saveConfiguration(myConfig)) {
       /* write successful, restart to rebuild MQTT topics etc. */
-      nameChanged = false;
+      requestSaveToSpiffs = false;
       myMqttHelper.setTriggerDiscovery(true);
       } else {
       /* write failed, retry next loop */
@@ -422,23 +421,141 @@ void mqttPubState(void) {
     false); /* retain */
 }
 
+String buildHtml(void) {
+  float rssiInPercent = WiFi.RSSI();
+  rssiInPercent = isnan(rssiInPercent) ? -100.0 : min(max(2 * (rssiInPercent + 100.0), 0.0), 100.0);
+
+  String webpage = "<!DOCTYPE html> <html>\n";
+  /* HEAD */
+  webpage +="<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
+  webpage +="<title> "+ String(myConfig.name) + "</title>\n";
+  webpage +="<style>html { font-family: Helvetica; font-size: 16px; display: inline-block; margin: 0px auto; text-align: left;}\n";
+  webpage +="body {background-color: #202226; color: #A0A2A8}\n";
+  webpage +="p {color: #2686c1; margin-bottom: 10px;}\n";
+  webpage +="table {color: #A0A2A8;}\n";
+  webpage +="</style>\n";
+  webpage +="</head>\n";
+  /* BODY */
+  webpage +="<body>\n";
+  webpage +="<p><b>System information</b></p>";
+  webpage +="<table>";
+  /* TABLE */
+  /*= KEY ======================================||= VALUE ================================*/
+  webpageTableAppend2Cols(String("Name"),                 String(myConfig.name));
+  webpageTableAppend2Cols(String("Chip ID"),              getEspChipId());
+  webpageTableAppend2Cols(String("Vcc"),                  String(ESP.getVcc()/1000.0));
+  webpageTableAppend2Cols(String("Arduino Core"),         ESP.getCoreVersion());
+  webpageTableAppend2Cols(String("Reset Reason"),         ESP.getResetReason());
+  webpageTableAppend2Cols(String("Flash Size"),           String(ESP.getFlashChipRealSize()));
+  webpageTableAppend2Cols(String("Sketch Size"),          String(ESP.getSketchSize()/1024)  + String(" kB"));
+  webpageTableAppend2Cols(String("Free for Sketch"),      String(ESP.getFreeSketchSpace()/1024)  + String(" kB"));
+  webpageTableAppend2Cols(String("Free Heap"),            String(ESP.getFreeHeap()/1024)  + String(" kB"));
+  webpageTableAppend2Cols(String("Time since Reset"),     millisFormatted());
+  webpageTableAppend2Cols(String("FW version"),           String(FW));
+  webpageTableAppend2Cols(String("IPv4"),                 WiFi.localIP().toString());
+  webpageTableAppend2Cols(String("WiFi Status"),          wifiStatusToString(WiFi.status()));
+  webpageTableAppend2Cols(String("WiFi Strength"),        String(rssiInPercent, 0) + " %");
+  webpageTableAppend2Cols(String("WiFi Connects"),        String(WiFiConnectCounter));
+  webpageTableAppend2Cols(String("MQTT Status"),          String((myMqttClient.connected()) == true ? "connected" : "disconnected"));
+  webpageTableAppend2Cols(String("MQTT Connects"),        String(MQTTConnectCounter));
+  webpage +="</table>";
+  /* Change Input Method */
+  webpage +="<p><b>Change Input Method</b></p>";
+  webpage +="<form method='POST' autocomplete='off'>";
+
+  /* Command Line */
+  webpage +="<p><b>Command Line</b></p>";
+  webpage +="<form method='POST' autocomplete='off'>";
+  webpage +="<input type='text' name='cmd' value='key:value'>&nbsp;<input type='submit' value='Submit'>";
+  webpage +="</form>";
+  webpage +="<p><b>Commands</b></p>";
+  /* COMMANDS TABLE */
+  webpage +="<table style='font-size: 12px'>";
+  webpageTableAppend4Cols(String("<b>Key</b>"),               String("<b>Value</b>"),                        String("<b>Current Value</b>"),             String("<b>Description</b>"));
+  webpageTableAppend4Cols(String("discover"),                 String("0 | 1"),                               String("void"),                             String("MQTT OnDemand discovery_enabled: 1 = discover; 0 = remove"));
+  webpageTableAppend4Cols(String("name"),                     String("string"),                              String(myConfig.name),                      String("Define a name for this device"));
+  webpageTableAppend4Cols(String("mqtt_server_address"),      String("string"),                              String(myConfig.mqtt_host),                 String("Address of the MQTT server"));
+  webpageTableAppend4Cols(String("mqtt_server_port"),         String("1 .. 65535"),                          String(myConfig.mqtt_port),                 String("Port of the MQTT server"));
+  webpageTableAppend4Cols(String("mqtt_user"),                String("string"),                              String(myConfig.mqtt_user),                 String("MQTT user"));
+  webpageTableAppend4Cols(String("mqtt_pwd"),                 String("string"),                              String("***"),                              String("MQTT password"));
+  webpageTableAppend4Cols(String("mqtt_pub_cycle"),           String("Range: 1 .. 255, LSB: 1 min"),         String(myConfig.mqtt_publish_cycle),        String("Publish cycle for MQTT messages in minutes"));
+  webpageTableAppend4Cols(String("update_server_address"),    String("string"),                              String(myConfig.update_server_address),     String("Address of the update server"));
+    webpage +="</table>";
+  /* Restart Device */
+  webpage +="<p><b>Restart Device</b></p>";
+  if (systemRestartRequest == false) {
+    webpage +="<button onclick=\"window.location.href='/restart'\"> Restart </button>";
+  } else {
+    webpage +="<button onclick=\"window.location.href='/'\"> Restarting, reload site </button>";
+  }
+  webpage +="</body>\n";
+  webpage +="</html>\n";
+
+  return webpage;
+}
+
 void handleWebServerClient(void) {
-  webServer.send(200, "text/plain", \
-    "Name: "+ String(myConfig.name) + "\n" \
-    "ChipID (hex): "+ String(ESP.getChipId(), HEX) + "\n" \
-    "FW version: "+ String(FW) + "\n" \
-    "Reset Reason: "+ String(ESP.getResetReason()) + "\n" \
-    "Time since Reset: "+ String(millisFormatted()) + "\n" \
-    "Flash Size: "+ String(ESP.getFlashChipRealSize()) + "\n" \
-    "Sketch Size: "+ String(ESP.getSketchSize()) + "\n" \
-    "Free for Sketch: "+ String(ESP.getFreeSketchSpace()) + "\n" \
-    "Free Heap: "+ String(ESP.getFreeHeap()) + "\n" \
-    "Vcc: "+ String(ESP.getVcc()/1000.0) + "\n" \
-    "WiFi Status: " + String(WiFi.status()) + "\n" \
-    "WiFi RSSI: " + String(WiFi.RSSI()) + "\n" \
-    "WiFi connects: " + String(WiFiConnectCounter) + "\n" \
-    "MQTT connection: " + String((myMqttClient.connected()) == true ? "connected" : "disconnected") + "\n" \
-    "MQTT connects: " + String(MQTTConnectCounter));
+  String webpage = buildHtml();
+
+  webServer.send(200, "text/html", webpage);  /* Send a response to the client asking for input */
+
+  /* Evaluate Received Arguments */
+  if (webServer.args() > 0) {  /* Arguments were received */
+    for ( uint8_t i = 0; i < webServer.args(); i++ ) {
+      #ifdef CFG_DEBUG
+      Serial.println("HTTP arg(" + String(i) + "): " + webServer.argName(i) + " = " + webServer.arg(i));  /* Display each argument */
+      #endif /* CFG_DEBUG */
+      if (webServer.argName(i) == "cmd") {  /* check for cmd */
+        String key = "";
+        String value = "";
+        if (splitHtmlCommand(webServer.arg(i), &key, &value)) {
+          Serial.println(key + " : " + value);
+          if (key == "name") {
+            if ( (value != "") && (value != myConfig.name) ) {
+              strlcpy(myConfig.name, value.c_str(), sizeof(myConfig.name));
+              /* new name will create new entities in HA if discovery is enabled so do a restart then */
+              requestSaveToSpiffs = true;
+            }
+          } else if (key == "update_server_address") {
+            if ( (value != "") && (value != myConfig.update_server_address) ) {
+              strlcpy(myConfig.update_server_address, value.c_str(), sizeof(myConfig.update_server_address));
+              requestSaveToSpiffs = true;
+            }
+          } else if (key == "mqtt_server_address") {
+            if ( (value != "") && (value != myConfig.mqtt_host) ) {
+              strlcpy(myConfig.mqtt_host, value.c_str(), sizeof(myConfig.mqtt_host));
+              requestSaveToSpiffs = true;
+            }
+          } else if (key == "mqtt_server_port") {
+            if ( (value.toInt() != myConfig.mqtt_port) && (value.toInt() > 0) && (value.toInt() <= UINT16_MAX) ) {
+              myConfig.mqtt_port = value.toInt();
+              requestSaveToSpiffs = true;
+            }
+          } else if (key == "mqtt_user") {
+            if ( (value != "") && (value != myConfig.mqtt_user) ) {
+              strlcpy(myConfig.mqtt_user, value.c_str(), sizeof(myConfig.mqtt_user));
+              requestSaveToSpiffs = true;
+            }
+          } else if (key == "mqtt_pwd") {
+            if ( (value != "") && (value != myConfig.mqtt_password) ) {
+              strlcpy(myConfig.mqtt_password, value.c_str(), sizeof(myConfig.mqtt_password));
+              requestSaveToSpiffs = true;
+            }
+          } else if (key == "mqtt_pub_cycle") {
+            if ( (value.toInt() != myConfig.mqtt_publish_cycle) && (value.toInt() > 0) && (value.toInt() <= UINT8_MAX) ) {
+              myConfig.mqtt_publish_cycle = value.toInt();
+              requestSaveToSpiffs = true;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+void handleHttpReset(void) {
+  requestSaveToSpiffs = true;
+  handleWebServerClient();
 }
 
 /* MQTT callback if a message was received */
@@ -467,7 +584,7 @@ void messageReceived(char* c_topic, byte* data, unsigned int data_len) {
       #ifdef CFG_DEBUG
       Serial.println("Firmware updated triggered via MQTT");
       #endif
-      fetchUpdate = true;
+      fetch_update = true;
     }
   } else if (topic == myMqttHelper.getTopicChangeName()) {
     #ifdef CFG_DEBUG
@@ -478,7 +595,7 @@ void messageReceived(char* c_topic, byte* data, unsigned int data_len) {
       Serial.println("Old name was: " + String(myConfig.name));
       #endif
       strlcpy(myConfig.name, payload.c_str(), sizeof(myConfig.name));
-      nameChanged = true;
+      requestSaveToSpiffs = true;
     }
   }
 }
