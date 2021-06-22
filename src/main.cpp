@@ -120,7 +120,9 @@ bool     systemRestartRequest = false;
 bool     requestSaveToSpiffs = false;
 bool     requestSaveToSpiffsWithRestart = false;
 uint32_t wifiReconnectTimer = secondsToMilliseconds(30);
+#ifndef WIFI_RECONNECT_TIME
 #define WIFI_RECONNECT_TIME 30
+#endif
 
 #define  FS_MQTT_ID_FILE        String("/itsme")       // for migration only
 #define  FS_SENSOR_CALIB_FILE   String("/sensor")      // for migration only

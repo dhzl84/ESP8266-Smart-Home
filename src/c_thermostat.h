@@ -20,7 +20,7 @@
 #endif
 
 #ifndef CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE
-  #define CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE 10
+  #define CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE 9
 #endif
 
 #define TH_HEAT true
@@ -90,6 +90,8 @@ class Thermostat {
   int16_t current_humidity_;
   int16_t filtered_temperature_;
   int16_t filtered_humidity_;
+  int16_t start_averaging_;
+  int16_t stop_averaging_;
   int8_t  sensor_failure_counter_;
   int16_t temperature_offset_;
   int16_t temperature_factor_;
@@ -104,6 +106,7 @@ class Thermostat {
   int16_t temperature_value_queue_[CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE];
   int16_t humidity_value_sample_id_;
   int16_t humidity_value_queue_[CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE];
+  static int int_cmp(const void *a, const void *b);
 };
 
 #endif  // C_THERMOSTAT_H_

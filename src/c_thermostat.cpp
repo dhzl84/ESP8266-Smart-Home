@@ -28,6 +28,8 @@ Thermostat::Thermostat()
     current_humidity_(0), \
     filtered_temperature_(0), \
     filtered_humidity_(0), \
+    start_averaging_(static_cast<uint8_t>(CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE / 3)), \
+    stop_averaging_(static_cast<uint8_t>(start_averaging_ * 2)), \
     sensor_failure_counter_(SENSOR_FAILURE_COUNTER_INIT_VALUE), \
     temperature_offset_(0), \
     temperature_factor_(100), \
@@ -225,12 +227,21 @@ void Thermostat::setCurrentTemperature(int16_t value) {
       temperature_value_queue_filled_ = true;
     }
   }
+  // copy array for sorting via qsort
+  int16_t sorted_temperature_value_queue[CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE];
+  std::copy(std::begin(temperature_value_queue_), std::end(temperature_value_queue_), std::begin(sorted_temperature_value_queue));
+  // call qsort
+
+  for (auto val : sorted_temperature_value_queue) {
+    Serial.printf("Value: %i", val);
+  }
+  qsort(sorted_temperature_value_queue, CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE, sizeof(sorted_temperature_value_queue[0]), int_cmp);
 
   // calculate new filtered temperature
   float tempValue = (int16_t) 0;
   if (temperature_value_queue_filled_ == true) {
-    for (int16_t i=0; i < CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE; i++) {
-      tempValue += (temperature_value_queue_[i]);
+    for (int16_t i=start_averaging_; i <= stop_averaging_; i++) {
+      tempValue += (sorted_temperature_value_queue[i]);
     }
     tempValue = (tempValue / (int16_t) (CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE));
   } else {  /* return partially filtered value until queue is filled */
@@ -257,11 +268,17 @@ void Thermostat::setCurrentHumidity(int16_t value) {
     }
   }
 
+  // copy array for sorting via qsort
+  int16_t sorted_humidity_value_queue[CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE];
+  std::copy(std::begin(humidity_value_queue_), std::end(humidity_value_queue_), std::begin(sorted_humidity_value_queue));
+  // call qsort
+  qsort(sorted_humidity_value_queue, CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE, sizeof(sorted_humidity_value_queue[0]), int_cmp);
+
   // calculate new filtered temeprature
   float humidValue = (int16_t) 0;
   if (humidity_value_queue_filled_ == true) {
-    for (int16_t i=0; i < CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE; i++) {
-      humidValue += (humidity_value_queue_[i]);
+    for (int16_t i=start_averaging_; i <= stop_averaging_; i++) {
+      humidValue += (sorted_humidity_value_queue[i]);
     }
     humidValue = (humidValue / (int16_t) (CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE));
   } else {  /* return partially filtered value until queue is filled */
@@ -322,4 +339,12 @@ void Thermostat::setSensorCalibData(int16_t factor, int16_t offset, bool calib) 
       new_calib_   = calib;
     }
   }
+}
+
+/* qsort int comparison function */
+int Thermostat::int_cmp(const void *a, const void *b) {
+  const int *ia = (const int *)a;  // casting pointer types
+  const int *ib = (const int *)b;
+  return *ia  - *ib;
+  /* integer comparison: returns negative if b > a and positive if a > b */
 }
