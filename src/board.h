@@ -13,10 +13,12 @@
 #define PHYS_INPUT_2_PIN    13 /* rotary left/right OR down/up */
 #define PHYS_INPUT_3_PIN    14 /* on/off/ok/reset */
 #define RELAY_PIN           16 /* relay control */
+#ifndef CFG_OTA_ONLY
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
-#include <ESP8266httpUpdate.h>
 #include <sntp.h>
+#endif
+#include <ESP8266httpUpdate.h>
 #include <FS.h>
 #include <LittleFS.h>
 #define FileSystem LittleFS
