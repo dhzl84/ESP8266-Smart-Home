@@ -1,15 +1,15 @@
+#ifndef CFG_OTA_ONLY
 /*===================================================================================================================*/
 /* includes */
 /*===================================================================================================================*/
 #include <ArduinoOTA.h>
-
+#include "main.h"
 #include <DHTesp.h>
 #include <Wire.h> /* for BME280 */
 #include <SPI.h>  /* for BME280 */
 #include <BME280I2C.h>
 #include "user_fonts.h"
 #include <SSD1306.h>
-#include "main.h"
 #include "c_mqtt.h"
 #include "c_thermostat.h"
 #include "MQTTClient.h"
@@ -59,7 +59,7 @@ typedef enum otaUpdate {
   TH_OTA_ERROR
 } OtaUpdate_t; /* global variable used to change display in case OTA update is initiated */
 OtaUpdate_t OTA_UPDATE = TH_OTA_IDLE;
-
+String ota_stub_address = "";
 /* for critical section lock during interrupt */
 
 #define rotLeft -1
@@ -120,7 +120,9 @@ bool     systemRestartRequest = false;
 bool     requestSaveToSpiffs = false;
 bool     requestSaveToSpiffsWithRestart = false;
 uint32_t wifiReconnectTimer = secondsToMilliseconds(30);
-#define WIFI_RECONNECT_TIME 30
+#ifndef WIFI_RECONNECT_TIME
+  #define WIFI_RECONNECT_TIME 30
+#endif
 
 #define  FS_MQTT_ID_FILE        String("/itsme")       // for migration only
 #define  FS_SENSOR_CALIB_FILE   String("/sensor")      // for migration only
@@ -802,7 +804,27 @@ void HANDLE_HTTP_UPDATE(void) {
     Serial.println("Remote update started");
     #endif
     WiFiClient client;
-    t_httpUpdate_return ret = myHttpUpdate.update(client, myConfig.update_server_address, FW);
+    // handle different pathes to firmware.bin
+
+    String firmware = String(myConfig.update_server_address);
+    int16_t index = firmware.indexOf("firmware.bin");
+    if (-1 == index) {
+      ota_stub_address = firmware;
+    } else {
+      ota_stub_address = firmware.substring(0, index-1);
+      strlcpy(myConfig.update_server_address, ota_stub_address.c_str() , sizeof(myConfig.update_server_address));
+      requestSaveToSpiffs = true;
+    }
+    ota_stub_address + "/ota_stub/firmware.bin";
+    #if CFG_DEBUG
+      Serial.println("Derive OTA Stub Address");
+      Serial.println("  Stored OTA Address:" + firmware);
+      Serial.println("  Found 'firmware.bin' at position: " + String(index));
+      Serial.println("  Derived OTA Address: " + ota_stub_address);
+    #endif  // CFG_DEBUG
+    t_httpUpdate_return ret = myHttpUpdate.update(client, ota_stub_address, FW);
+
+
 
     switch (ret) {
     case HTTP_UPDATE_FAILED:
@@ -884,7 +906,7 @@ void FS_MAIN(void) {
 /*===================================================================================================================*/
 
 /* Rotary Encoder */
-void ICACHE_RAM_ATTR updateEncoder(void) {
+void IRAM_ATTR updateEncoder(void) {
   int16_t MSB = digitalRead(PHYS_INPUT_1_PIN);
   int16_t LSB = digitalRead(PHYS_INPUT_2_PIN);
   int16_t encoded = (MSB << 1) |LSB;  /* converting the 2 pin value to single number */
@@ -951,10 +973,18 @@ void homeAssistantRemoveDiscoveredObsolete(void) {
 
 /* publish state topic in JSON format */
 void mqttPubState(void) {
+  /* send "none" in case of sensor error */
+  String temperature = "None";
+  String humidity = "None";
+  if (myThermostat.getSensorError() == false) {
+    temperature = String(intToFloat(myThermostat.getFilteredTemperature()), 1);
+    humidity = String(intToFloat(myThermostat.getFilteredHumidity()), 1);
+  }
+
   String payload = myMqttHelper.buildStateJSON( /* build JSON payload */\
       String(myConfig.name), \
-      String(intToFloat(myThermostat.getFilteredTemperature()), 1), \
-      String(intToFloat(myThermostat.getFilteredHumidity()), 1), \
+      temperature, \
+      humidity, \
       String(intToFloat(myThermostat.getThermostatHysteresis()), 1), \
       boolToStringOnOff(myThermostat.getActualState()), \
       String(intToFloat(myThermostat.getTargetTemperature()), 1), \
@@ -1393,3 +1423,152 @@ void messageReceived(String &topic, String &payload) {  // NOLINT
     myThermostat.setOutsideTemperature(floatToInt(payload.toFloat()));
   }
 }
+
+#else
+
+#include "main.h"
+
+struct Configuration myConfig;
+WiFiClient myWiFiClient;
+ESP8266HTTPUpdate myHttpUpdate;
+uint32_t wifi_connect_counter = 0;
+
+void WIFI_CONNECT(void) {
+  wifi_connect_counter++;
+  if (WiFi.status() != WL_CONNECTED) {
+    #ifdef CFG_DEBUG
+    Serial.println("Initialize WiFi ");
+    #endif
+
+    WiFi.mode(WIFI_STA);
+    WiFi.setSleepMode(WIFI_NONE_SLEEP);
+    WiFi.hostname(myConfig.name);
+    WiFi.begin(myConfig.ssid, myConfig.wifi_password);
+
+    /* try to connect to WiFi, proceed offline if not connecting here*/
+    if (WiFi.waitForConnectResult() != WL_CONNECTED) {
+      #ifdef CFG_DEBUG
+      Serial.println("Failed to connect to WiFi, continue offline");
+      #endif
+    }
+  }
+
+  #ifdef CFG_DEBUG
+  Serial.println("WiFi Status: "+ wifiStatusToString(WiFi.status()));
+  WiFi.printDiag(Serial);
+  Serial.println("Local IP: "+ WiFi.localIP().toString());
+  Serial.println("Gateway IP: " + WiFi.gatewayIP().toString());
+  Serial.println("DNS IP: " + WiFi.dnsIP().toString());
+  #endif
+}
+
+void FS_INIT(void) {  // initializes the FileSystem when first used and loads the configuration from FileSystem to RAM
+  FileSystem.begin();
+
+  if (!FileSystem.exists("/formatted")) {
+    /* This code is only run once to format the FileSystem before first usage */
+    #ifdef CFG_DEBUG
+    Serial.println("Formatting FileSystem, this takes some time");
+    #endif
+    FileSystem.format();
+    #ifdef CFG_DEBUG
+    Serial.println("Formatting FileSystem finished");
+    Serial.println("Open file '/formatted' in write mode");
+    #endif
+    File f = FileSystem.open("/formatted", "w");
+    if (!f) {
+      #ifdef CFG_DEBUG
+      Serial.println("file open failed");
+      #endif
+    } else {
+      f.close();
+      delay(5000);
+      if (!FileSystem.exists("/formatted")) {
+        #ifdef CFG_DEBUG
+        Serial.println("That didn't work!");
+        #endif
+      } else {
+        #ifdef CFG_DEBUG
+        Serial.println("Cool, working!");
+        #endif
+      }
+    }
+  } else {
+    #ifdef CFG_DEBUG
+    Serial.println("Found '/formatted' >> FileSystem ready to use");
+    #endif
+  }
+  #ifdef CFG_DEBUG
+  Serial.println("Check if I remember who I am ... ");
+  #endif
+
+  #ifdef CFG_DEBUG
+  #if CFG_BOARD_ESP8266
+  Dir dir = FileSystem.openDir("/");
+  while (dir.next()) {
+    Serial.print("FileSystem file found: " + dir.fileName() + " - Size in byte: ");
+    File f = dir.openFile("r");
+    Serial.println(f.size());
+  }
+  #elif CFG_BOARD_ESP32
+  listDir(FileSystem, "/", 0);
+  #else
+  #endif
+  #endif  /* CFG_DEBUG */
+
+  loadConfiguration(myConfig);  // load config
+
+  #ifdef CFG_DEBUG
+  Serial.println("My name is: " + String(myConfig.name));
+  #endif
+}
+
+void setup() {
+  #ifdef CFG_DEBUG
+  Serial.begin(115200);
+  Serial.println("SETUP STARTED");
+  #endif
+  FS_INIT();       /* read stuff from FileSystem */
+  WIFI_CONNECT();  /* connect to WiFi */
+  Serial.println("Sketch Size: " + String(ESP.getSketchSize()/1024)  + String(" kB"));
+  Serial.println("Free Sketch Size: " + String(ESP.getFreeSketchSpace()/1024)  + String(" kB"));
+}
+
+void loop() {
+  WiFiClient client;
+  String firmware = String(myConfig.update_server_address);
+  int16_t index = firmware.indexOf("firmware.bin");
+  if (-1 == index) {
+    firmware + "/firmware.bin";
+  }
+  #if CFG_DEBUG
+    Serial.println("Derive OTA Address");
+    Serial.println("  Stored OTA Address:" + String(myConfig.update_server_address));
+    Serial.println("  Found 'firmware.bin' at position: " + String(index));
+    Serial.println("  Derived OTA Address: " + firmware);
+  #endif  // CFG_DEBUG
+  t_httpUpdate_return ret = myHttpUpdate.update(client, firmware, FW);
+
+  switch (ret) {
+  case HTTP_UPDATE_FAILED:
+    #ifdef CFG_DEBUG
+    Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s \n", myHttpUpdate.getLastError(), myHttpUpdate.getLastErrorString().c_str());
+    #endif
+    break;
+
+  case HTTP_UPDATE_NO_UPDATES:
+    #ifdef CFG_DEBUG
+    Serial.println("HTTP_UPDATE_NO_UPDATES");
+    #endif
+    break;
+
+  case HTTP_UPDATE_OK:
+    #ifdef CFG_DEBUG
+    Serial.println("HTTP_UPDATE_OK");
+    #endif
+    break;
+  }
+  ESP.restart();
+}
+
+#endif  // CFG_OTA_ONLY
