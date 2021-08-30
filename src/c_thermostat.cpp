@@ -28,8 +28,9 @@ Thermostat::Thermostat()
     current_humidity_(0), \
     filtered_temperature_(0), \
     filtered_humidity_(0), \
-    start_averaging_(static_cast<uint8_t>(CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE / 3)), \
-    stop_averaging_(static_cast<uint8_t>(start_averaging_ * 2)), \
+    start_averaging_(2), \
+    stop_averaging_(CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE - 3), \
+    filter_size_(stop_averaging_ - start_averaging_), \
     sensor_failure_counter_(SENSOR_FAILURE_COUNTER_INIT_VALUE), \
     temperature_offset_(0), \
     temperature_factor_(100), \
@@ -230,20 +231,32 @@ void Thermostat::setCurrentTemperature(int16_t value) {
   // copy array for sorting via qsort
   int16_t sorted_temperature_value_queue[CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE];
   std::copy(std::begin(temperature_value_queue_), std::end(temperature_value_queue_), std::begin(sorted_temperature_value_queue));
-  // call qsort
 
-  for (auto val : sorted_temperature_value_queue) {
-    Serial.printf("Value: %i", val);
+  for (auto val : temperature_value_queue_) {
+    Serial.printf("Value: %i\n", val);
   }
-  qsort(sorted_temperature_value_queue, CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE, sizeof(sorted_temperature_value_queue[0]), int_cmp);
 
   // calculate new filtered temperature
   float tempValue = (int16_t) 0;
   if (temperature_value_queue_filled_ == true) {
+    #if CFG_DEBUG
+    uint32_t t_start = micros();
+    #endif  // CFG_DEBUG
+    quick_sort(sorted_temperature_value_queue, 0, CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE-1);
+    #if CFG_DEBUG
+    uint32_t t_finish = micros();
+    Serial.printf("Sorting took %i µs\n", t_finish - t_start);
+    for (auto val : sorted_temperature_value_queue) {
+      Serial.printf("Sorted Value: %i\n", val);
+    }
+    #endif  // CFG_DEBUG
     for (int16_t i=start_averaging_; i <= stop_averaging_; i++) {
       tempValue += (sorted_temperature_value_queue[i]);
+      #if CFG_DEBUG
+      Serial.printf("Use Value: %i from index %i \n", sorted_temperature_value_queue[i], i);
+      #endif  // CFG_DEBUG
     }
-    tempValue = (tempValue / (int16_t) (CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE));
+    tempValue = (tempValue / (int16_t) (filter_size_));
   } else {  /* return partially filtered value until queue is filled */
     if (temperature_value_sample_id_ > 0) {
       for (int16_t i=0; i < temperature_value_sample_id_; i++) {
@@ -271,16 +284,15 @@ void Thermostat::setCurrentHumidity(int16_t value) {
   // copy array for sorting via qsort
   int16_t sorted_humidity_value_queue[CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE];
   std::copy(std::begin(humidity_value_queue_), std::end(humidity_value_queue_), std::begin(sorted_humidity_value_queue));
-  // call qsort
-  qsort(sorted_humidity_value_queue, CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE, sizeof(sorted_humidity_value_queue[0]), int_cmp);
 
   // calculate new filtered temeprature
   float humidValue = (int16_t) 0;
   if (humidity_value_queue_filled_ == true) {
+    quick_sort(sorted_humidity_value_queue, 0, CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE-1);
     for (int16_t i=start_averaging_; i <= stop_averaging_; i++) {
       humidValue += (sorted_humidity_value_queue[i]);
     }
-    humidValue = (humidValue / (int16_t) (CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE));
+    humidValue = (humidValue / (int16_t) (filter_size_));
   } else {  /* return partially filtered value until queue is filled */
     if (humidity_value_sample_id_ > 0) {
       for (int16_t i=0; i < humidity_value_sample_id_; i++) {
@@ -341,10 +353,29 @@ void Thermostat::setSensorCalibData(int16_t factor, int16_t offset, bool calib) 
   }
 }
 
-/* qsort int comparison function */
-int Thermostat::int_cmp(const void *a, const void *b) {
-  const int *ia = (const int *)a;  // casting pointer types
-  const int *ib = (const int *)b;
-  return *ia  - *ib;
-  /* integer comparison: returns negative if b > a and positive if a > b */
+void Thermostat::quick_sort(int16_t arr[], int16_t left, int16_t right) {
+  int16_t i = left, j = right;
+  int16_t tmp;
+  int16_t pivot = arr[(left + right) / 2];
+
+  /* partition */
+  while (i <= j) {
+    while (arr[i] < pivot)
+      i++;
+    while (arr[j] > pivot)
+      j--;
+    if (i <= j) {
+      tmp = arr[i];
+      arr[i] = arr[j];
+      arr[j] = tmp;
+      i++;
+      j--;
+    }
+  }
+
+  /* recursion */
+  if (left < j)
+    Thermostat::quick_sort(arr, left, j);
+  if (i < right)
+    Thermostat::quick_sort(arr, i, right);
 }
