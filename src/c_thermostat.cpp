@@ -358,12 +358,26 @@ void Thermostat::quick_sort(int16_t arr[], int16_t left, int16_t right) {
   int16_t tmp;
   int16_t pivot = arr[(left + right) / 2];
 
+  #if CFG_DEBUG_QUICKSORT
+  Serial.printf("jeft = %i\n", left);
+  Serial.printf("right = %i\n", right);
+  Serial.printf("i = %i\n", i);
+  Serial.printf("j = %i\n", j);
+  #endif  // CFG_DEBUG_QUICKSORT
   /* partition */
   while (i <= j) {
-    while (arr[i] < pivot)
+    while (arr[i] < pivot) {
       i++;
-    while (arr[j] > pivot)
+      #if CFG_DEBUG_QUICKSORT
+      Serial.printf("incremented i = %i\n", i);
+      #endif  // CFG_DEBUG_QUICKSORT
+    }
+    while (arr[j] > pivot) {
       j--;
+      #if CFG_DEBUG_QUICKSORT
+      Serial.printf("decremented j = %i\n", j);
+      #endif  // CFG_DEBUG_QUICKSORT
+    }
     if (i <= j) {
       tmp = arr[i];
       arr[i] = arr[j];
@@ -374,8 +388,16 @@ void Thermostat::quick_sort(int16_t arr[], int16_t left, int16_t right) {
   }
 
   /* recursion */
-  if (left < j)
+  if (left < j) {
+    #if CFG_DEBUG_QUICKSORT
+    Serial.printf("recurse left < j\n");
+    #endif  // CFG_DEBUG_QUICKSORT
     Thermostat::quick_sort(arr, left, j);
-  if (i < right)
+  }
+  if (i < right) {
+    #if CFG_DEBUG_QUICKSORT
+    Serial.printf("recurse right > i\n");
+    #endif  // CFG_DEBUG_QUICKSORT
     Thermostat::quick_sort(arr, i, right);
+  }
 }
