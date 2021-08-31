@@ -815,10 +815,10 @@ void HANDLE_HTTP_UPDATE(void) {
       strlcpy(myConfig.update_server_address, ota_stub_address.c_str() , sizeof(myConfig.update_server_address));
       requestSaveToSpiffs = true;
     }
-    ota_stub_address + "/ota_stub/firmware.bin";
+    ota_stub_address += "/ota_stub/firmware.bin";
     #if CFG_DEBUG
       Serial.println("Derive OTA Stub Address");
-      Serial.println("  Stored OTA Address:" + firmware);
+      Serial.println("  Stored OTA Address: " + firmware);
       Serial.println("  Found 'firmware.bin' at position: " + String(index));
       Serial.println("  Derived OTA Address: " + ota_stub_address);
     #endif  // CFG_DEBUG
@@ -1539,7 +1539,7 @@ void loop() {
   String firmware = String(myConfig.update_server_address);
   int16_t index = firmware.indexOf("firmware.bin");
   if (-1 == index) {
-    firmware + "/firmware.bin";
+    firmware += "/firmware.bin";
   }
   #if CFG_DEBUG
     Serial.println("Derive OTA Address");

@@ -29,7 +29,7 @@ Thermostat::Thermostat()
     filtered_temperature_(0), \
     filtered_humidity_(0), \
     start_averaging_(2), \
-    stop_averaging_(CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE - 3), \
+    stop_averaging_(CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE - 2), \
     filter_size_(stop_averaging_ - start_averaging_), \
     sensor_failure_counter_(SENSOR_FAILURE_COUNTER_INIT_VALUE), \
     temperature_offset_(0), \
@@ -250,7 +250,7 @@ void Thermostat::setCurrentTemperature(int16_t value) {
       Serial.printf("Sorted Value: %i\n", val);
     }
     #endif  // CFG_DEBUG
-    for (int16_t i=start_averaging_; i <= stop_averaging_; i++) {
+    for (int16_t i=start_averaging_; i < stop_averaging_; i++) {
       tempValue += (sorted_temperature_value_queue[i]);
       #if CFG_DEBUG
       Serial.printf("Use Value: %i from index %i \n", sorted_temperature_value_queue[i], i);
@@ -289,7 +289,7 @@ void Thermostat::setCurrentHumidity(int16_t value) {
   float humidValue = (int16_t) 0;
   if (humidity_value_queue_filled_ == true) {
     quick_sort(sorted_humidity_value_queue, 0, CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE-1);
-    for (int16_t i=start_averaging_; i <= stop_averaging_; i++) {
+    for (int16_t i=start_averaging_; i < stop_averaging_; i++) {
       humidValue += (sorted_humidity_value_queue[i]);
     }
     humidValue = (humidValue / (int16_t) (filter_size_));
