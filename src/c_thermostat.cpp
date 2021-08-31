@@ -232,29 +232,31 @@ void Thermostat::setCurrentTemperature(int16_t value) {
   int16_t sorted_temperature_value_queue[CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE];
   std::copy(std::begin(temperature_value_queue_), std::end(temperature_value_queue_), std::begin(sorted_temperature_value_queue));
 
+  #if CFG_DEBUG_QUICKSORT
   for (auto val : temperature_value_queue_) {
     Serial.printf("Value: %i\n", val);
   }
+  #endif  // CFG_DEBUG_QUICKSORT
 
   // calculate new filtered temperature
   float tempValue = (int16_t) 0;
   if (temperature_value_queue_filled_ == true) {
-    #if CFG_DEBUG
+    #if CFG_DEBUG_QUICKSORT
     uint32_t t_start = micros();
-    #endif  // CFG_DEBUG
+    #endif  // CFG_DEBUG_QUICKSORT
     quick_sort(sorted_temperature_value_queue, 0, CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE-1);
-    #if CFG_DEBUG
+    #if CFG_DEBUG_QUICKSORT
     uint32_t t_finish = micros();
     Serial.printf("Sorting took %i µs\n", t_finish - t_start);
     for (auto val : sorted_temperature_value_queue) {
       Serial.printf("Sorted Value: %i\n", val);
     }
-    #endif  // CFG_DEBUG
+    #endif  // CFG_DEBUG_QUICKSORT
     for (int16_t i=start_averaging_; i < stop_averaging_; i++) {
       tempValue += (sorted_temperature_value_queue[i]);
-      #if CFG_DEBUG
+      #if CFG_DEBUG_QUICKSORT
       Serial.printf("Use Value: %i from index %i \n", sorted_temperature_value_queue[i], i);
-      #endif  // CFG_DEBUG
+      #endif  // CFG_DEBUG_QUICKSORT
     }
     tempValue = (tempValue / (int16_t) (filter_size_));
   } else {  /* return partially filtered value until queue is filled */

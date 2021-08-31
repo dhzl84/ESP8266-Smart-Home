@@ -446,13 +446,17 @@ void loop() {
   }
   if (debounceUp.fell()) {
     if (myConfig.display_enabled || display_enabled_temporary) {
-      myThermostat.increaseTargetTemperature(tempStep);
+      if (myThermostat.getThermostatMode() == TH_HEAT) {
+        myThermostat.increaseTargetTemperature(tempStep);
+      }
     }
     SetNextTimeInterval(&display_enabled_temporary_reference_time, display_enabled_temporary_interval);
   }
   if (debounceDown.fell()) {
     if (myConfig.display_enabled || display_enabled_temporary) {
-      myThermostat.decreaseTargetTemperature(tempStep);
+      if (myThermostat.getThermostatMode() == TH_HEAT) {
+        myThermostat.decreaseTargetTemperature(tempStep);
+      }
     }
     SetNextTimeInterval(&display_enabled_temporary_reference_time, display_enabled_temporary_interval);
   }
@@ -926,9 +930,13 @@ void IRAM_ATTR updateEncoder(void) {
       #endif
 
       if (rotaryEncoderDirectionInts > rotRight) { /* if there was a higher amount of interrupts to the right, consider the encoder was turned to the right */
-        myThermostat.increaseTargetTemperature(tempStep);
+        if (myThermostat.getThermostatMode() == TH_HEAT) {
+          myThermostat.increaseTargetTemperature(tempStep);
+        }
       } else if (rotaryEncoderDirectionInts < rotLeft) { /* if there was a higher amount of interrupts to the left, consider the encoder was turned to the left */
-        myThermostat.decreaseTargetTemperature(tempStep);
+        if (myThermostat.getThermostatMode() == TH_HEAT) {
+          myThermostat.decreaseTargetTemperature(tempStep);
+        }
       } else {
         /* do nothing here, left/right interrupts have occurred with same amount -> should never happen */
       }
