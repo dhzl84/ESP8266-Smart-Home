@@ -117,6 +117,8 @@ bool is_daylight_saving_time(int year, int month, int day, int hour, int8_t tzHo
 void listDir(fs::FS &fs, const char * dirname, uint8_t levels);  // NOLINT
 String getEspResetReason(RESET_REASON reason);
 #endif
+int int_cmp(const void *a, const void *b);
+void quickSort(int arr[], int left, int right);
 
 class DiffTime {
  public:

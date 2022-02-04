@@ -1,4 +1,4 @@
-#ifndef CFG_OTA_ONLY
+#ifndef CFG_HTTP_UPDATE_ONLY
 /*===================================================================================================================*/
 /* includes */
 /*===================================================================================================================*/
@@ -446,13 +446,17 @@ void loop() {
   }
   if (debounceUp.fell()) {
     if (myConfig.display_enabled || display_enabled_temporary) {
-      myThermostat.increaseTargetTemperature(tempStep);
+      if (myThermostat.getThermostatMode() == TH_HEAT) {
+        myThermostat.increaseTargetTemperature(tempStep);
+      }
     }
     SetNextTimeInterval(&display_enabled_temporary_reference_time, display_enabled_temporary_interval);
   }
   if (debounceDown.fell()) {
     if (myConfig.display_enabled || display_enabled_temporary) {
-      myThermostat.decreaseTargetTemperature(tempStep);
+      if (myThermostat.getThermostatMode() == TH_HEAT) {
+        myThermostat.decreaseTargetTemperature(tempStep);
+      }
     }
     SetNextTimeInterval(&display_enabled_temporary_reference_time, display_enabled_temporary_interval);
   }
@@ -815,10 +819,10 @@ void HANDLE_HTTP_UPDATE(void) {
       strlcpy(myConfig.update_server_address, ota_stub_address.c_str() , sizeof(myConfig.update_server_address));
       requestSaveToSpiffs = true;
     }
-    ota_stub_address + "/ota_stub/firmware.bin";
+    ota_stub_address += "/ota_stub/firmware.bin";
     #if CFG_DEBUG
       Serial.println("Derive OTA Stub Address");
-      Serial.println("  Stored OTA Address:" + firmware);
+      Serial.println("  Stored OTA Address: " + firmware);
       Serial.println("  Found 'firmware.bin' at position: " + String(index));
       Serial.println("  Derived OTA Address: " + ota_stub_address);
     #endif  // CFG_DEBUG
@@ -926,9 +930,13 @@ void IRAM_ATTR updateEncoder(void) {
       #endif
 
       if (rotaryEncoderDirectionInts > rotRight) { /* if there was a higher amount of interrupts to the right, consider the encoder was turned to the right */
-        myThermostat.increaseTargetTemperature(tempStep);
+        if (myThermostat.getThermostatMode() == TH_HEAT) {
+          myThermostat.increaseTargetTemperature(tempStep);
+        }
       } else if (rotaryEncoderDirectionInts < rotLeft) { /* if there was a higher amount of interrupts to the left, consider the encoder was turned to the left */
-        myThermostat.decreaseTargetTemperature(tempStep);
+        if (myThermostat.getThermostatMode() == TH_HEAT) {
+          myThermostat.decreaseTargetTemperature(tempStep);
+        }
       } else {
         /* do nothing here, left/right interrupts have occurred with same amount -> should never happen */
       }
@@ -1539,7 +1547,7 @@ void loop() {
   String firmware = String(myConfig.update_server_address);
   int16_t index = firmware.indexOf("firmware.bin");
   if (-1 == index) {
-    firmware + "/firmware.bin";
+    firmware += "/firmware.bin";
   }
   #if CFG_DEBUG
     Serial.println("Derive OTA Address");
@@ -1571,4 +1579,4 @@ void loop() {
   ESP.restart();
 }
 
-#endif  // CFG_OTA_ONLY
+#endif  // CFG_HTTP_UPDATE_ONLY
