@@ -1,4 +1,3 @@
-#ifndef CFG_HTTP_UPDATE_ONLY
 /*===================================================================================================================*/
 /* includes */
 /*===================================================================================================================*/
@@ -771,64 +770,39 @@ void DISPLAY_MAIN(void) {
 }
 
 void MQTT_MAIN(void) {
-  if (myMqttClient.connected() != true) {
+  if (myMqttClient.connected() == false) {
     if (TimeReached(mqttReconnectTime)) {  /* try reconnect to MQTT broker after mqttReconnectTime expired */
         SetNextTimeInterval(&mqttReconnectTime, mqttReconnectInterval); /* reset interval */
         MQTT_CONNECT();
-        mqttPubState();
     } else {
       /* just wait */
     }
   } else {  /* check if there is new data to publish and shift PubCycle if data is published on event, else publish every PubCycleInterval */
-    if ( TimeReached(mqttPubCycleTime) || myThermostat.getNewData() ) {
-        SetNextTimeInterval(&mqttPubCycleTime, minutesToMilliseconds(myConfig.mqtt_publish_cycle));
-        mqttPubState();
-        myThermostat.resetNewData();
+    if (myMqttHelper.getTriggerRemoveDiscovered()) {
+      homeAssistantRemoveDiscovered();  /* make HA remove entities */
+      myMqttHelper.setTriggerRemoveDiscovered(false);
     }
     if (myMqttHelper.getTriggerDiscovery()) {
       homeAssistantDiscovery();  /* make HA discover/update necessary devices at runtime e.g. after name change */
       myMqttHelper.setTriggerDiscovery(false);
     }
-    if (myMqttHelper.getTriggerRemoveDiscovered()) {
-      homeAssistantRemoveDiscovered();  /* make HA remove entities */
-      myMqttHelper.setTriggerRemoveDiscovered(false);
+    if ( TimeReached(mqttPubCycleTime) || myThermostat.getNewData() ) {
+        SetNextTimeInterval(&mqttPubCycleTime, minutesToMilliseconds(myConfig.mqtt_publish_cycle));
+        mqttPubState();
+        myThermostat.resetNewData();
     }
   }
 }
 
 void HANDLE_HTTP_UPDATE(void) {
   if (fetch_update == true) {
-    /* publish and loop here before fetching the update */
-    myMqttClient.publish(myMqttHelper.getTopicUpdateFirmwareAccepted(), String(false), false, MQTT_QOS); /* publish accepted update with value false to reset the switch in Home Assistant */
-    myMqttClient.loop();
-
     DISPLAY_MAIN();
     fetch_update = false;
     #ifdef CFG_DEBUG
     Serial.println("Remote update started");
     #endif
     WiFiClient client;
-    // handle different pathes to firmware.bin
-
-    String firmware = String(myConfig.update_server_address);
-    int16_t index = firmware.indexOf("firmware.bin");
-    if (-1 == index) {
-      ota_stub_address = firmware;
-    } else {
-      ota_stub_address = firmware.substring(0, index-1);
-      strlcpy(myConfig.update_server_address, ota_stub_address.c_str() , sizeof(myConfig.update_server_address));
-      requestSaveToSpiffs = true;
-    }
-    ota_stub_address += "/ota_stub/firmware.bin";
-    #if CFG_DEBUG
-      Serial.println("Derive OTA Stub Address");
-      Serial.println("  Stored OTA Address: " + firmware);
-      Serial.println("  Found 'firmware.bin' at position: " + String(index));
-      Serial.println("  Derived OTA Address: " + ota_stub_address);
-    #endif  // CFG_DEBUG
-    t_httpUpdate_return ret = myHttpUpdate.update(client, ota_stub_address, FW);
-
-
+    t_httpUpdate_return ret = myHttpUpdate.update(client, String(myConfig.update_server_address), FW);
 
     switch (ret) {
     case HTTP_UPDATE_FAILED:
@@ -953,8 +927,8 @@ void homeAssistantDiscovery(void) {
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(kThermostatState),    myMqttHelper.buildHassDiscoveryBinarySensor(String(myConfig.name), kThermostatState),        true, MQTT_QOS);    // make HA discover the binary_sensor for thermostat state
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kTemp),                     myMqttHelper.buildHassDiscoverySensor(String(myConfig.name),  kTemp),                        true, MQTT_QOS);    // make HA discover the temperature sensor
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kHum),                      myMqttHelper.buildHassDiscoverySensor(String(myConfig.name),  kHum),                         true, MQTT_QOS);    // make HA discover the humidity sensor
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kRestart),                  myMqttHelper.buildHassDiscoveryButton(String(myConfig.name),  kRestart),                     true, MQTT_QOS);    // make HA discover the reset switch
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kUpdate),                   myMqttHelper.buildHassDiscoveryButton(String(myConfig.name),  kUpdate),                      true, MQTT_QOS);    // make HA discover the update switch
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kRestart_button),           myMqttHelper.buildHassDiscoveryButton(String(myConfig.name),  kRestart_button),              true, MQTT_QOS);    // make HA discover the reset switch
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kUpdate_button),            myMqttHelper.buildHassDiscoveryButton(String(myConfig.name),  kUpdate_button),               true, MQTT_QOS);    // make HA discover the update switch
 }
 
 /* Make Home Assistant forget the discovered entities on demand */
@@ -963,8 +937,8 @@ void homeAssistantRemoveDiscovered(void) {
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(kThermostatState),    String(""),         true, MQTT_QOS);    // make HA discover the binary_sensor for thermostat state
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kTemp),                     String(""),         true, MQTT_QOS);    // make HA forget the temperature sensor
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kHum),                      String(""),         true, MQTT_QOS);    // make HA forget the humidity sensor
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kRestart),                  String(""),         true, MQTT_QOS);    // make HA forget the reset switch
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kUpdate),                   String(""),         true, MQTT_QOS);    // make HA forget the update switch
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kRestart_button),           String(""),         true, MQTT_QOS);    // make HA forget the reset switch
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kUpdate_button),            String(""),         true, MQTT_QOS);    // make HA forget the update switch
   homeAssistantRemoveDiscoveredObsolete();
 }
 
@@ -977,6 +951,9 @@ void homeAssistantRemoveDiscoveredObsolete(void) {
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kCalibO),                   String(""),         true, MQTT_QOS);    // make HA discover the offset sensor
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kHysteresis),               String(""),         true, MQTT_QOS);    // make HA discover the hysteresis sensor
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kFW),                       String(""),         true, MQTT_QOS);    // make HA discover the firmware version sensor
+  /* for migration to version 2022.03.0 */
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(kRestart_switch),           String(""),         true, MQTT_QOS);    // make HA discover the hysteresis sensor
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(kUpdate_switch),            String(""),         true, MQTT_QOS);    // make HA discover the firmware version sensor
 }
 
 /* publish state topic in JSON format */
@@ -1382,6 +1359,7 @@ void messageReceived(String &topic, String &payload) {  // NOLINT
       Serial.println("Firmware updated triggered via MQTT");
       #endif
       fetch_update = true;
+      myMqttHelper.setTriggerRemoveDiscovered(false);
     }
   } else if (topic == myMqttHelper.getTopicTargetTempCmd()) { /* check incoming target temperature, don't set same target temperature as new*/
     if (myThermostat.getTargetTemperature() != floatToInt(payload.toFloat())) {
@@ -1431,152 +1409,3 @@ void messageReceived(String &topic, String &payload) {  // NOLINT
     myThermostat.setOutsideTemperature(floatToInt(payload.toFloat()));
   }
 }
-
-#else
-
-#include "main.h"
-
-struct Configuration myConfig;
-WiFiClient myWiFiClient;
-ESP8266HTTPUpdate myHttpUpdate;
-uint32_t wifi_connect_counter = 0;
-
-void WIFI_CONNECT(void) {
-  wifi_connect_counter++;
-  if (WiFi.status() != WL_CONNECTED) {
-    #ifdef CFG_DEBUG
-    Serial.println("Initialize WiFi ");
-    #endif
-
-    WiFi.mode(WIFI_STA);
-    WiFi.setSleepMode(WIFI_NONE_SLEEP);
-    WiFi.hostname(myConfig.name);
-    WiFi.begin(myConfig.ssid, myConfig.wifi_password);
-
-    /* try to connect to WiFi, proceed offline if not connecting here*/
-    if (WiFi.waitForConnectResult() != WL_CONNECTED) {
-      #ifdef CFG_DEBUG
-      Serial.println("Failed to connect to WiFi, continue offline");
-      #endif
-    }
-  }
-
-  #ifdef CFG_DEBUG
-  Serial.println("WiFi Status: "+ wifiStatusToString(WiFi.status()));
-  WiFi.printDiag(Serial);
-  Serial.println("Local IP: "+ WiFi.localIP().toString());
-  Serial.println("Gateway IP: " + WiFi.gatewayIP().toString());
-  Serial.println("DNS IP: " + WiFi.dnsIP().toString());
-  #endif
-}
-
-void FS_INIT(void) {  // initializes the FileSystem when first used and loads the configuration from FileSystem to RAM
-  FileSystem.begin();
-
-  if (!FileSystem.exists("/formatted")) {
-    /* This code is only run once to format the FileSystem before first usage */
-    #ifdef CFG_DEBUG
-    Serial.println("Formatting FileSystem, this takes some time");
-    #endif
-    FileSystem.format();
-    #ifdef CFG_DEBUG
-    Serial.println("Formatting FileSystem finished");
-    Serial.println("Open file '/formatted' in write mode");
-    #endif
-    File f = FileSystem.open("/formatted", "w");
-    if (!f) {
-      #ifdef CFG_DEBUG
-      Serial.println("file open failed");
-      #endif
-    } else {
-      f.close();
-      delay(5000);
-      if (!FileSystem.exists("/formatted")) {
-        #ifdef CFG_DEBUG
-        Serial.println("That didn't work!");
-        #endif
-      } else {
-        #ifdef CFG_DEBUG
-        Serial.println("Cool, working!");
-        #endif
-      }
-    }
-  } else {
-    #ifdef CFG_DEBUG
-    Serial.println("Found '/formatted' >> FileSystem ready to use");
-    #endif
-  }
-  #ifdef CFG_DEBUG
-  Serial.println("Check if I remember who I am ... ");
-  #endif
-
-  #ifdef CFG_DEBUG
-  #if CFG_BOARD_ESP8266
-  Dir dir = FileSystem.openDir("/");
-  while (dir.next()) {
-    Serial.print("FileSystem file found: " + dir.fileName() + " - Size in byte: ");
-    File f = dir.openFile("r");
-    Serial.println(f.size());
-  }
-  #elif CFG_BOARD_ESP32
-  listDir(FileSystem, "/", 0);
-  #else
-  #endif
-  #endif  /* CFG_DEBUG */
-
-  loadConfiguration(myConfig);  // load config
-
-  #ifdef CFG_DEBUG
-  Serial.println("My name is: " + String(myConfig.name));
-  #endif
-}
-
-void setup() {
-  #ifdef CFG_DEBUG
-  Serial.begin(115200);
-  Serial.println("SETUP STARTED");
-  #endif
-  FS_INIT();       /* read stuff from FileSystem */
-  WIFI_CONNECT();  /* connect to WiFi */
-  Serial.println("Sketch Size: " + String(ESP.getSketchSize()/1024)  + String(" kB"));
-  Serial.println("Free Sketch Size: " + String(ESP.getFreeSketchSpace()/1024)  + String(" kB"));
-}
-
-void loop() {
-  WiFiClient client;
-  String firmware = String(myConfig.update_server_address);
-  int16_t index = firmware.indexOf("firmware.bin");
-  if (-1 == index) {
-    firmware += "/firmware.bin";
-  }
-  #if CFG_DEBUG
-    Serial.println("Derive OTA Address");
-    Serial.println("  Stored OTA Address:" + String(myConfig.update_server_address));
-    Serial.println("  Found 'firmware.bin' at position: " + String(index));
-    Serial.println("  Derived OTA Address: " + firmware);
-  #endif  // CFG_DEBUG
-  t_httpUpdate_return ret = myHttpUpdate.update(client, firmware, FW);
-
-  switch (ret) {
-  case HTTP_UPDATE_FAILED:
-    #ifdef CFG_DEBUG
-    Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s \n", myHttpUpdate.getLastError(), myHttpUpdate.getLastErrorString().c_str());
-    #endif
-    break;
-
-  case HTTP_UPDATE_NO_UPDATES:
-    #ifdef CFG_DEBUG
-    Serial.println("HTTP_UPDATE_NO_UPDATES");
-    #endif
-    break;
-
-  case HTTP_UPDATE_OK:
-    #ifdef CFG_DEBUG
-    Serial.println("HTTP_UPDATE_OK");
-    #endif
-    break;
-  }
-  ESP.restart();
-}
-
-#endif  // CFG_HTTP_UPDATE_ONLY

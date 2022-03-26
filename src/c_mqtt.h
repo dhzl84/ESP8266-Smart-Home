@@ -21,9 +21,14 @@ typedef enum {
 } BinarySensor_t;
 
 typedef enum {
-  kRestart,
-  kUpdate
+  kRestart_switch,
+  kUpdate_switch
 } Switch_t;
+
+typedef enum {
+  kRestart_button,
+  kUpdate_button
+} Button_t;
 
 class mqttHelper {
  public:
@@ -36,7 +41,6 @@ class mqttHelper {
   void   setTriggerRemoveDiscovered(bool remove);
   bool   getTriggerRemoveDiscovered(void);
   String getTopicUpdateFirmware(void);
-  String getTopicUpdateFirmwareAccepted(void);
   String getTopicChangeName(void);
   String getTopicLastWill(void);
   String getTopicSystemRestartRequest(void);
@@ -47,12 +51,14 @@ class mqttHelper {
   String getTopicHassDiscoveryClimate(void);
   String getTopicHassDiscoveryBinarySensor(BinarySensor_t binarySensor);
   String getTopicHassDiscoverySensor(Sensor_t sensor);
-  String getTopicHassDiscoveryButton(Switch_t switches);
+  String getTopicHassDiscoverySwitch(Switch_t switches);
+  String getTopicHassDiscoveryButton(Button_t buttons);
   String buildStateJSON(String name, String temp, String humid, String hysteresis, String actState, String tarTemp, String sensError, String thermoMode, String calibration_factor, String calibration_offset, String ip, String firmware);
   String buildHassDiscoveryClimate(String name, String firmware, String model);
   String buildHassDiscoveryBinarySensor(String name, BinarySensor_t binarySensor);
   String buildHassDiscoverySensor(String name, Sensor_t sensor);
-  String buildHassDiscoveryButton(String name, Switch_t switches);
+  String buildHassDiscoveryButton(String name, Button_t buttons);
+  String buildHassDiscoverySwitch(String name, Switch_t switches);
   String getTopicData(void);
   String getTopicOutsideTemperature(void);
 
