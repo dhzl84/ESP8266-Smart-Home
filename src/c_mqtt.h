@@ -47,12 +47,12 @@ class mqttHelper {
   String getTopicHassDiscoveryClimate(void);
   String getTopicHassDiscoveryBinarySensor(BinarySensor_t binarySensor);
   String getTopicHassDiscoverySensor(Sensor_t sensor);
-  String getTopicHassDiscoverySwitch(Switch_t switches);
+  String getTopicHassDiscoveryButton(Switch_t switches);
   String buildStateJSON(String name, String temp, String humid, String hysteresis, String actState, String tarTemp, String sensError, String thermoMode, String calibration_factor, String calibration_offset, String ip, String firmware);
   String buildHassDiscoveryClimate(String name, String firmware, String model);
   String buildHassDiscoveryBinarySensor(String name, BinarySensor_t binarySensor);
   String buildHassDiscoverySensor(String name, Sensor_t sensor);
-  String buildHassDiscoverySwitch(String name, Switch_t switches);
+  String buildHassDiscoveryButton(String name, Switch_t switches);
   String getTopicData(void);
   String getTopicOutsideTemperature(void);
 
@@ -71,6 +71,7 @@ class mqttHelper {
   String mqttCompDevice_;
   String mqttCompSensor_;
   String mqttCompSwitch_;
+  String mqttCompButton_;
   String mqttCompBinarySensor_;
   String mqttObjectId_;
   String mqttGeneralBaseTopic_;

@@ -953,8 +953,8 @@ void homeAssistantDiscovery(void) {
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(kThermostatState),    myMqttHelper.buildHassDiscoveryBinarySensor(String(myConfig.name), kThermostatState),        true, MQTT_QOS);    // make HA discover the binary_sensor for thermostat state
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kTemp),                     myMqttHelper.buildHassDiscoverySensor(String(myConfig.name),  kTemp),                        true, MQTT_QOS);    // make HA discover the temperature sensor
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kHum),                      myMqttHelper.buildHassDiscoverySensor(String(myConfig.name),  kHum),                         true, MQTT_QOS);    // make HA discover the humidity sensor
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(kRestart),                  myMqttHelper.buildHassDiscoverySwitch(String(myConfig.name),  kRestart),                     true, MQTT_QOS);    // make HA discover the reset switch
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(kUpdate),                   myMqttHelper.buildHassDiscoverySwitch(String(myConfig.name),  kUpdate),                      true, MQTT_QOS);    // make HA discover the update switch
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kRestart),                  myMqttHelper.buildHassDiscoveryButton(String(myConfig.name),  kRestart),                     true, MQTT_QOS);    // make HA discover the reset switch
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kUpdate),                   myMqttHelper.buildHassDiscoveryButton(String(myConfig.name),  kUpdate),                      true, MQTT_QOS);    // make HA discover the update switch
 }
 
 /* Make Home Assistant forget the discovered entities on demand */
@@ -963,8 +963,8 @@ void homeAssistantRemoveDiscovered(void) {
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(kThermostatState),    String(""),         true, MQTT_QOS);    // make HA discover the binary_sensor for thermostat state
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kTemp),                     String(""),         true, MQTT_QOS);    // make HA forget the temperature sensor
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kHum),                      String(""),         true, MQTT_QOS);    // make HA forget the humidity sensor
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(kRestart),                  String(""),         true, MQTT_QOS);    // make HA forget the reset switch
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(kUpdate),                   String(""),         true, MQTT_QOS);    // make HA forget the update switch
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kRestart),                  String(""),         true, MQTT_QOS);    // make HA forget the reset switch
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kUpdate),                   String(""),         true, MQTT_QOS);    // make HA forget the update switch
   homeAssistantRemoveDiscoveredObsolete();
 }
 
@@ -994,7 +994,7 @@ void mqttPubState(void) {
       temperature, \
       humidity, \
       String(intToFloat(myThermostat.getThermostatHysteresis()), 1), \
-      boolToStringOnOff(myThermostat.getActualState()), \
+      boolToStringHeatingOff(myThermostat.getActualState()), \
       String(intToFloat(myThermostat.getTargetTemperature()), 1), \
       sensErrorToString(myThermostat.getSensorError()), \
       boolToStringHeatOff(myThermostat.getThermostatMode()), \
@@ -1373,11 +1373,11 @@ void messageReceived(String &topic, String &payload) {  // NOLINT
     #ifdef CFG_DEBUG
     Serial.println("Restart request received with value: " + payload);
     #endif
-    if ((payload == "true") || (payload == "1")) {
+    if (payload == "PRESS") {
       systemRestartRequest = true;
     }
   } else if (topic == myMqttHelper.getTopicUpdateFirmware()) { /* HTTP Update */
-    if ((payload == "true") || (payload == "1")) {
+    if (payload == "PRESS") {
       #ifdef CFG_DEBUG
       Serial.println("Firmware updated triggered via MQTT");
       #endif

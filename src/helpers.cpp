@@ -1,10 +1,11 @@
 #include "main.h"
 
-float    intToFloat(int16_t intValue)     { return (static_cast<float>(intValue/10.0f)); }
-int16_t  floatToInt(float floatValue)     { return (static_cast<int16_t>(floatValue * 10)); }
-String boolToStringOnOff(bool boolean)    { return (boolean == true ? "on" : "off"); }
-String boolToStringHeatOff(bool boolean)  { return (boolean == true ? "heat" : "off"); }
-String sensErrorToString(bool boolean)    { return (boolean == true ? "error" : "ok"); }
+float    intToFloat(int16_t intValue)         { return (static_cast<float>(intValue/10.0f)); }
+int16_t  floatToInt(float floatValue)         { return (static_cast<int16_t>(floatValue * 10)); }
+String boolToStringOnOff(bool boolean)        { return (boolean == true ? "on" : "off"); }
+String boolToStringHeatOff(bool boolean)      { return (boolean == true ? "heat" : "off"); }
+String boolToStringHeatingOff(bool boolean)   { return (boolean == true ? "heating" : "off"); }
+String sensErrorToString(bool boolean)        { return (boolean == true ? "error" : "ok"); }
 
 /* Thanks to Tasmota  for timer functions */
 int32_t TimeDifference(uint32_t prev, uint32_t next) {

@@ -22,6 +22,7 @@ mqttHelper::mqttHelper()
     mqttCompDevice_("climate/"), \
     mqttCompSensor_("sensor/"), \
     mqttCompSwitch_("switch/"), \
+    mqttCompButton_("button/"), \
     mqttCompBinarySensor_("binary_sensor/"), \
     mqttObjectId_("/thermostat"), \
     mqttGeneralBaseTopic_("tbd"), \
@@ -83,14 +84,18 @@ String mqttHelper::buildHassDiscoveryClimate(String name, String firmware, Strin
   "  \"max_temp\":\"25\",\n" \
   "  \"temp_step\":\"0.5\",\n" \
   "  \"modes\":[\"heat\",\"off\"],\n" \
+  "  \"act_t\":\"~" + mqttData_ + "\",\n" \
+  "  \"act_tpl\":\"{{value_json.state}}\",\n" \
   "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
   "  \"uniq_id\":\"" + mqttNodeId_ + "_climate\",\n" \
+  "  \"ic\":\"mdi:thermostat\",\n" \
   "  \"dev\" : { \n" \
   "    \"ids\":[\"" + mqttNodeId_ + "\"],\n" \
   "    \"mdl\":\"" + model + " Thermostat\",\n" \
   "    \"name\":\"" + name + "\",\n" \
   "    \"sw\":\"" + firmware + "\",\n" \
-  "    \"mf\":\"dhzl84\"\n" \
+  "    \"mf\":\"dhzl84\",\n" \
+  "    \"cu\":\"http://" + name + "/\"\n"
   "  }\n" \
   "}";
 
@@ -182,10 +187,10 @@ String mqttHelper::buildHassDiscoverySensor(String name, Sensor_t sensor) {
   return (JSON);
 }
 
-String mqttHelper::buildHassDiscoverySwitch(String name, Switch_t switches) {
+String mqttHelper::buildHassDiscoveryButton(String name, Switch_t buttons) {
   String JSON = "void";
 
-  switch (switches) {
+  switch (buttons) {
     case kRestart:
     {
       JSON = \
@@ -193,9 +198,6 @@ String mqttHelper::buildHassDiscoverySwitch(String name, Switch_t switches) {
       "  \"~\":\"" + mqttGeneralBaseTopic_ + "\",\n" \
       "  \"name\":\"Neustart " + name + "\",\n" \
       "  \"cmd_t\":\"~" + mqttSystemRestartRequest_ + "\",\n" \
-      "  \"stat_t\":\"~" + mqttSystemRestartRequest_ + "\",\n" \
-      "  \"pl_on\":\"true\",\n" \
-      "  \"pl_off\":\"false\",\n" \
       "  \"avty_t\":\"~" + mqttWill_ + "\",\n" \
       "  \"pl_avail\":\"online\",\n" \
       "  \"pl_not_avail\":\"offline\",\n" \
@@ -215,9 +217,6 @@ String mqttHelper::buildHassDiscoverySwitch(String name, Switch_t switches) {
       "  \"~\":\"" + mqttGeneralBaseTopic_ + "\",\n" \
       "  \"name\":\"Firmwareupdate " + name + "\",\n" \
       "  \"cmd_t\":\"~" + mqttUpdateFirmware_ + "\",\n" \
-      "  \"stat_t\":\"~" + mqttUpdateFirmwareAccepted_ + "\",\n" \
-      "  \"pl_on\":\"true\",\n" \
-      "  \"pl_off\":\"false\",\n" \
       "  \"avty_t\":\"~" + mqttWill_ + "\",\n" \
       "  \"pl_avail\":\"online\",\n" \
       "  \"pl_not_avail\":\"offline\",\n" \
@@ -303,15 +302,15 @@ String mqttHelper::getTopicHassDiscoverySensor(Sensor_t sensor) {
   return topic;
 }
 
-String mqttHelper::getTopicHassDiscoverySwitch(Switch_t switches) {
+String mqttHelper::getTopicHassDiscoveryButton(Switch_t buttons) {
   String topic = "void";
 
-  switch (switches) {
+  switch (buttons) {
     case kRestart:
-      topic = mqttPrefix_ + mqttCompSwitch_ + mqttNodeId_ + mqttObjectId_ + "Reset" + mqttHassDiscoveryTopic_;
+      topic = mqttPrefix_ + mqttCompButton_ + mqttNodeId_ + mqttObjectId_ + "Reset" + mqttHassDiscoveryTopic_;
     break;
     case kUpdate:
-      topic = mqttPrefix_ + mqttCompSwitch_ + mqttNodeId_ + mqttObjectId_ + "Update" + mqttHassDiscoveryTopic_;
+      topic = mqttPrefix_ + mqttCompButton_ + mqttNodeId_ + mqttObjectId_ + "Update" + mqttHassDiscoveryTopic_;
     break;
     default:
     break;
