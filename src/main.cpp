@@ -147,11 +147,11 @@ void setup() {
   GPIO_CONFIG();                  /* configure GPIOs */
 
   myThermostat.setup(RELAY_PIN,
-                     myConfig.target_temperature,
-                     myConfig.calibration_factor,
-                     myConfig.calibration_offset,
-                     myConfig.temperature_hysteresis,
-                     myConfig.thermostat_mode);
+                      myConfig.target_temperature,
+                      myConfig.calibration_factor,
+                      myConfig.calibration_offset,
+                      myConfig.temperature_hysteresis,
+                      myConfig.thermostat_mode);
 
   SENSOR_INIT();   /* init sensors */
   DISPLAY_INIT();  /* init Display */
@@ -376,7 +376,7 @@ void MQTT_CONNECT(void) {
       myMqttClient.onMessage(messageReceived);                                                        /* register callback */
       (void)myMqttClient.connect(myConfig.name, myConfig.mqtt_user, myConfig.mqtt_password);
 
-      homeAssistantRemoveDiscoveredObsolete();  /* for migration from 0.13.x to later versions only */ /* DEPRECATED */
+      homeAssistantRemoveDiscoveredObsolete();  /* for migration */
       if (myConfig.discovery_enabled == true) {
         homeAssistantDiscovery();  /* make HA discover necessary devices */
       }

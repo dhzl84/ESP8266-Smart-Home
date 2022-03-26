@@ -67,7 +67,6 @@ class mqttHelper {
   bool   mqttTriggerRemoveDiscovered_;
   String mqttData_;
   String mqttUpdateFirmware_;
-  String mqttUpdateFirmwareAccepted_;
   String mqttChangeName_;
   String mqttWill_;
   String mqttSystemRestartRequest_;
