@@ -22,6 +22,7 @@ mqttHelper::mqttHelper()
     mqttCompDevice_("climate/"), \
     mqttCompSensor_("sensor/"), \
     mqttCompSwitch_("switch/"), \
+    mqttCompButton_("button/"), \
     mqttCompBinarySensor_("binary_sensor/"), \
     mqttObjectId_("/thermostat"), \
     mqttGeneralBaseTopic_("tbd"), \
@@ -83,14 +84,18 @@ String mqttHelper::buildHassDiscoveryClimate(String name, String firmware, Strin
   "  \"max_temp\":\"25\",\n" \
   "  \"temp_step\":\"0.5\",\n" \
   "  \"modes\":[\"heat\",\"off\"],\n" \
+  "  \"act_t\":\"~" + mqttData_ + "\",\n" \
+  "  \"act_tpl\":\"{{value_json.state}}\",\n" \
   "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
   "  \"uniq_id\":\"" + mqttNodeId_ + "_climate\",\n" \
+  "  \"ic\":\"mdi:thermostat\",\n" \
   "  \"dev\" : { \n" \
   "    \"ids\":[\"" + mqttNodeId_ + "\"],\n" \
   "    \"mdl\":\"" + model + " Thermostat\",\n" \
   "    \"name\":\"" + name + "\",\n" \
   "    \"sw\":\"" + firmware + "\",\n" \
-  "    \"mf\":\"dhzl84\"\n" \
+  "    \"mf\":\"dhzl84\",\n" \
+  "    \"cu\":\"http://" + name + "/\"\n"
   "  }\n" \
   "}";
 
@@ -186,7 +191,7 @@ String mqttHelper::buildHassDiscoverySwitch(String name, Switch_t switches) {
   String JSON = "void";
 
   switch (switches) {
-    case kRestart:
+    case kRestart_switch:
     {
       JSON = \
       "{\n" \
@@ -208,7 +213,7 @@ String mqttHelper::buildHassDiscoverySwitch(String name, Switch_t switches) {
       "}";
     }
     break;
-    case kUpdate:
+    case kUpdate_button:
     {
       JSON = \
       "{\n" \
@@ -237,8 +242,56 @@ String mqttHelper::buildHassDiscoverySwitch(String name, Switch_t switches) {
   return (JSON);
 }
 
+String mqttHelper::buildHassDiscoveryButton(String name, Button_t buttons) {
+  String JSON = "void";
+
+  switch (buttons) {
+    case kRestart_button:
+    {
+      JSON = \
+      "{\n" \
+      "  \"~\":\"" + mqttGeneralBaseTopic_ + "\",\n" \
+      "  \"name\":\"Neustart " + name + "\",\n" \
+      "  \"cmd_t\":\"~" + mqttSystemRestartRequest_ + "\",\n" \
+      "  \"avty_t\":\"~" + mqttWill_ + "\",\n" \
+      "  \"pl_avail\":\"online\",\n" \
+      "  \"pl_not_avail\":\"offline\",\n" \
+      "  \"qos\":\"1\",\n" \
+      "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
+      "  \"uniq_id\":\"" + mqttNodeId_ + "_swRestart\",\n" \
+      "  \"dev\" : { \n" \
+      "    \"ids\":[\"" + mqttNodeId_ + "\"]\n" \
+      "  }\n" \
+      "}";
+    }
+    break;
+    case kUpdate_button:
+    {
+      JSON = \
+      "{\n" \
+      "  \"~\":\"" + mqttGeneralBaseTopic_ + "\",\n" \
+      "  \"name\":\"Firmwareupdate " + name + "\",\n" \
+      "  \"cmd_t\":\"~" + mqttUpdateFirmware_ + "\",\n" \
+      "  \"avty_t\":\"~" + mqttWill_ + "\",\n" \
+      "  \"pl_avail\":\"online\",\n" \
+      "  \"pl_not_avail\":\"offline\",\n" \
+      "  \"qos\":\"1\",\n" \
+      "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
+      "  \"uniq_id\":\"" + mqttNodeId_ + "_swUpdate\",\n" \
+      "  \"dev\" : { \n" \
+      "    \"ids\":[\"" + mqttNodeId_ + "\"]\n" \
+      "  }\n" \
+      "}";
+    }
+    break;
+    default:
+    break;
+  }
+
+  return (JSON);
+}
+
 String mqttHelper::getTopicUpdateFirmware(void)                   { return mqttGeneralBaseTopic_ + mqttUpdateFirmware_;  }
-String mqttHelper::getTopicUpdateFirmwareAccepted(void)           { return mqttGeneralBaseTopic_ + mqttUpdateFirmwareAccepted_; }
 String mqttHelper::getTopicChangeName(void)                       { return mqttGeneralBaseTopic_ + mqttChangeName_; }
 String mqttHelper::getTopicLastWill(void)                         { return mqttGeneralBaseTopic_ + mqttWill_; }
 String mqttHelper::getTopicSystemRestartRequest(void)             { return mqttGeneralBaseTopic_ + mqttSystemRestartRequest_; }
@@ -252,7 +305,7 @@ String mqttHelper::getTopicOutsideTemperature(void)               { return mqttP
 bool   mqttHelper::getTriggerDiscovery(void)                      { return mqttTriggerDiscovery_; }
 void   mqttHelper::setTriggerDiscovery(bool discover)             { mqttTriggerDiscovery_ = discover; }
 bool   mqttHelper::getTriggerRemoveDiscovered(void)               { return mqttTriggerRemoveDiscovered_; }
-void   mqttHelper::setTriggerRemoveDiscovered(bool remove)    { mqttTriggerRemoveDiscovered_ = remove; }
+void   mqttHelper::setTriggerRemoveDiscovered(bool remove)        { mqttTriggerRemoveDiscovered_ = remove; }
 String mqttHelper::getTopicHassDiscoveryBinarySensor(BinarySensor_t binarySensor) {
   String topic = "void";
 
@@ -307,11 +360,27 @@ String mqttHelper::getTopicHassDiscoverySwitch(Switch_t switches) {
   String topic = "void";
 
   switch (switches) {
-    case kRestart:
+    case kRestart_switch:
       topic = mqttPrefix_ + mqttCompSwitch_ + mqttNodeId_ + mqttObjectId_ + "Reset" + mqttHassDiscoveryTopic_;
     break;
-    case kUpdate:
+    case kUpdate_switch:
       topic = mqttPrefix_ + mqttCompSwitch_ + mqttNodeId_ + mqttObjectId_ + "Update" + mqttHassDiscoveryTopic_;
+    break;
+    default:
+    break;
+  }
+  return topic;
+}
+
+String mqttHelper::getTopicHassDiscoveryButton(Button_t buttons) {
+  String topic = "void";
+
+  switch (buttons) {
+    case kRestart_button:
+      topic = mqttPrefix_ + mqttCompButton_ + mqttNodeId_ + mqttObjectId_ + "Reset" + mqttHassDiscoveryTopic_;
+    break;
+    case kUpdate_button:
+      topic = mqttPrefix_ + mqttCompButton_ + mqttNodeId_ + mqttObjectId_ + "Update" + mqttHassDiscoveryTopic_;
     break;
     default:
     break;
