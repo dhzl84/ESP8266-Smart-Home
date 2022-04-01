@@ -114,7 +114,7 @@ String mqttHelper::buildHassDiscoveryBinarySensor(String name, BinarySensor_t bi
       "  \"dev_cla\":\"heat\",\n" \
       "  \"stat_t\":\"~" + mqttData_ + "\",\n" \
       "  \"val_tpl\":\"{{value_json.state}}\",\n" \
-      "  \"pl_on\":\"on\",\n" \
+      "  \"pl_on\":\"heating\",\n" \
       "  \"pl_off\":\"off\",\n" \
       "  \"avty_t\":\"~" + mqttWill_ + "\",\n" \
       "  \"pl_avail\":\"online\",\n" \
