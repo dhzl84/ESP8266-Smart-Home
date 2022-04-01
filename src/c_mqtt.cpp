@@ -12,7 +12,6 @@ mqttHelper::mqttHelper()
     mqttTriggerRemoveDiscovered_(false), \
     mqttData_("/state"), \
     mqttUpdateFirmware_("/updateFirmware"), \
-    mqttUpdateFirmwareAccepted_("/updateFirmwareAccepted"), \
     mqttChangeName_("/changeName"), \
     mqttWill_("/availability"), \
     mqttSystemRestartRequest_("/systemRestartRequest"), \
@@ -115,7 +114,7 @@ String mqttHelper::buildHassDiscoveryBinarySensor(String name, BinarySensor_t bi
       "  \"dev_cla\":\"heat\",\n" \
       "  \"stat_t\":\"~" + mqttData_ + "\",\n" \
       "  \"val_tpl\":\"{{value_json.state}}\",\n" \
-      "  \"pl_on\":\"on\",\n" \
+      "  \"pl_on\":\"heating\",\n" \
       "  \"pl_off\":\"off\",\n" \
       "  \"avty_t\":\"~" + mqttWill_ + "\",\n" \
       "  \"pl_avail\":\"online\",\n" \
@@ -198,7 +197,6 @@ String mqttHelper::buildHassDiscoverySwitch(String name, Switch_t switches) {
       "  \"~\":\"" + mqttGeneralBaseTopic_ + "\",\n" \
       "  \"name\":\"Neustart " + name + "\",\n" \
       "  \"cmd_t\":\"~" + mqttSystemRestartRequest_ + "\",\n" \
-      "  \"stat_t\":\"~" + mqttSystemRestartRequest_ + "\",\n" \
       "  \"pl_on\":\"true\",\n" \
       "  \"pl_off\":\"false\",\n" \
       "  \"avty_t\":\"~" + mqttWill_ + "\",\n" \
@@ -220,7 +218,6 @@ String mqttHelper::buildHassDiscoverySwitch(String name, Switch_t switches) {
       "  \"~\":\"" + mqttGeneralBaseTopic_ + "\",\n" \
       "  \"name\":\"Firmwareupdate " + name + "\",\n" \
       "  \"cmd_t\":\"~" + mqttUpdateFirmware_ + "\",\n" \
-      "  \"stat_t\":\"~" + mqttUpdateFirmwareAccepted_ + "\",\n" \
       "  \"pl_on\":\"true\",\n" \
       "  \"pl_off\":\"false\",\n" \
       "  \"avty_t\":\"~" + mqttWill_ + "\",\n" \
