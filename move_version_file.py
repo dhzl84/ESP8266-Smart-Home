@@ -1,4 +1,4 @@
-"""move the version file to the build directory"""
+"""Move the version file to the build directory."""
 import shutil
 import os
 Import("env")

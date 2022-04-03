@@ -1,11 +1,11 @@
-""" Script used to generate the version and verion.h file during build """
+"""Generate the version and verion.h file during build."""
 
 import datetime
 import calendar
 
 YEAR = '2022'
 MONTH = '04'
-PATCH = '5'
+PATCH = '6'
 
 VERSION = ".".join([YEAR,MONTH,PATCH])
 

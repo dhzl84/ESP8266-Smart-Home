@@ -43,11 +43,15 @@ uint32_t mqttPubCycleTime        = 0;
 #define loop500ms      500
 #define loop1000ms     secondsToMilliseconds(1)
 #define loop1m         minutesToMilliseconds(1)
-uint32_t loop50msMillis    =  0;
-uint32_t loop100msMillis   = 13; /* start loops with some offset to avoid calling all loops every second */
-uint32_t loop500msMillis   = 17; /* start loops with some offset to avoid calling all loops every second */
-uint32_t loop1000msMillis  = 19; /* start loops with some offset to avoid calling all loops every second */
-uint32_t loop1minuteMillis = 23; /* start loops with some offset to avoid calling all loops every second */
+#define loop5m         minutesToMilliseconds(5)
+#define loop30m        minutesToMilliseconds(30)
+uint32_t loop50msMillis      =  0;
+uint32_t loop100msMillis     = 13; /* start loops with some offset to avoid calling all loops every second */
+uint32_t loop500msMillis     = 17; /* start loops with some offset to avoid calling all loops every second */
+uint32_t loop1000msMillis    = 19; /* start loops with some offset to avoid calling all loops every second */
+uint32_t loop1minuteMillis   = 23; /* start loops with some offset to avoid calling all loops every second */
+uint32_t loop5minutesMillis  = 29; /* start loops with some offset to avoid calling all loops every second */
+uint32_t loop30minutesMillis = 31; /* start loops with some offset to avoid calling all loops every second */
 /* HTTP Update */
 bool fetch_update = false;       /* global variable used to decide whether an update shall be fetched from server or not */
 /* OTA */
@@ -198,6 +202,7 @@ void setup() {
   #endif
 
   SENSOR_MAIN();  /* acquire first sensor data before staring loop() to avoid false value reporting due to current temperature, etc. being the init value until first sensor value is read */
+  CHECK_FOR_UPDATE();
 }
 
 /*===================================================================================================================*/
@@ -422,15 +427,23 @@ void loop() {
   if (TimeReached(loop1000msMillis)) {
     SetNextTimeInterval(&loop1000msMillis, loop1000ms);
     SENSOR_MAIN();          /* get sensor data */
-    FS_MAIN();          /* check for new data and write FileSystem is necessary */
+    FS_MAIN();              /* check for new data and write FileSystem is necessary */
     HANDLE_HTTP_UPDATE();   /* pull update from server if it was requested via MQTT or a new version was detected */
   }
-
   /* call every minute */
   if (TimeReached(loop1minuteMillis)) {
     SetNextTimeInterval(&loop1minuteMillis, loop1m);
-    CHECK_FOR_UPDATE();
+    /* nothing yet */
+  }
+  /* call every 5 minutes */
+  if (TimeReached(loop5minutesMillis)) {
+    SetNextTimeInterval(&loop5minutesMillis, loop5m);
     NTP();                 /* check time regularly and change DST is necessary */
+  }
+  /* call every 30 minutes */
+  if (TimeReached(loop30minutesMillis)) {
+    SetNextTimeInterval(&loop30minutesMillis, loop30m);
+    CHECK_FOR_UPDATE();    /* check for updates on update server */
   }
   /* debounce buttons */
   debounceOnOff.update();
