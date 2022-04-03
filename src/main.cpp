@@ -423,12 +423,13 @@ void loop() {
     SetNextTimeInterval(&loop1000msMillis, loop1000ms);
     SENSOR_MAIN();          /* get sensor data */
     FS_MAIN();          /* check for new data and write FileSystem is necessary */
-    HANDLE_HTTP_UPDATE();   /* pull update from server if it was requested via MQTT*/
+    HANDLE_HTTP_UPDATE();   /* pull update from server if it was requested via MQTT or a new version was detected */
   }
 
   /* call every minute */
   if (TimeReached(loop1minuteMillis)) {
     SetNextTimeInterval(&loop1minuteMillis, loop1m);
+    CHECK_FOR_UPDATE();
     NTP();                 /* check time regularly and change DST is necessary */
   }
   /* debounce buttons */
@@ -794,6 +795,32 @@ void MQTT_MAIN(void) {
   }
 }
 
+void CHECK_FOR_UPDATE(void) {
+  WiFiClient client;
+  HTTPClient httpClient;
+  String binary_version_address = String(myConfig.update_server_address) + String("/version");
+  myConfig.available_firmware_version = "none";
+  httpClient.begin(client, binary_version_address);
+  int httpCode = httpClient.GET();
+  if (httpCode == 200) {
+    myConfig.available_firmware_version = httpClient.getString();
+
+    #ifdef CFG_DEBUG
+    Serial.print("Current firmware version: ");
+    Serial.println(VERSION);
+    Serial.print("Available firmware version: ");
+    Serial.println(myConfig.available_firmware_version);
+    #endif /* CFG_DEBUG */
+  }
+  if ( (myConfig.available_firmware_version != "none") \
+    && (myConfig.available_firmware_version != "") \
+    && (myConfig.available_firmware_version != VERSION) ) {
+      if (myConfig.auto_update == true) {
+        fetch_update = true;
+      }
+  }
+}
+
 void HANDLE_HTTP_UPDATE(void) {
   if (fetch_update == true) {
     DISPLAY_MAIN();
@@ -802,7 +829,8 @@ void HANDLE_HTTP_UPDATE(void) {
     Serial.println("Remote update started");
     #endif
     WiFiClient client;
-    t_httpUpdate_return ret = myHttpUpdate.update(client, String(myConfig.update_server_address), FW);
+    String binary_address = String(myConfig.update_server_address) + String("/firmware.bin");
+    t_httpUpdate_return ret = myHttpUpdate.update(client, binary_address, FW);
 
     switch (ret) {
     case HTTP_UPDATE_FAILED:
@@ -1037,7 +1065,8 @@ String buildHtml(void) {
   webpageTableAppend2Cols(String("Free for Sketch"),      String(ESP.getFreeSketchSpace()/1024)  + String(" kB"));
   webpageTableAppend2Cols(String("Free Heap"),            String(ESP.getFreeHeap()/1024)  + String(" kB"));
   webpageTableAppend2Cols(String("Time since Reset"),     millisFormatted());
-  webpageTableAppend2Cols(String("FW version"),           String(FW));
+  webpageTableAppend2Cols(String("Installed Firmware"),   String(VERSION));
+  webpageTableAppend2Cols(String("Available Firmware"),   myConfig.available_firmware_version);
   webpageTableAppend2Cols(String("IPv4"),                 WiFi.localIP().toString());
   webpageTableAppend2Cols(String("WiFi Status"),          wifiStatusToString(WiFi.status()));
   webpageTableAppend2Cols(String("WiFi Strength"),        String(rssiInPercent, 0) + " %");
@@ -1089,11 +1118,12 @@ String buildHtml(void) {
   webpageTableAppend4Cols(String("mqtt_pwd"),                 String("string"),                              String("***"),                              String("MQTT password"));
   webpageTableAppend4Cols(String("mqtt_pub_cycle"),           String("Range: 1 .. 255, LSB: 1 min"),         String(myConfig.mqtt_publish_cycle),        String("Publish cycle for MQTT messages in minutes"));
   webpageTableAppend4Cols(String("update_server_address"),    String("string"),                              String(myConfig.update_server_address),     String("Address of the update server"));
+  webpageTableAppend4Cols(String("auto_update"),              String("0 | 1"),                               String(myConfig.auto_update),               String("Automatically apply available updates: 1 = Auto Updates enabled; 0 = Auto Updates disabled"));
+  webpageTableAppend4Cols(String("fetch_update"),             String("0 | 1"),                               String(fetch_update),                       String("Trigger download and install binary from update server: 1 = fetch; 0 = do nothing"));
   webpageTableAppend4Cols(String("calibration_offset"),       String("Range: -50 .. +50, LSB: 0.1 &deg;C"),  String(myConfig.calibration_offset),        String("Offset calibration for temperature sensor."));
   webpageTableAppend4Cols(String("calibration_factor"),       String("Range: +50 .. +200, LSB: 1 %"),        String(myConfig.calibration_factor),        String("Linearity calibration for temperature sensor."));
   webpageTableAppend4Cols(String("display_enabled"),          String("0 | 1"),                               String(myConfig.display_enabled),           String("Display always on or only on user interaction"));
   webpageTableAppend4Cols(String("display_brightness"),       String("Range: 0 .. +255, LSB: 1 step"),       String(myConfig.display_brightness),        String("Brightness of OLED display"));
-  webpageTableAppend4Cols(String("fetch_update"),             String("0 | 1"),                               String(fetch_update),                       String("Trigger download and install binary from update server: 1 = fetch; 0 = do nothing"));
   webpageTableAppend4Cols(String("utc_offset"),               String("-12 .. +12"),                          String(myConfig.utc_offset),                String("UTC offset for time calculation, only integers allowed"));
   webpage +="</table>";
   /* Restart Device */
@@ -1164,6 +1194,16 @@ void handleWebServerClient(void) {
               Serial.println("Request FileSystem write.");
               #endif
               strlcpy(myConfig.update_server_address, value.c_str(), sizeof(myConfig.update_server_address));
+              requestSaveToSpiffs = true;
+            } else {
+              #ifdef CFG_DEBUG
+              Serial.println("Configuration unchanged, do nothing");
+              #endif
+            }
+          } else if (key == "auto_update") {
+            boolean auto_update = static_cast<boolean>(value.toInt() & 1);
+            if (auto_update != myConfig.auto_update) {
+              myConfig.auto_update = auto_update;
               requestSaveToSpiffs = true;
             } else {
               #ifdef CFG_DEBUG

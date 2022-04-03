@@ -2,10 +2,10 @@
 import gzip
 import shutil
 import os
-Import("env", "projenv")
+Import("env")
 
 def compress_firmware(source, target, env):
-    """function to compress the binary"""
+    """compress the binary with gzip"""
     # """ Compress ESP8266 firmware using gzip for 'compressed OTA upload' """
     # compressed binary_compressed shall replace the original binary_compressed
     binary_compressed = env.subst("$BUILD_DIR") + os.sep + env.subst("$PROGNAME") + ".bin"
