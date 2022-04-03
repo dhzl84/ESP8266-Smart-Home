@@ -16,7 +16,7 @@
   "mqttPort":"1234",
   "mqttUser":"xxxxxxxxxxxxx",
   "mqttPwd":"xxxxxxxxxxxxx",
-  "updServer":"http://192.168.178.12:88/firmware/thermostat/firmware.bin",
+  "updServer":"http://192.168.178.12:88/firmware/thermostat",
   "sensUpdInterval":"20",
   "mqttPubCycle":"5",
   "sensor":"0"
@@ -25,6 +25,7 @@
   "utcOffset":1
   "dst":0,
   "dispEna":1
+  "autoUpd":1
 }
 */
 
@@ -84,6 +85,7 @@ void loadConfiguration(Configuration &config) { // NOLINT: pass by reference
   config.utc_offset =                           jsonDoc["utcOffset"]             | 1;
   config.daylight_saving_time =                 jsonDoc["dst"]                   | false;
   config.display_enabled =                      jsonDoc["dispEna"]               | true;
+  config.auto_update =                          jsonDoc["autoUpd"]               | true;
 }
 
 // Saves the Configuration to a file
@@ -133,6 +135,7 @@ bool saveConfiguration(const Configuration &config) {
     Serial.print((config.utc_offset ==              jsonDoc["utcOffset"]) ? false : true);
     Serial.print((config.daylight_saving_time ==    jsonDoc["dst"]) ? false : true);
     Serial.print((config.display_enabled ==         jsonDoc["dispEna"]) ? false : true);
+    Serial.print((config.auto_update ==             jsonDoc["autoUpd"]) ? false : true);
     Serial.println();
     #endif /* CFG_DEBUG */
 
@@ -160,6 +163,7 @@ bool saveConfiguration(const Configuration &config) {
     writeFile |= (config.utc_offset ==              jsonDoc["utcOffset"]) ? false : true;
     writeFile |= (config.daylight_saving_time ==    jsonDoc["dst"]) ? false : true;
     writeFile |= (config.display_enabled ==         jsonDoc["dispEna"]) ? false : true;
+    writeFile |= (config.auto_update ==             jsonDoc["autoUpd"]) ? false : true;
 
     file.close();
   } else {
@@ -203,6 +207,7 @@ bool saveConfiguration(const Configuration &config) {
     jsonDocNew["utcOffset"] =              config.utc_offset;
     jsonDocNew["dst"] =                    config.daylight_saving_time;
     jsonDocNew["dispEna"] =                config.display_enabled;
+    jsonDocNew["autoUpd"] =                config.auto_update;
 
     // Serialize JSON to file
     if (serializeJson(jsonDocNew, file) == 0) {

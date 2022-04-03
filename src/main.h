@@ -51,6 +51,8 @@ struct Configuration {
   int8_t        utc_offset;                   /* UTC offset in hours, no fractions supported */
   bool          daylight_saving_time;
   bool          display_enabled;
+  bool          auto_update;
+  String        available_firmware_version;
 };
 
 /*===================================================================================================================*/
@@ -71,6 +73,7 @@ void DISPLAY_MAIN(void);
 void MQTT_MAIN(void);
 void FS_MAIN(void);
 void HANDLE_HTTP_UPDATE(void);
+void CHECK_FOR_UPDATE(void);
 void NTP(void);
 /* callback */
 void handleWebServerClient(void);
