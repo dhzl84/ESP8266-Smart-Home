@@ -135,8 +135,11 @@ bool     FS_WRITTEN =           true;
 uint32_t FS_REFERENCE_TIME      = 0;
 
 /* Time */
-struct tm time_info;
+tm time_info;
 char time_buffer[6];  /* hold the current time in format "%H:%M" */
+#define NTP_SERVER_1 "fritz.box"
+#define NTP_SERVER_2 "0.de.pool.ntp.org"
+#define NTP_SERVER_3 "1.de.pool.ntp.org"
 
 /*===================================================================================================================*/
 /* The setup function is called once at startup of the sketch */
@@ -162,9 +165,8 @@ void setup() {
   WIFI_CONNECT();  /* connect to WiFi */
   OTA_INIT();      /* init over the air update */
   MQTT_CONNECT();  /* connect to MQTT host and build subscriptions, must be called after FS_INIT()*/
-  NTP();            /* init network time protocol, must be called after WIFI_CONNECT() and FS_INIT() */
   MDNS.begin(myConfig.name);
-
+  configTzTime(myConfig.timezone, NTP_SERVER_1, NTP_SERVER_2, NTP_SERVER_3);  /* init network time protocol, must be called after WIFI_CONNECT() and FS_INIT() */
   webServer.begin();
   webServer.on("/", handleWebServerClient);
   webServer.on("/restart", handleHttpReset);
@@ -186,9 +188,9 @@ void setup() {
 
   #ifdef CFG_DEBUG
   #if CFG_BOARD_ESP8266
-  Serial.printf("Vcc: %f", (ESP.getVcc() / 1000.0f));
+  Serial.printf("Vcc: %f\n", (ESP.getVcc() / 1000.0f));
   Serial.printf("Reset Reason: %s\n", ESP.getResetReason().c_str());
-  Serial.printf("lash Size: %d\n", ESP.getFlashChipRealSize());
+  Serial.printf("Flash Size: %d\n", ESP.getFlashChipRealSize());
   #elif CFG_BOARD_ESP32
   Serial.println("CPU Frequency: " + String(ESP.getCpuFreqMHz()));
   Serial.println("CPU 0 reset reason: " + getEspResetReason(rtc_get_reset_reason(0)));
@@ -433,12 +435,11 @@ void loop() {
   /* call every minute */
   if (TimeReached(loop1minuteMillis)) {
     SetNextTimeInterval(&loop1minuteMillis, loop1m);
-    /* nothing yet */
+    NTP();                 /* calculate formatted time */
   }
   /* call every 5 minutes */
   if (TimeReached(loop5minutesMillis)) {
     SetNextTimeInterval(&loop5minutesMillis, loop5m);
-    NTP();                 /* check time regularly and change DST is necessary */
   }
   /* call every 30 minutes */
   if (TimeReached(loop30minutesMillis)) {
@@ -534,94 +535,32 @@ void HANDLE_SYSTEM_STATE(void) {
 }
 
 void NTP(void) {
-  const char* ntp_server[] = { "fritz.box", "fritz.box", "fritz.box" };  // WiFi.gatewayIP().toString().c_str()
+  time_t now;                              // this is the epoch
+  time(&now);                              // read the current time
+  localtime_r(&now, &time_info);           // update the structure time_info with the current time
+  const char* time_format = "%H:%M";
+  strftime(time_buffer, sizeof(time_buffer), time_format, &time_info);
   #ifdef CFG_DEBUG_SNTP
-  Serial.print("NTP Servers: ");
-  for (auto server : ntp_server) {
-    Serial.printf("%s ", server);
-  }
+  Serial.print("year:");
+  Serial.print(time_info.tm_year + 1900);  // years since 1900
+  Serial.print("\tmonth:");
+  Serial.print(time_info.tm_mon + 1);      // January = 0 (!)
+  Serial.print("\tday:");
+  Serial.print(time_info.tm_mday);         // day of month
+  Serial.print("\thour:");
+  Serial.print(time_info.tm_hour);         // hours since midnight  0-23
+  Serial.print("\tmin:");
+  Serial.print(time_info.tm_min);          // minutes after the hour  0-59
+  Serial.print("\tsec:");
+  Serial.print(time_info.tm_sec);          // seconds after the minute  0-61*
+  Serial.print("\twday");
+  Serial.print(time_info.tm_wday);         // days since Sunday 0-6
+  if (time_info.tm_isdst == 1)             // Daylight Saving Time flag
+    Serial.print("\tDST");
+  else
+    Serial.print("\tstandard");
   Serial.println();
-  Serial.println("UTC Offset: " + String(myConfig.utc_offset));
-  Serial.println("DST : " + String(myConfig.daylight_saving_time));
   #endif  /* CFG_DEBUG_SNTP */
-
-  /* UTC and DST are defined in hours, configTime expects seconds, thus multiply with 3600 */
-  configTime((myConfig.utc_offset * 3600), (static_cast<uint8_t>(myConfig.daylight_saving_time) * 3600), ntp_server[0], ntp_server[1], ntp_server[2]);
-
-  #ifdef CFG_BOARD_ESP8266
-  /* try every second to get an answer from the NTP server for max. 15 seconds */
-  bool server_reachable = false;
-  uint32_t ntp_start_time = millis();
-  uint32_t millis_delta = millis() - ntp_start_time;
-  do {
-    delay(25);
-    millis_delta = millis() - ntp_start_time;
-    if (millis_delta >= 1000) {
-      #ifdef CFG_DEBUG_SNTP
-      Serial.printf("Waiting for NTP-Answer %02u sec\n", millis_delta / 1000);
-      #endif  /* CFG_DEBUG_SNTP */
-      delay(975);
-    }
-
-    for (uint8_t server_id = 0; server_id < 3 ; server_id++) {
-      if (sntp_getreachability(server_id)) {
-        #ifdef CFG_DEBUG_SNTP
-        Serial.printf("NTP Server %i - '%s' not reachable!\n", server_id, ntp_server[server_id]);
-        #endif  /* CFG_DEBUG_SNTP */
-      } else {
-        server_reachable = true;
-        #ifdef CFG_DEBUG_SNTP
-        Serial.printf("NTP Server %i - '%s' reachable!\n", server_id, ntp_server[server_id]);
-        #endif  /* CFG_DEBUG_SNTP */
-      }
-    }
-  } while ((millis_delta <= (secondsToMilliseconds(30))) && !server_reachable);
-
-  #ifdef CFG_DEBUG_SNTP
-  // Serial.printf("SNTP connected to: %s\n", sntp_getserver());
-  #endif  /* CFG_DEBUG_SNTP */
-  #endif  /* CFG_BOARD_ESP8266 */
-
-  // In the EU, EFTA and associated countries, European Summer Time begins at 01:00 UTC/WET (02:00 CET, 03:00 EET) on the last Sunday in March and ends at 01:00 UTC (02:00 WEST, 03:00 CEST, 04:00 EEST) on the last Sunday in October each year */
-
-  bool local_ntp_time_received = false;
-
-  if (time_info.tm_year >= (2016 - 1900)) {
-    local_ntp_time_received = true;
-  } else {
-    #ifdef CFG_DEBUG
-    Serial.println("Failed to obtain time from NTP");
-    #endif /* CFG_DEBUG */
-  }
-
-  bool local_daylight_saving_time = is_daylight_saving_time((time_info.tm_year + 1900), (time_info.tm_mon + 1), time_info.tm_mday, time_info.tm_hour, myConfig.utc_offset);
-
-  #ifdef CFG_DEBUG_SNTP
-  Serial.println("DST: " + String(local_daylight_saving_time));
-  Serial.println("YDay: " + String(time_info.tm_yday));
-  Serial.println("WDay: " + String(time_info.tm_wday));
-  Serial.println("Year: " + String(time_info.tm_year));
-  Serial.println("Month: " + String(time_info.tm_mon));
-  Serial.println("Day: " + String(time_info.tm_mday));
-  Serial.println("Hour: " + String(time_info.tm_hour));
-  Serial.println("Min: " + String(time_info.tm_min));
-  Serial.println("Sec: " + String(time_info.tm_sec));
-  Serial.println("Time: " + String(time_buffer));
-  #endif  /* CFG_DEBUG_SNTP */
-
-  // if actual DST differs from the stored one, change it, persist it and re-initialze NTP with new DST flag
-  if ((local_ntp_time_received == true) && (myConfig.daylight_saving_time != local_daylight_saving_time)) {
-    #ifdef CFG_DEBUG_SNTP
-    Serial.println("DST change calculated");
-    Serial.println("DST old: " + String(myConfig.daylight_saving_time));
-    Serial.println("DST new: " + String(local_daylight_saving_time));
-    #endif  /* CFG_DEBUG_SNTP */
-    myConfig.daylight_saving_time = local_daylight_saving_time;
-    requestSaveToSpiffs = true;
-    /* UTC and DST are defined in hours, configTime expects seconds, thus multiply with 3600 */
-    configTime((myConfig.utc_offset * 3600), (static_cast<uint8_t>(myConfig.daylight_saving_time) * 3600), ntp_server[0], ntp_server[1], ntp_server[2]);
-  }
-  updateTimeBuffer();
 }
 
 void SENSOR_INIT() {
@@ -897,7 +836,8 @@ void FS_MAIN(void) {
     myThermostat.resetNewCalib();
     FS_WRITTEN = false;
     #ifdef CFG_DEBUG
-    Serial.println("FileSystem to be stored after debounce time: " + String(FS_WRITE_DEBOUNCE));
+    char cstr[16];
+    Serial.printf("FileSystem to be stored after debounce time: %s\n", itoa(FS_WRITE_DEBOUNCE, cstr, 10));
     #endif /* CFG_DEBUG */
   } else {
     /* no spiffs data changed this loop */
@@ -1028,15 +968,6 @@ void mqttPubState(void) {
     MQTT_QOS); /* QoS */
 }
 
-/* time_buffer holds the current time in the %H:%M format */
-void updateTimeBuffer(void) {
-  time_t now;
-  time(&now);
-  (void) localtime_r(&now, &time_info);
-  const char* time_format = "%H:%M";
-  strftime(time_buffer, sizeof(time_buffer), time_format, &time_info);
-}
-
 String buildHtml(void) {
   float rssiInPercent = WiFi.RSSI();
   rssiInPercent = isnan(rssiInPercent) ? -100.0 : min(max(2 * (rssiInPercent + 100.0), 0.0), 100.0);
@@ -1137,7 +1068,7 @@ String buildHtml(void) {
   webpageTableAppend4Cols(String("calibration_factor"),       String("Range: +50 .. +200, LSB: 1 %"),        String(myConfig.calibration_factor),        String("Linearity calibration for temperature sensor."));
   webpageTableAppend4Cols(String("display_enabled"),          String("0 | 1"),                               String(myConfig.display_enabled),           String("Display always on or only on user interaction"));
   webpageTableAppend4Cols(String("display_brightness"),       String("Range: 0 .. +255, LSB: 1 step"),       String(myConfig.display_brightness),        String("Brightness of OLED display"));
-  webpageTableAppend4Cols(String("utc_offset"),               String("-12 .. +12"),                          String(myConfig.utc_offset),                String("UTC offset for time calculation, only integers allowed"));
+  webpageTableAppend4Cols(String("timezone"),                 String("string"),                              String(myConfig.timezone),                  String("Timezone for NTP, pick from this list: https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv"));
   webpage +="</table>";
   /* Restart Device */
   webpage +="<p><b>Restart Device</b></p>";
@@ -1342,10 +1273,10 @@ void handleWebServerClient(void) {
               Serial.println("Configuration unchanged, do nothing");
               #endif
             }
-          } else if (key == "utc_offset") {
-            if ( (value.toInt() != myConfig.utc_offset) && (value.toInt() >= -12) && (value.toInt() <= +12) ) {
-              myConfig.utc_offset = value.toInt();
-              requestSaveToSpiffs = true;
+          } else if (key == "timezone") {
+            if ( (value != myConfig.timezone) && (value != "") ) {
+              strlcpy(myConfig.timezone, value.c_str(), sizeof(myConfig.timezone));
+              requestSaveToSpiffsWithRestart = true;    // restarting could be prevented by reconfiguration via configTzTime()
               #ifdef CFG_DEBUG
               Serial.println("New UTC offset configured.");
               #endif

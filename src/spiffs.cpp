@@ -9,7 +9,7 @@
   "tTemp":"200",
   "tHyst":"4",
   "calibF":"100",                           // factor in percent
-  "calibO":"0",                             // offset in 0.1 *C    
+  "calibO":"0",                             // offset in 0.1 *C
   "ssid":"xxxxxxxxxxxxxxxx",
   "wifiPwd":"xxxxxxxxxxxxxxxxx",
   "mqttHost":"123.456.789.012",
@@ -22,8 +22,7 @@
   "sensor":"0"
   "dispBrightn":"50",
   "discovery":0
-  "utcOffset":1
-  "dst":0,
+  "tt":"CET-1CEST,M3.5.0,M10.5.0/3"
   "dispEna":1
   "autoUpd":1
 }
@@ -48,7 +47,6 @@ void loadConfiguration(Configuration &config) { // NOLINT: pass by reference
     Serial.print(F("deserializeJson() failed with code "));
     Serial.println(error.c_str());
     #endif /* CFG_DEBUG */
-    return;
   } else {
       serializeJsonPretty(jsonDoc, Serial);
       Serial.println();
@@ -82,8 +80,7 @@ void loadConfiguration(Configuration &config) { // NOLINT: pass by reference
   config.sensor_type =                          jsonDoc["sensor"]                | cDHT22;
   config.display_brightness =                   jsonDoc["dispBrightn"]           | 100;
   config.discovery_enabled =                    jsonDoc["discovery"]             | false;
-  config.utc_offset =                           jsonDoc["utcOffset"]             | 1;
-  config.daylight_saving_time =                 jsonDoc["dst"]                   | false;
+  strlcpy(config.timezone,                      jsonDoc["tz"]                    | TIMEZONE, sizeof(config.timezone));
   config.display_enabled =                      jsonDoc["dispEna"]               | true;
   config.auto_update =                          jsonDoc["autoUpd"]               | true;
 }
@@ -132,8 +129,7 @@ bool saveConfiguration(const Configuration &config) {
     Serial.print((config.sensor_type ==             jsonDoc["sensor"]) ? false : true);
     Serial.print((config.display_brightness ==      jsonDoc["dispBrightn"]) ? false : true);
     Serial.print((config.discovery_enabled ==       jsonDoc["discovery"]) ? false : true);
-    Serial.print((config.utc_offset ==              jsonDoc["utcOffset"]) ? false : true);
-    Serial.print((config.daylight_saving_time ==    jsonDoc["dst"]) ? false : true);
+    Serial.print((config.timezone ==                jsonDoc["tz"]) ? false : true);
     Serial.print((config.display_enabled ==         jsonDoc["dispEna"]) ? false : true);
     Serial.print((config.auto_update ==             jsonDoc["autoUpd"]) ? false : true);
     Serial.println();
@@ -160,8 +156,7 @@ bool saveConfiguration(const Configuration &config) {
     writeFile |= (config.sensor_type ==             jsonDoc["sensor"]) ? false : true;
     writeFile |= (config.display_brightness ==      jsonDoc["dispBrightn"]) ? false : true;
     writeFile |= (config.discovery_enabled ==       jsonDoc["discovery"]) ? false : true;
-    writeFile |= (config.utc_offset ==              jsonDoc["utcOffset"]) ? false : true;
-    writeFile |= (config.daylight_saving_time ==    jsonDoc["dst"]) ? false : true;
+    writeFile |= (config.timezone ==                jsonDoc["tz"]) ? false : true;
     writeFile |= (config.display_enabled ==         jsonDoc["dispEna"]) ? false : true;
     writeFile |= (config.auto_update ==             jsonDoc["autoUpd"]) ? false : true;
 
@@ -204,8 +199,7 @@ bool saveConfiguration(const Configuration &config) {
     jsonDocNew["sensor"] =                 config.sensor_type;
     jsonDocNew["dispBrightn"] =            config.display_brightness;
     jsonDocNew["discovery"] =              config.discovery_enabled;
-    jsonDocNew["utcOffset"] =              config.utc_offset;
-    jsonDocNew["dst"] =                    config.daylight_saving_time;
+    jsonDocNew["tz"] =                     config.timezone;
     jsonDocNew["dispEna"] =                config.display_enabled;
     jsonDocNew["autoUpd"] =                config.auto_update;
 

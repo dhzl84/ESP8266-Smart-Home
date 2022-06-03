@@ -16,6 +16,7 @@
 
 #define secondsToMilliseconds(s)  static_cast<uint32_t>(s*1000u)
 #define minutesToMilliseconds(m)  static_cast<uint32_t>(m*60000u)
+#define millisecondsToSeconds(ms)  static_cast<uint32_t>(ms/1000u)
 
 /* input_method */
 #define cROTARY_ENCODER 0
@@ -48,8 +49,7 @@ struct Configuration {
   uint8_t       display_brightness;
   uint8_t       sensor_type;
   bool          discovery_enabled;
-  int8_t        utc_offset;                   /* UTC offset in hours, no fractions supported */
-  bool          daylight_saving_time;
+  char          timezone[64];                   // https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
   bool          display_enabled;
   bool          auto_update;
   String        available_firmware_version;
@@ -114,7 +114,6 @@ bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor)
 String millisFormatted(void);
 String wifiStatusToString(wl_status_t status);
 bool splitHtmlCommand(String sInput, String *key, String *value);
-void updateTimeBuffer(void);
 String getEspChipId(void);
 bool is_daylight_saving_time(int year, int month, int day, int hour, int8_t tzHours);
 #if CFG_BOARD_ESP32
