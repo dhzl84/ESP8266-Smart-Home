@@ -293,6 +293,9 @@ void DISPLAY_INIT(void) {
   myDisplay.drawString(64, 24, String(myConfig.name));
   myDisplay.drawString(64, 44, FW);
   myDisplay.display();
+  // keep display on for some time after initialization
+  display_enabled_temporary = true;
+  SetNextTimeInterval(&display_enabled_temporary_reference_time, secondsToMilliseconds(20));
 }
 
 void WIFI_CONNECT(void) {
