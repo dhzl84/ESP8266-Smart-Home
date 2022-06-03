@@ -1,4 +1,4 @@
-"""compress the binary with gzip"""
+"""Compress the binary with gzip."""
 import gzip
 import shutil
 import os
