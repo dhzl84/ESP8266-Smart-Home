@@ -4,7 +4,7 @@ import os
 Import("env")
 
 def move_version_file(source, target, env):
-    """move the version file to the build directory"""
+    """move the version file to the build directory."""
     version_file = "version"
     version_file_target = env.subst("$BUILD_DIR") + os.sep + env.subst("version")
     if os.path.exists(version_file):

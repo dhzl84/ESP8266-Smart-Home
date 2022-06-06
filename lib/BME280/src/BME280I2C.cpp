@@ -93,9 +93,10 @@ bool BME280I2C::ReadRegister
 
   Wire.requestFrom(static_cast<uint8_t>(m_settings.bme280Addr), length);
 
-  while(Wire.available())
-  {
-    data[ord++] = Wire.read();
+  while (Wire.available()) {
+    if (ord <= length) {
+      data[ord++] = Wire.read();
+    }
   }
 
   return ord == length;

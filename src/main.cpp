@@ -35,25 +35,27 @@ struct Configuration myConfig;
   #define MQTT_QOS 1 /* valid values are 0, 1 and 2 */
 #endif
 uint32_t mqttReconnectTime       = 0;
-uint32_t mqttReconnectInterval   = secondsToMilliseconds(5); /* 5 s in milliseconds */
+uint32_t mqttReconnectInterval   = seconds_to_milliseconds(5); /* 5 s in milliseconds */
 uint32_t mqttPubCycleTime        = 0;
 /* loop handler */
-#define loop50ms        50
-#define loop100ms      100
-#define loop500ms      500
-#define loop1000ms     secondsToMilliseconds(1)
-#define loop1m         minutesToMilliseconds(1)
-#define loop5m         minutesToMilliseconds(5)
-#define loop30m        minutesToMilliseconds(30)
-uint32_t loop50msMillis      =  0;
-uint32_t loop100msMillis     = 13; /* start loops with some offset to avoid calling all loops every second */
-uint32_t loop500msMillis     = 17; /* start loops with some offset to avoid calling all loops every second */
-uint32_t loop1000msMillis    = 19; /* start loops with some offset to avoid calling all loops every second */
-uint32_t loop1minuteMillis   = 23; /* start loops with some offset to avoid calling all loops every second */
-uint32_t loop5minutesMillis  = 29; /* start loops with some offset to avoid calling all loops every second */
-uint32_t loop30minutesMillis = 31; /* start loops with some offset to avoid calling all loops every second */
+#define loop_time_50_ms        50
+#define loop_time_100_ms      100
+#define loop_time_500_ms      500
+#define loop_time_1000_ms     seconds_to_milliseconds(1)
+#define loop_time_30_seconds  seconds_to_milliseconds(30)
+#define loop_time_1_minute    minutes_to_milliseconds(1)
+#define loop_time_5_minutes   minutes_to_milliseconds(5)
+#define loop_time_30_minutes  minutes_to_milliseconds(30)
+uint32_t loop_50_ms_in_millis      =  0;
+uint32_t loop_100_ms_in_millis     = 13; /* start loops with some offset to avoid calling all loops every second */
+uint32_t loop_500_ms_in_millis     = 17; /* start loops with some offset to avoid calling all loops every second */
+uint32_t loop_1000_ms_in_millis    = 19; /* start loops with some offset to avoid calling all loops every second */
+uint32_t loop_30_seconds_in_millis = 23; /* start loops with some offset to avoid calling all loops every second */
+uint32_t loop_1_minute_in_millis   = 29; /* start loops with some offset to avoid calling all loops every second */
+uint32_t loop_5_minutes_in_millis  = 31; /* start loops with some offset to avoid calling all loops every second */
+uint32_t loop_30_minutes_in_millis = 37; /* start loops with some offset to avoid calling all loops every second */
 /* HTTP Update */
-bool fetch_update = false;       /* global variable used to decide whether an update shall be fetched from server or not */
+bool update_firmware = false;       /* global variable used to decide whether an update shall be fetched from server or not */
 /* OTA */
 typedef enum otaUpdate {
   TH_OTA_IDLE,
@@ -72,7 +74,7 @@ volatile int16_t lastEncoded = 0b11;                   /* initial state of the r
 volatile int16_t rotaryEncoderDirectionInts = rotInit; /* initialize rotary encoder with no direction */
 const uint32_t buttonDebounceInterval = 25;
 uint32_t onOffButtonSystemResetTime = 0;
-uint32_t onOffButtonSystemResetInterval = secondsToMilliseconds(5);
+uint32_t onOffButtonSystemResetInterval = seconds_to_milliseconds(5);
 
 /* thermostat */
 #define tempStep              5
@@ -117,12 +119,12 @@ Bounce            debounceDown = Bounce();
 DiffTime          MyLooptime;
 
 uint32_t display_enabled_temporary_reference_time = 0;
-#define  display_enabled_temporary_interval secondsToMilliseconds(10)
+#define  display_enabled_temporary_interval seconds_to_milliseconds(10)
 bool     display_enabled_temporary = false;
 bool     systemRestartRequest = false;
 bool     requestSaveToSpiffs = false;
 bool     requestSaveToSpiffsWithRestart = false;
-uint32_t wifiReconnectTimer = secondsToMilliseconds(30);
+uint32_t wifiReconnectTimer = seconds_to_milliseconds(30);
 #ifndef WIFI_RECONNECT_TIME
   #define WIFI_RECONNECT_TIME 30
 #endif
@@ -130,7 +132,7 @@ uint32_t wifiReconnectTimer = secondsToMilliseconds(30);
 #define  FS_MQTT_ID_FILE        String("/itsme")       // for migration only
 #define  FS_SENSOR_CALIB_FILE   String("/sensor")      // for migration only
 #define  FS_TARGET_TEMP_FILE    String("/targetTemp")  // for migration only
-#define  FS_WRITE_DEBOUNCE      secondsToMilliseconds(20) /* write target temperature to spiffs if it wasn't changed for 20 s (time in ms) */
+#define  FS_WRITE_DEBOUNCE      seconds_to_milliseconds(20) /* write target temperature to spiffs if it wasn't changed for 20 s (time in ms) */
 bool     FS_WRITTEN =           true;
 uint32_t FS_REFERENCE_TIME      = 0;
 
@@ -295,7 +297,7 @@ void DISPLAY_INIT(void) {
   myDisplay.display();
   // keep display on for some time after initialization
   display_enabled_temporary = true;
-  SetNextTimeInterval(&display_enabled_temporary_reference_time, secondsToMilliseconds(20));
+  SetNextTimeInterval(&display_enabled_temporary_reference_time, seconds_to_milliseconds(20));
 }
 
 void WIFI_CONNECT(void) {
@@ -380,7 +382,7 @@ void MQTT_CONNECT(void) {
   if (WiFi.status() == WL_CONNECTED) {
     if (!myMqttClient.connected()) {
       myMqttClient.disconnect();
-      myMqttClient.setOptions(30, true, secondsToMilliseconds(30));
+      myMqttClient.setOptions(30, true, seconds_to_milliseconds(30));
       myMqttClient.begin(myConfig.mqtt_host, myConfig.mqtt_port, myWiFiClient);
       myMqttClient.setWill((myMqttHelper.getTopicLastWill()).c_str(),   "offline", true, MQTT_QOS);     /* broker shall publish 'offline' on ungraceful disconnect >> Last Will */
       myMqttClient.onMessage(messageReceived);                                                        /* register callback */
@@ -411,43 +413,47 @@ void MQTT_CONNECT(void) {
 void loop() {
   MyLooptime.set_time_start();
   /* call every 50 ms */
-  if (TimeReached(loop50msMillis)) {
-    SetNextTimeInterval(&loop50msMillis, loop50ms);
+  if (TimeReached(loop_50_ms_in_millis)) {
+    SetNextTimeInterval(&loop_50_ms_in_millis, loop_time_50_ms);
     /* nothing yet */
   }
   /* call every 100 ms */
-  if (TimeReached(loop100msMillis)) {
-    SetNextTimeInterval(&loop100msMillis, loop100ms);
+  if (TimeReached(loop_100_ms_in_millis)) {
+    SetNextTimeInterval(&loop_100_ms_in_millis, loop_time_100_ms);
     HANDLE_SYSTEM_STATE();   /* handle connectivity and trigger reconnects */
     myThermostat.loop();     /* control relay for heating */
     DISPLAY_MAIN();          /* draw display each loop */
     MQTT_MAIN();             /* handle MQTT each loop */
   }
   /* call every 500 ms */
-  if (TimeReached(loop500msMillis)) {
-    SetNextTimeInterval(&loop500msMillis, loop500ms);
+  if (TimeReached(loop_500_ms_in_millis)) {
+    SetNextTimeInterval(&loop_500_ms_in_millis, loop_time_500_ms);
     /* nothing yet */
   }
   /* call every second */
-  if (TimeReached(loop1000msMillis)) {
-    SetNextTimeInterval(&loop1000msMillis, loop1000ms);
+  if (TimeReached(loop_1000_ms_in_millis)) {
+    SetNextTimeInterval(&loop_1000_ms_in_millis, loop_time_1000_ms);
     SENSOR_MAIN();          /* get sensor data */
     FS_MAIN();              /* check for new data and write FileSystem is necessary */
     HANDLE_HTTP_UPDATE();   /* pull update from server if it was requested via MQTT or a new version was detected */
   }
-  /* call every minute */
-  if (TimeReached(loop1minuteMillis)) {
-    SetNextTimeInterval(&loop1minuteMillis, loop1m);
+  /* call every 30 s */
+  if (TimeReached(loop_30_seconds_in_millis)) {
+    SetNextTimeInterval(&loop_30_seconds_in_millis, loop_time_30_seconds);
     NTP();                 /* calculate formatted time */
   }
+  /* call every minute */
+  if (TimeReached(loop_1_minute_in_millis)) {
+    SetNextTimeInterval(&loop_1_minute_in_millis, loop_time_1_minute);
+  }
   /* call every 5 minutes */
-  if (TimeReached(loop5minutesMillis)) {
-    SetNextTimeInterval(&loop5minutesMillis, loop5m);
+  if (TimeReached(loop_5_minutes_in_millis)) {
+    SetNextTimeInterval(&loop_5_minutes_in_millis, loop_time_5_minutes);
+    CHECK_FOR_UPDATE();    /* check for updates on update server */
   }
   /* call every 30 minutes */
-  if (TimeReached(loop30minutesMillis)) {
-    SetNextTimeInterval(&loop30minutesMillis, loop30m);
-    CHECK_FOR_UPDATE();    /* check for updates on update server */
+  if (TimeReached(loop_30_minutes_in_millis)) {
+    SetNextTimeInterval(&loop_30_minutes_in_millis, loop_time_30_minutes);
   }
   /* debounce buttons */
   debounceOnOff.update();
@@ -496,7 +502,7 @@ void loop() {
 void HANDLE_SYSTEM_STATE(void) {
   /* check WiFi connection every 30 seconds*/
   if (TimeReached(wifiReconnectTimer)) {
-    SetNextTimeInterval(&wifiReconnectTimer, (secondsToMilliseconds(WIFI_RECONNECT_TIME)));
+    SetNextTimeInterval(&wifiReconnectTimer, (seconds_to_milliseconds(WIFI_RECONNECT_TIME)));
     if (WiFi.status() != WL_CONNECTED) {
       #ifdef CFG_DEBUG
       Serial.println("Lost WiFi; Status: "+ String(WiFi.status()));
@@ -532,7 +538,7 @@ void HANDLE_SYSTEM_STATE(void) {
     Serial.println("Restarting in 3 seconds");
     #endif
     myMqttClient.disconnect();
-    delay(secondsToMilliseconds(3));
+    delay(seconds_to_milliseconds(3));
     ESP.restart();
   }
 }
@@ -544,25 +550,14 @@ void NTP(void) {
   const char* time_format = "%H:%M";
   strftime(time_buffer, sizeof(time_buffer), time_format, &time_info);
   #ifdef CFG_DEBUG_SNTP
-  Serial.print("year:");
-  Serial.print(time_info.tm_year + 1900);  // years since 1900
-  Serial.print("\tmonth:");
-  Serial.print(time_info.tm_mon + 1);      // January = 0 (!)
-  Serial.print("\tday:");
-  Serial.print(time_info.tm_mday);         // day of month
-  Serial.print("\thour:");
-  Serial.print(time_info.tm_hour);         // hours since midnight  0-23
-  Serial.print("\tmin:");
-  Serial.print(time_info.tm_min);          // minutes after the hour  0-59
-  Serial.print("\tsec:");
-  Serial.print(time_info.tm_sec);          // seconds after the minute  0-61*
-  Serial.print("\twday");
-  Serial.print(time_info.tm_wday);         // days since Sunday 0-6
-  if (time_info.tm_isdst == 1)             // Daylight Saving Time flag
-    Serial.print("\tDST");
-  else
-    Serial.print("\tstandard");
-  Serial.println();
+  Serial.printf("NTP - year:%d", time_info.tm_year + 1900);   // years since 1900
+  Serial.printf("  month:%d", time_info.tm_mon + 1);      // January = 0 (!)
+  Serial.printf("  day:%d", time_info.tm_mday);         // day of month
+  Serial.printf("  hour:%d", time_info.tm_hour);         // hours since midnight  0-23
+  Serial.printf("  min:%d", time_info.tm_min);          // minutes after the hour  0-59
+  Serial.printf("  sec:%d", time_info.tm_sec);          // seconds after the minute  0-61*
+  Serial.printf("  wday:%d", time_info.tm_wday);         // days since Sunday 0-6
+  Serial.printf("  DST:%d\n", time_info.tm_isdst);  // Daylight Saving Time flag
   #endif  /* CFG_DEBUG_SNTP */
 }
 
@@ -574,6 +569,21 @@ void SENSOR_INIT() {
       #endif
     } else {
       myBME280.setSettings(settings);
+      #ifdef CFG_DEBUG
+      // ChipModel_UNKNOWN = 0
+      // ChipModel_BMP280 = 0x58
+      // ChipModel_BME280 = 0x60
+      switch (myBME280.chipModel()) {
+      case 0x60:
+        Serial.println("Sensor Chip Model: BME280");
+        break;
+      case 0x58:
+        Serial.println("Sensor Chip Model: BMP280");
+        break;
+      default:
+        Serial.println("Sensor Chip Model: unknown");
+      }
+      #endif
     }
   } else if (myConfig.sensor_type == cDHT22) {
       myDHT22.setup(DHT_PIN, DHTesp::DHT22); /* init DHT sensor */
@@ -588,7 +598,7 @@ void SENSOR_INIT() {
 void SENSOR_MAIN() {
   /* schedule routine for sensor read */
   if (TimeReached(readSensorScheduled)) {
-    SetNextTimeInterval(&readSensorScheduled, (secondsToMilliseconds(myConfig.sensor_update_interval)));
+    SetNextTimeInterval(&readSensorScheduled, (seconds_to_milliseconds(myConfig.sensor_update_interval)));
 
     float sensTemp(NAN), sensHumid(NAN);
 
@@ -673,7 +683,7 @@ void DISPLAY_MAIN(void) {
       case TH_OTA_IDLE:
         break;
       }
-    } else if (fetch_update == true) { /* HTTP Update */
+    } else if (update_firmware == true) { /* HTTP Update */
       myDisplay.setFont(Roboto_Condensed_16);
       myDisplay.setTextAlignment(TEXT_ALIGN_CENTER);
       myDisplay.drawString(64, 22, "Update");
@@ -743,7 +753,7 @@ void MQTT_MAIN(void) {
       myMqttHelper.setTriggerDiscovery(false);
     }
     if ( TimeReached(mqttPubCycleTime) || myThermostat.getNewData() ) {
-        SetNextTimeInterval(&mqttPubCycleTime, minutesToMilliseconds(myConfig.mqtt_publish_cycle));
+        SetNextTimeInterval(&mqttPubCycleTime, minutes_to_milliseconds(myConfig.mqtt_publish_cycle));
         mqttPubState();
         myThermostat.resetNewData();
     }
@@ -751,41 +761,52 @@ void MQTT_MAIN(void) {
 }
 
 void CHECK_FOR_UPDATE(void) {
-  WiFiClient client;
+  WiFiClient wifiClient;
   HTTPClient httpClient;
   String binary_version_address = String(myConfig.update_server_address) + String("/version");
   myConfig.available_firmware_version = "none";
-  httpClient.begin(client, binary_version_address);
+  httpClient.begin(wifiClient, binary_version_address);
   int httpCode = httpClient.GET();
   if (httpCode == 200) {
     myConfig.available_firmware_version = httpClient.getString();
 
     #ifdef CFG_DEBUG
-    Serial.print("Current firmware version: ");
+    Serial.println("Check For Update");
+    Serial.print("  Current firmware version: ");
     Serial.println(VERSION);
-    Serial.print("Available firmware version: ");
+    Serial.print("  Available firmware version: ");
     Serial.println(myConfig.available_firmware_version);
     #endif /* CFG_DEBUG */
+  } else {
+    #ifdef CFG_DEBUG
+    Serial.println("Check For Update");
+    Serial.print("  HTTP Code: ");
+    Serial.println(httpClient.errorToString(httpCode));
+    #endif  // CFG_DEBUG
   }
+
   if ( (myConfig.available_firmware_version != "none") \
     && (myConfig.available_firmware_version != "") \
     && (myConfig.available_firmware_version != VERSION) ) {
       if (myConfig.auto_update == true) {
-        fetch_update = true;
+        update_firmware = true;
       }
   }
 }
 
 void HANDLE_HTTP_UPDATE(void) {
-  if (fetch_update == true) {
+  if (update_firmware == true) {
     DISPLAY_MAIN();
-    fetch_update = false;
-    #ifdef CFG_DEBUG
-    Serial.println("Remote update started");
-    #endif
+    CHECK_FOR_UPDATE();
+    update_firmware = false;
     WiFiClient client;
     String binary_address = String(myConfig.update_server_address) + String("/firmware.bin");
     t_httpUpdate_return ret = myHttpUpdate.update(client, binary_address, FW);
+
+    #ifdef CFG_DEBUG
+    Serial.println("Remote update started");
+    Serial.println("Firmware Address: " + binary_address);
+    #endif
 
     switch (ret) {
     case HTTP_UPDATE_FAILED:
@@ -974,6 +995,7 @@ void mqttPubState(void) {
 String buildHtml(void) {
   float rssiInPercent = WiFi.RSSI();
   rssiInPercent = isnan(rssiInPercent) ? -100.0 : min(max(2 * (rssiInPercent + 100.0), 0.0), 100.0);
+  // char html[8192];
 
   String webpage = "<!DOCTYPE html> <html>\n";
   /* HEAD */
@@ -1056,7 +1078,7 @@ String buildHtml(void) {
   /* COMMANDS TABLE */
   webpage +="<table style='font-size: 12px'>";
   webpageTableAppend4Cols(String("<b>Key</b>"),               String("<b>Value</b>"),                        String("<b>Current Value</b>"),             String("<b>Description</b>"));
-  webpageTableAppend4Cols(String("discover"),                 String("0 | 1"),                               String("void"),                             String("MQTT OnDemand discovery_enabled: 1 = discover; 0 = remove"));
+  webpageTableAppend4Cols(String("discover"),                 String("0 | 1"),                               String("none"),                             String("MQTT on demand device discovery: 1 = discover; 0 = remove"));
   webpageTableAppend4Cols(String("discovery_enabled"),        String("0 | 1"),                               String(myConfig.discovery_enabled),         String("MQTT Autodiscovery: 1 = enabled; 0 = disabled"));
   webpageTableAppend4Cols(String("name"),                     String("string"),                              String(myConfig.name),                      String("Define a name for this device"));
   webpageTableAppend4Cols(String("mqtt_server_address"),      String("string"),                              String(myConfig.mqtt_host),                 String("Address of the MQTT server"));
@@ -1066,7 +1088,7 @@ String buildHtml(void) {
   webpageTableAppend4Cols(String("mqtt_pub_cycle"),           String("Range: 1 .. 255, LSB: 1 min"),         String(myConfig.mqtt_publish_cycle),        String("Publish cycle for MQTT messages in minutes"));
   webpageTableAppend4Cols(String("update_server_address"),    String("string"),                              String(myConfig.update_server_address),     String("Address of the update server"));
   webpageTableAppend4Cols(String("auto_update"),              String("0 | 1"),                               String(myConfig.auto_update),               String("Automatically apply available updates: 1 = Auto Updates enabled; 0 = Auto Updates disabled"));
-  webpageTableAppend4Cols(String("fetch_update"),             String("0 | 1"),                               String(fetch_update),                       String("Trigger download and install binary from update server: 1 = fetch; 0 = do nothing"));
+  webpageTableAppend4Cols(String("update_firmware"),          String("0 | 1"),                               String("none"),                             String("On demand firmware update: 1 = update"));
   webpageTableAppend4Cols(String("calibration_offset"),       String("Range: -50 .. +50, LSB: 0.1 &deg;C"),  String(myConfig.calibration_offset),        String("Offset calibration for temperature sensor."));
   webpageTableAppend4Cols(String("calibration_factor"),       String("Range: +50 .. +200, LSB: 1 %"),        String(myConfig.calibration_factor),        String("Linearity calibration for temperature sensor."));
   webpageTableAppend4Cols(String("display_enabled"),          String("0 | 1"),                               String(myConfig.display_enabled),           String("Display always on or only on user interaction"));
@@ -1083,6 +1105,9 @@ String buildHtml(void) {
   webpage +="</body>\n";
   webpage +="</html>\n";
 
+  #ifdef CFG_DEBUG
+  Serial.printf("Length of HTML Code in characters: %i", webpage.length());
+  #endif /* CFG_DEBUG */
   return webpage;
 }
 
@@ -1196,9 +1221,9 @@ void handleWebServerClient(void) {
               Serial.println("Configuration unchanged, do nothing");
               #endif
             }
-          } else if (key == "fetch_update") {
+          } else if (key == "update_firmware") {
             if ((value.toInt() & 1) == true) {
-              fetch_update = true;
+              update_firmware = true;
               #ifdef CFG_DEBUG
               Serial.println("HTTP Update triggered via webpage");
               #endif
@@ -1345,7 +1370,7 @@ void messageReceived(String &topic, String &payload) {  // NOLINT
       #ifdef CFG_DEBUG
       Serial.println("Firmware updated triggered via MQTT");
       #endif
-      fetch_update = true;
+      update_firmware = true;
       myMqttHelper.setTriggerRemoveDiscovered(false);
     }
   } else if (topic == myMqttHelper.getTopicTargetTempCmd()) { /* check incoming target temperature, don't set same target temperature as new*/
