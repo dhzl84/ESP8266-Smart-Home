@@ -61,6 +61,7 @@ class mqttHelper {
   String buildHassDiscoverySwitch(String name, Switch_t switches);
   String getTopicData(void);
   String getTopicOutsideTemperature(void);
+  String mqttLastErrorToString(int8_t last_error);
 
  private:
   bool   mqttTriggerDiscovery_;

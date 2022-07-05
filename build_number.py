@@ -4,7 +4,7 @@ import datetime
 import calendar
 
 YEAR = '2022'
-MONTH = '06'
+MONTH = '07'
 PATCH = '0'
 
 VERSION = ".".join([YEAR,MONTH,PATCH])

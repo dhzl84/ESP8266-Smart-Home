@@ -1020,6 +1020,7 @@ String buildHtml(void) {
   webpageTableAppend2Cols(String("WiFi Connects"),        String(wifi_connect_counter));
   webpageTableAppend2Cols(String("MQTT Status"),          String((myMqttClient.connected()) == true ? "connected" : "disconnected"));
   webpageTableAppend2Cols(String("MQTT Connects"),        String(mqtt_connect_counter));
+  webpageTableAppend2Cols(String("MQTT Last Error"),      myMqttHelper.mqttLastErrorToString((int8_t)myMqttClient.lastError()));
   webpageTableAppend2Cols(String("Local Time"),           String(time_buffer));
   webpageTableAppend2Cols(String("Looptime mean [&micro;s]"),   String(MyLooptime.get_time_duration_mean()));
   webpageTableAppend2Cols(String("Looptime min [&micro;s]"),    String(MyLooptime.get_time_duration_min()));

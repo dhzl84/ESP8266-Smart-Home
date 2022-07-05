@@ -384,3 +384,38 @@ String mqttHelper::getTopicHassDiscoveryButton(Button_t buttons) {
   }
   return topic;
 }
+
+String mqttHelper::mqttLastErrorToString(int8_t last_error) {
+  String error_string = "unknown";
+  switch (last_error) {
+    case 0:
+      error_string = "LWMQTT_SUCCESS";
+    case -1:
+      error_string = "LWMQTT_BUFFER_TOO_SHORT";
+    case -2:
+      error_string = "LWMQTT_VARNUM_OVERFLOW";
+    case -3:
+      error_string = "LWMQTT_NETWORK_FAILED_CONNECT";
+    case -4:
+      error_string = "LWMQTT_NETWORK_TIMEOUT";
+    case -5:
+      error_string = "LWMQTT_NETWORK_FAILED_READ";
+    case -6:
+      error_string = "LWMQTT_NETWORK_FAILED_WRITE";
+    case -7:
+      error_string = "LWMQTT_REMAINING_LENGTH_OVERFLOW";
+    case -8:
+      error_string = "LWMQTT_REMAINING_LENGTH_MISMATCH";
+    case -9:
+      error_string = "LWMQTT_MISSING_OR_WRONG_PACKET";
+    case -10:
+      error_string = "LWMQTT_CONNECTION_DENIED";
+    case -11:
+      error_string = "LWMQTT_FAILED_SUBSCRIPTION";
+    case -12:
+      error_string = "LWMQTT_SUBACK_ARRAY_OVERFLOW";
+    case -13:
+      error_string = "LWMQTT_PONG_TIMEOUT";
+  }
+  return error_string;
+}
