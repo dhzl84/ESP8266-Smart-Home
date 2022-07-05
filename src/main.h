@@ -14,8 +14,8 @@
   #define DEVICE_BINARY               "http://<domain or ip>/<name>.bin"
 */
 
-#define secondsToMilliseconds(s)  static_cast<uint32_t>(s*1000u)
-#define minutesToMilliseconds(m)  static_cast<uint32_t>(m*60000u)
+#define seconds_to_milliseconds(s)  static_cast<uint32_t>(s*1000u)
+#define minutes_to_milliseconds(m)  static_cast<uint32_t>(m*60000u)
 #define millisecondsToSeconds(ms)  static_cast<uint32_t>(ms/1000u)
 
 /* input_method */

@@ -35,6 +35,7 @@ courtesy of Brian McNoldy at http://andrew.rsmas.miami.edu.
 /****************************************************************/
 BME280::BME280(const Settings &settings)
     : m_settings(settings),
+      m_chip_model(ChipModel_UNKNOWN),
       m_initialized(false) {
   for (uint8_t i = 0; i < 32; i++) {
     m_dig[i] = (uint8_t)0;

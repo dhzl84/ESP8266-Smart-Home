@@ -9,3 +9,4 @@ lib/readme.txt
 backup
 /.pio/
 /.cache/
+/version
