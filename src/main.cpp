@@ -132,7 +132,7 @@ uint32_t wifiReconnectTimer = seconds_to_milliseconds(30);
 #define  FS_MQTT_ID_FILE        String("/itsme")       // for migration only
 #define  FS_SENSOR_CALIB_FILE   String("/sensor")      // for migration only
 #define  FS_TARGET_TEMP_FILE    String("/targetTemp")  // for migration only
-#define  FS_WRITE_DEBOUNCE      seconds_to_milliseconds(20) /* write target temperature to spiffs if it wasn't changed for 20 s (time in ms) */
+#define  FS_WRITE_DEBOUNCE      minutes_to_milliseconds(30) /* write target temperature to spiffs if it wasn't changed for 20 s (time in ms) */
 bool     FS_WRITTEN =           true;
 uint32_t FS_REFERENCE_TIME      = 0;
 

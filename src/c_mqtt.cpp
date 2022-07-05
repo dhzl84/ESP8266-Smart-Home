@@ -386,7 +386,7 @@ String mqttHelper::getTopicHassDiscoveryButton(Button_t buttons) {
 }
 
 String mqttHelper::mqttLastErrorToString(int8_t last_error) {
-  String error_string = "unknown";
+  String error_string;
   switch (last_error) {
     case 0:
       error_string = "LWMQTT_SUCCESS";
@@ -416,6 +416,8 @@ String mqttHelper::mqttLastErrorToString(int8_t last_error) {
       error_string = "LWMQTT_SUBACK_ARRAY_OVERFLOW";
     case -13:
       error_string = "LWMQTT_PONG_TIMEOUT";
+    default:
+      error_string = "UNKNOWN";
   }
   return error_string;
 }
