@@ -215,7 +215,7 @@ String mqttHelper::buildHassDiscoverySwitch(String name, Switch_t switches) {
       "}";
     }
     break;
-    case kUpdate_button:
+    case kUpdate_switch:
     {
       JSON = \
       "{\n" \
@@ -261,6 +261,7 @@ String mqttHelper::buildHassDiscoveryButton(String name, Button_t buttons) {
       "  \"qos\":\"1\",\n" \
       "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
       "  \"uniq_id\":\"" + mqttNodeId_ + "_swRestart\",\n" \
+      "  \"ic\":\"mdi:restart\",\n" \
       "  \"dev\" : { \n" \
       "    \"ids\":[\"" + mqttNodeId_ + "\"]\n" \
       "  }\n" \
@@ -280,6 +281,7 @@ String mqttHelper::buildHassDiscoveryButton(String name, Button_t buttons) {
       "  \"qos\":\"1\",\n" \
       "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
       "  \"uniq_id\":\"" + mqttNodeId_ + "_swUpdate\",\n" \
+      "  \"ic\":\"mdi:cellphone-arrow-down\",\n" \
       "  \"dev\" : { \n" \
       "    \"ids\":[\"" + mqttNodeId_ + "\"]\n" \
       "  }\n" \
