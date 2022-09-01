@@ -1,0 +1,56 @@
+#{{NAME}}
+
+  - platform: history_stats
+    name: Heizungsansteuerung {{NAME}} heute
+    entity_id: binary_sensor.state_{{ID}}
+    state: 'on'
+    type: ratio
+    start: '{{ now().replace(hour=0).replace(minute=0).replace(second=0) }}'
+    end: '{{ now() }}'
+    # end: '{{ now().replace(hour=0).replace(minute=0).replace(second=0) }}'
+    # duration:
+    #   days: 1
+
+  - platform: history_stats
+    name: Heizungsansteuerung {{NAME}} letzte 7 Tage
+    entity_id: binary_sensor.state_{{ID}}
+    state: 'on'
+    type: ratio
+    end: '{{ now().replace(hour=0).replace(minute=0).replace(second=0) }}'
+    duration:
+      days: 7
+
+  - platform: history_stats
+    name: Heizungsansteuerung {{NAME}} letzte 30 Tage
+    entity_id: binary_sensor.state_{{ID}}
+    state: 'on'
+    type: ratio
+    end: '{{ now().replace(hour=0).replace(minute=0).replace(second=0) }}'
+    duration:
+      days: 30
+
+  - platform: history_stats
+    name: Heizzyklen {{NAME}} heute
+    entity_id: binary_sensor.state_{{ID}}
+    state: 'on'
+    type: count
+    start: '{{ now().replace(hour=0).replace(minute=0).replace(second=0) }}'
+    end: '{{ now() }}'
+
+  - platform: history_stats
+    name: Heizzyklen {{NAME}} letzte 7 Tage
+    entity_id: binary_sensor.state_{{ID}}
+    state: 'on'
+    type: count
+    end: '{{ now().replace(hour=0).replace(minute=0).replace(second=0) }}'
+    duration:
+      days: 7
+
+  - platform: history_stats
+    name: Heizzyklen {{NAME}} letzte 30 Tage
+    entity_id: binary_sensor.state_{{ID}}
+    state: 'on'
+    type: count
+    end: '{{ now().replace(hour=0).replace(minute=0).replace(second=0) }}'
+    duration:
+      days: 30

@@ -87,7 +87,7 @@ String mqttHelper::buildHassDiscoveryClimate(String name, String firmware, Strin
   "  \"act_tpl\":\"{{value_json.state}}\",\n" \
   "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
   "  \"uniq_id\":\"" + mqttNodeId_ + "_climate\",\n" \
-  "  \"ic\":\"mdi:thermostat\",\n" \
+  "  \"ic\":\"mdi:thermostat-box\",\n" \
   "  \"dev\" : { \n" \
   "    \"ids\":[\"" + mqttNodeId_ + "\"],\n" \
   "    \"mdl\":\"" + model + " Thermostat\",\n" \
@@ -121,7 +121,8 @@ String mqttHelper::buildHassDiscoveryBinarySensor(String name, BinarySensor_t bi
       "  \"pl_not_avail\":\"offline\",\n" \
       "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
       "  \"uniq_id\":\"" + mqttNodeId_ + "_state\",\n" \
-      "  \"device\" : { \n" \
+      "  \"ic\":\"mdi:radiator\",\n" \
+      "  \"dev\" : { \n" \
       "    \"identifiers\":[\"" + mqttNodeId_ + "\"]\n" \
       "  }\n" \
       "}";
@@ -152,6 +153,7 @@ String mqttHelper::buildHassDiscoverySensor(String name, Sensor_t sensor) {
       "  \"pl_not_avail\":\"offline\",\n" \
       "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
       "  \"uniq_id\":\"" + mqttNodeId_ + "_sensTemp\",\n" \
+      "  \"ic\":\"mdi:thermometer\",\n" \
       "  \"dev\" : { \n" \
       "    \"ids\":[\"" + mqttNodeId_ + "\"]\n" \
       "  }\n" \
@@ -173,6 +175,7 @@ String mqttHelper::buildHassDiscoverySensor(String name, Sensor_t sensor) {
       "  \"pl_not_avail\":\"offline\",\n" \
       "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
       "  \"uniq_id\":\"" + mqttNodeId_ + "_sensHum\",\n" \
+      "  \"ic\":\"mdi:water-percent\",\n" \
       "  \"dev\" : { \n" \
       "    \"ids\":[\"" + mqttNodeId_ + "\"]\n" \
       "  }\n" \
@@ -205,6 +208,7 @@ String mqttHelper::buildHassDiscoverySwitch(String name, Switch_t switches) {
       "  \"qos\":\"1\",\n" \
       "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
       "  \"uniq_id\":\"" + mqttNodeId_ + "_swRestart\",\n" \
+      "  \"ic\":\"mdi:restart\",\n" \
       "  \"dev\" : { \n" \
       "    \"ids\":[\"" + mqttNodeId_ + "\"]\n" \
       "  }\n" \
@@ -226,6 +230,7 @@ String mqttHelper::buildHassDiscoverySwitch(String name, Switch_t switches) {
       "  \"qos\":\"1\",\n" \
       "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
       "  \"uniq_id\":\"" + mqttNodeId_ + "_swUpdate\",\n" \
+      "  \"ic\":\"mdi:cellphone-arrow-down\",\n" \
       "  \"dev\" : { \n" \
       "    \"ids\":[\"" + mqttNodeId_ + "\"]\n" \
       "  }\n" \
