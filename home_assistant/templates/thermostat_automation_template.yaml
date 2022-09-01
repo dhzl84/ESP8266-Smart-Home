@@ -1,0 +1,28 @@
+#{{NAME}}
+
+# Trigger notification if heating is on for more than 12h
+  - alias: 'Heizung ungewöhnlich lange an {{NAME}}'
+    initial_state: 'on'
+    trigger:
+      platform: template
+      value_template: "{{ is_state_attr('climate.{{ID}}', 'state', 'on') }}"
+      for:
+        hours: 12
+    action:
+      service: notify.mobile_app_dhzl_p30
+      data:
+        message: 'Heizung im {{NAME}} seit 12 Stunden an'
+
+# Trigger notification if thermostat is offline for more than 5 minute
+  - alias: 'thermostat offline {{NAME}}'
+    initial_state: 'on'
+    trigger:
+      platform: state
+      entity_id: climate.{{ID}}
+      to: 'unavailable'
+      for:
+        minutes: 10
+    action:
+      service: notify.mobile_app_dhzl_p30
+      data:
+        message: 'Thermostat im {{NAME}} offline'

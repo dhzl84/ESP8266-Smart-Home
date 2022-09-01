@@ -132,7 +132,7 @@ uint32_t wifiReconnectTimer = seconds_to_milliseconds(30);
 #define  FS_MQTT_ID_FILE        String("/itsme")       // for migration only
 #define  FS_SENSOR_CALIB_FILE   String("/sensor")      // for migration only
 #define  FS_TARGET_TEMP_FILE    String("/targetTemp")  // for migration only
-#define  FS_WRITE_DEBOUNCE      seconds_to_milliseconds(20) /* write target temperature to spiffs if it wasn't changed for 20 s (time in ms) */
+#define  FS_WRITE_DEBOUNCE      minutes_to_milliseconds(30) /* write target temperature to spiffs if it wasn't changed for 20 s (time in ms) */
 bool     FS_WRITTEN =           true;
 uint32_t FS_REFERENCE_TIME      = 0;
 
@@ -1042,6 +1042,7 @@ String buildHtml(void) {
   webpageTableAppend2Cols(String("WiFi Connects"),        String(wifi_connect_counter));
   webpageTableAppend2Cols(String("MQTT Status"),          String((myMqttClient.connected()) == true ? "connected" : "disconnected"));
   webpageTableAppend2Cols(String("MQTT Connects"),        String(mqtt_connect_counter));
+  webpageTableAppend2Cols(String("MQTT Last Error"),      myMqttHelper.mqttLastErrorToString((int8_t)myMqttClient.lastError()));
   webpageTableAppend2Cols(String("Local Time"),           String(time_buffer));
   webpageTableAppend2Cols(String("Looptime mean [&micro;s]"),   String(MyLooptime.get_time_duration_mean()));
   webpageTableAppend2Cols(String("Looptime min [&micro;s]"),    String(MyLooptime.get_time_duration_min()));

@@ -87,7 +87,7 @@ String mqttHelper::buildHassDiscoveryClimate(String name, String firmware, Strin
   "  \"act_tpl\":\"{{value_json.state}}\",\n" \
   "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
   "  \"uniq_id\":\"" + mqttNodeId_ + "_climate\",\n" \
-  "  \"ic\":\"mdi:thermostat\",\n" \
+  "  \"ic\":\"mdi:thermostat-box\",\n" \
   "  \"dev\" : { \n" \
   "    \"ids\":[\"" + mqttNodeId_ + "\"],\n" \
   "    \"mdl\":\"" + model + " Thermostat\",\n" \
@@ -121,7 +121,8 @@ String mqttHelper::buildHassDiscoveryBinarySensor(String name, BinarySensor_t bi
       "  \"pl_not_avail\":\"offline\",\n" \
       "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
       "  \"uniq_id\":\"" + mqttNodeId_ + "_state\",\n" \
-      "  \"device\" : { \n" \
+      "  \"ic\":\"mdi:radiator\",\n" \
+      "  \"dev\" : { \n" \
       "    \"identifiers\":[\"" + mqttNodeId_ + "\"]\n" \
       "  }\n" \
       "}";
@@ -152,6 +153,7 @@ String mqttHelper::buildHassDiscoverySensor(String name, Sensor_t sensor) {
       "  \"pl_not_avail\":\"offline\",\n" \
       "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
       "  \"uniq_id\":\"" + mqttNodeId_ + "_sensTemp\",\n" \
+      "  \"ic\":\"mdi:thermometer\",\n" \
       "  \"dev\" : { \n" \
       "    \"ids\":[\"" + mqttNodeId_ + "\"]\n" \
       "  }\n" \
@@ -173,6 +175,7 @@ String mqttHelper::buildHassDiscoverySensor(String name, Sensor_t sensor) {
       "  \"pl_not_avail\":\"offline\",\n" \
       "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
       "  \"uniq_id\":\"" + mqttNodeId_ + "_sensHum\",\n" \
+      "  \"ic\":\"mdi:water-percent\",\n" \
       "  \"dev\" : { \n" \
       "    \"ids\":[\"" + mqttNodeId_ + "\"]\n" \
       "  }\n" \
@@ -205,6 +208,7 @@ String mqttHelper::buildHassDiscoverySwitch(String name, Switch_t switches) {
       "  \"qos\":\"1\",\n" \
       "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
       "  \"uniq_id\":\"" + mqttNodeId_ + "_swRestart\",\n" \
+      "  \"ic\":\"mdi:restart\",\n" \
       "  \"dev\" : { \n" \
       "    \"ids\":[\"" + mqttNodeId_ + "\"]\n" \
       "  }\n" \
@@ -226,6 +230,7 @@ String mqttHelper::buildHassDiscoverySwitch(String name, Switch_t switches) {
       "  \"qos\":\"1\",\n" \
       "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
       "  \"uniq_id\":\"" + mqttNodeId_ + "_swUpdate\",\n" \
+      "  \"ic\":\"mdi:cellphone-arrow-down\",\n" \
       "  \"dev\" : { \n" \
       "    \"ids\":[\"" + mqttNodeId_ + "\"]\n" \
       "  }\n" \
@@ -383,4 +388,41 @@ String mqttHelper::getTopicHassDiscoveryButton(Button_t buttons) {
     break;
   }
   return topic;
+}
+
+String mqttHelper::mqttLastErrorToString(int8_t last_error) {
+  String error_string;
+  switch (last_error) {
+    case 0:
+      error_string = "LWMQTT_SUCCESS";
+    case -1:
+      error_string = "LWMQTT_BUFFER_TOO_SHORT";
+    case -2:
+      error_string = "LWMQTT_VARNUM_OVERFLOW";
+    case -3:
+      error_string = "LWMQTT_NETWORK_FAILED_CONNECT";
+    case -4:
+      error_string = "LWMQTT_NETWORK_TIMEOUT";
+    case -5:
+      error_string = "LWMQTT_NETWORK_FAILED_READ";
+    case -6:
+      error_string = "LWMQTT_NETWORK_FAILED_WRITE";
+    case -7:
+      error_string = "LWMQTT_REMAINING_LENGTH_OVERFLOW";
+    case -8:
+      error_string = "LWMQTT_REMAINING_LENGTH_MISMATCH";
+    case -9:
+      error_string = "LWMQTT_MISSING_OR_WRONG_PACKET";
+    case -10:
+      error_string = "LWMQTT_CONNECTION_DENIED";
+    case -11:
+      error_string = "LWMQTT_FAILED_SUBSCRIPTION";
+    case -12:
+      error_string = "LWMQTT_SUBACK_ARRAY_OVERFLOW";
+    case -13:
+      error_string = "LWMQTT_PONG_TIMEOUT";
+    default:
+      error_string = "UNKNOWN";
+  }
+  return error_string;
 }
