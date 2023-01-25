@@ -129,9 +129,6 @@ uint32_t wifiReconnectTimer = seconds_to_milliseconds(30);
   #define WIFI_RECONNECT_TIME 30
 #endif
 
-#define  FS_MQTT_ID_FILE        String("/itsme")       // for migration only
-#define  FS_SENSOR_CALIB_FILE   String("/sensor")      // for migration only
-#define  FS_TARGET_TEMP_FILE    String("/targetTemp")  // for migration only
 #define  FS_WRITE_DEBOUNCE      minutes_to_milliseconds(30) /* write target temperature to spiffs if it wasn't changed for 20 s (time in ms) */
 bool     FS_WRITTEN =           true;
 uint32_t FS_REFERENCE_TIME      = 0;
@@ -216,7 +213,7 @@ void setup() {
 void FS_INIT(void) {  // initializes the FileSystem when first used and loads the configuration from FileSystem to RAM
   FileSystem.begin();
 
-  if (!FileSystem.exists("/formatted")) {
+  if (!FileSystem.exists(F("/formatted"))) {
     /* This code is only run once to format the FileSystem before first usage */
     #ifdef CFG_DEBUG
     Serial.println("Formatting FileSystem, this takes some time");
@@ -234,7 +231,7 @@ void FS_INIT(void) {  // initializes the FileSystem when first used and loads th
     } else {
       f.close();
       delay(5000);
-      if (!FileSystem.exists("/formatted")) {
+      if (!FileSystem.exists(F("/formatted"))) {
         #ifdef CFG_DEBUG
         Serial.println("That didn't work!");
         #endif
