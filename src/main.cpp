@@ -766,7 +766,6 @@ void CHECK_FOR_UPDATE(void) {
   int httpCode = httpClient.GET();
   if (httpCode == 200) {
     myConfig.available_firmware_version = httpClient.getString();
-
     #ifdef CFG_DEBUG
     Serial.println("Check For Update");
     Serial.print("  Current firmware version: ");
