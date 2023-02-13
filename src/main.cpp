@@ -379,7 +379,7 @@ void MQTT_CONNECT(void) {
   if (WiFi.status() == WL_CONNECTED) {
     if (!myMqttClient.connected()) {
       myMqttClient.disconnect();
-      myMqttClient.setOptions(30, true, seconds_to_milliseconds(30));
+      myMqttClient.setOptions(30, true, seconds_to_milliseconds(60));
       myMqttClient.begin(myConfig.mqtt_host, myConfig.mqtt_port, myWiFiClient);
       myMqttClient.setWill((myMqttHelper.getTopicLastWill()).c_str(),   "offline", true, MQTT_QOS);     /* broker shall publish 'offline' on ungraceful disconnect >> Last Will */
       myMqttClient.onMessage(messageReceived);                                                        /* register callback */
