@@ -53,6 +53,8 @@ struct Configuration {
   bool          display_enabled;
   bool          auto_update;
   String        available_firmware_version;
+  String        binary_address;
+  String        binary_version_address;
 };
 
 /*===================================================================================================================*/

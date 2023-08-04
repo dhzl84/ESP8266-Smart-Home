@@ -150,6 +150,8 @@ void setup() {
   #endif
   Wire.begin(SDA_PIN, SCL_PIN);   /* needed for I²C communication with display and BME280 */
   FS_INIT();                  /* read stuff from FileSystem */
+  myConfig.binary_version_address = String(myConfig.update_server_address).concat("/version");
+  myConfig.binary_address         = String(myConfig.update_server_address).concat("/firmware.bin");
   GPIO_CONFIG();                  /* configure GPIOs */
 
   myThermostat.setup(RELAY_PIN,
@@ -760,9 +762,7 @@ void MQTT_MAIN(void) {
 void CHECK_FOR_UPDATE(void) {
   WiFiClient wifiClient;
   HTTPClient httpClient;
-  String binary_version_address = String(myConfig.update_server_address) + String("/version");
-  myConfig.available_firmware_version = "none";
-  httpClient.begin(wifiClient, binary_version_address);
+  httpClient.begin(wifiClient, myConfig.binary_version_address);
   int httpCode = httpClient.GET();
   if (httpCode == 200) {
     myConfig.available_firmware_version = httpClient.getString();
@@ -774,6 +774,7 @@ void CHECK_FOR_UPDATE(void) {
     Serial.println(myConfig.available_firmware_version);
     #endif /* CFG_DEBUG */
   } else {
+    myConfig.available_firmware_version = "none";
     #ifdef CFG_DEBUG
     Serial.println("Check For Update");
     Serial.print("  HTTP Code: ");
@@ -796,12 +797,11 @@ void HANDLE_HTTP_UPDATE(void) {
     CHECK_FOR_UPDATE();
     update_firmware = false;
     WiFiClient client;
-    String binary_address = String(myConfig.update_server_address) + String("/firmware.bin");
-    t_httpUpdate_return ret = myHttpUpdate.update(client, binary_address, FW);
+    t_httpUpdate_return ret = myHttpUpdate.update(client, myConfig.binary_address, FW);
 
     #ifdef CFG_DEBUG
     Serial.println("Remote update started");
-    Serial.println("Firmware Address: " + binary_address);
+    Serial.println("Firmware Address: " + myConfig.binary_address);
     #endif
 
     switch (ret) {
@@ -959,12 +959,16 @@ void homeAssistantRemoveDiscoveredObsolete(void) {
 
 /* publish state topic in JSON format */
 void mqttPubState(void) {
-  /* send "none" in case of sensor error */
+  /* send "none" in case of sensor error and if filtered values are still on init values */
   String temperature = "None";
   String humidity = "None";
   if (myThermostat.getSensorError() == false) {
-    temperature = String(intToFloat(myThermostat.getFilteredTemperature()), 1);
-    humidity = String(intToFloat(myThermostat.getFilteredHumidity()), 1);
+    if (myThermostat.getFilteredTemperature() != THERMOSTAT_SENSOR_INIT_VALUE) {
+      temperature = String(intToFloat(myThermostat.getFilteredTemperature()), 1);
+    }
+    if (myThermostat.getFilteredHumidity() != THERMOSTAT_SENSOR_INIT_VALUE) {
+      humidity = String(intToFloat(myThermostat.getFilteredHumidity()), 1);
+    }
   }
 
   String payload = myMqttHelper.buildStateJSON( /* build JSON payload */\

@@ -24,10 +24,10 @@ Thermostat::Thermostat()
     thermostat_hysteresis_low_(2), \
     sensor_error_(false), \
     new_calib_(0), \
-    current_temperature_(0), \
-    current_humidity_(0), \
-    filtered_temperature_(0), \
-    filtered_humidity_(0), \
+    current_temperature_(THERMOSTAT_SENSOR_INIT_VALUE), \
+    current_humidity_(THERMOSTAT_SENSOR_INIT_VALUE), \
+    filtered_temperature_(THERMOSTAT_SENSOR_INIT_VALUE), \
+    filtered_humidity_(THERMOSTAT_SENSOR_INIT_VALUE), \
     start_averaging_(2), \
     stop_averaging_(CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE - 2), \
     filter_size_(stop_averaging_ - start_averaging_), \
@@ -42,11 +42,11 @@ Thermostat::Thermostat()
     temperature_value_sample_id_(0), \
     humidity_value_sample_id_(0) {
   for (int16_t i=0; i < CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE; i++) {
-    temperature_value_queue_[i] = (int16_t)0;
+    temperature_value_queue_[i] = THERMOSTAT_SENSOR_INIT_VALUE;
   }
 
   for (int16_t i=0; i < CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE; i++) {
-    humidity_value_queue_[i] = (int16_t)0;
+    humidity_value_queue_[i] = THERMOSTAT_SENSOR_INIT_VALUE;
   }
 }
 
@@ -324,6 +324,11 @@ void Thermostat::setLastSensorReadFailed(bool value) {
     if (sensor_failure_counter_ >= sensor_error_threshold_) {
       new_data_ = true;
       sensor_error_ = true;
+      /* set (filtered) temperature and humidity to init value */
+      current_temperature_ = THERMOSTAT_SENSOR_INIT_VALUE;
+      current_humidity_ = THERMOSTAT_SENSOR_INIT_VALUE;
+      filtered_temperature_ = THERMOSTAT_SENSOR_INIT_VALUE;
+      filtered_humidity_ = THERMOSTAT_SENSOR_INIT_VALUE;
     }
   } else {
     if (sensor_failure_counter_ == 0) {

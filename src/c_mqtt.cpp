@@ -91,7 +91,7 @@ String mqttHelper::buildHassDiscoveryClimate(String name, String firmware, Strin
   "  \"dev\" : { \n" \
   "    \"ids\":[\"" + mqttNodeId_ + "\"],\n" \
   "    \"mdl\":\"" + model + " Thermostat\",\n" \
-  "    \"name\":\"" + name + "\",\n" \
+  "    \"name\":\"Thermostat " + name + "\",\n" \
   "    \"sw\":\"" + firmware + "\",\n" \
   "    \"mf\":\"dhzl84\",\n" \
   "    \"cu\":\"http://" + name + "/\"\n"
