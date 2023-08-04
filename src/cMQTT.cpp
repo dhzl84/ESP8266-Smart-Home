@@ -65,7 +65,7 @@ String mqttHelper::buildHassDiscoveryDevice(String name, String firmware) {
   "  \"uniq_id\":\"" + mqttNodeId + "_rf2mqtt\",\n" \
   "  \"device\" : { \n" \
   "    \"ids\":[\"" + mqttNodeId + "\"],\n" \
-  "    \"name\":\"" + name + "\",\n" \
+  "    \"name\":\"" + name + " Gateway\",\n" \
   "    \"sw\":\"" + firmware + "\",\n" \
   "    \"mf\":\"dhzl84\"\n" \
   "  }\n" \
