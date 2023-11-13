@@ -1,7 +1,7 @@
 # ESP8266 / ESP32 Smart Home Playground
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Build Status](https://github.com/dhzl84/ESP8266-Smart-Home/workflows/CI/badge.svg?branch=main)](https://github.com/dhzl84/ESP8266-Smart-Home/actions?query=branch%3Amain)
+[![Build Status](https://github.com/dhzl84/ESP8266-Smart-Home/actions/workflows/main.yml/badge.svg)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/62f9be8a6ab441ec82306f1c18f8c0b3)](https://www.codacy.com/manual/dhzl84/ESP8266-Smart-Home/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=dhzl84/ESP8266-Smart-Home&amp;utm_campaign=Badge_Grade)
 
 **This is my ESP8266 / ESP32 smart home playground for self made floor heating sens and control units.**
