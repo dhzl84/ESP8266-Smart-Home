@@ -101,7 +101,7 @@ String mqttHelper::buildHassDiscoveryClimate(String name, String firmware, Strin
   return (JSON);
 }
 
-String mqttHelper::buildHassDiscoveryBinarySensor(String name, BinarySensor_t binarySensor) {
+String mqttHelper::buildHassDiscoveryBinarySensor(BinarySensor_t binarySensor) {
   String JSON;
 
   switch (binarySensor) {
@@ -110,7 +110,7 @@ String mqttHelper::buildHassDiscoveryBinarySensor(String name, BinarySensor_t bi
       JSON = \
       "{\n" \
       "  \"~\":\"" + mqttGeneralBaseTopic_ + "\",\n" \
-      "  \"name\":\"State " + name + "\",\n" \
+      "  \"name\":\"State\",\n" \
       "  \"dev_cla\":\"heat\",\n" \
       "  \"stat_t\":\"~" + mqttData_ + "\",\n" \
       "  \"val_tpl\":\"{{value_json.state}}\",\n" \

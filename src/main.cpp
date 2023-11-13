@@ -150,8 +150,17 @@ void setup() {
   #endif
   Wire.begin(SDA_PIN, SCL_PIN);   /* needed for I²C communication with display and BME280 */
   FS_INIT();                  /* read stuff from FileSystem */
-  myConfig.binary_version_address = String(myConfig.update_server_address).concat("/version");
-  myConfig.binary_address         = String(myConfig.update_server_address).concat("/firmware.bin");
+  myConfig.binary_version_address.concat(myConfig.update_server_address);
+  myConfig.binary_version_address.concat("/version");
+  myConfig.binary_address.concat(myConfig.update_server_address);
+  myConfig.binary_address.concat("/firmware.bin");
+  #ifdef CFG_DEBUG
+  Serial.print("Update binary address: ");
+  Serial.println(myConfig.binary_address);
+  Serial.print("Update version file address: ");
+  Serial.println(myConfig.binary_version_address);
+  #endif /* CFG_DEBUG */
+
   GPIO_CONFIG();                  /* configure GPIOs */
 
   myThermostat.setup(RELAY_PIN,
@@ -205,7 +214,6 @@ void setup() {
   #endif
 
   SENSOR_MAIN();  /* acquire first sensor data before staring loop() to avoid false value reporting due to current temperature, etc. being the init value until first sensor value is read */
-  CHECK_FOR_UPDATE();
 }
 
 /*===================================================================================================================*/
@@ -777,6 +785,8 @@ void CHECK_FOR_UPDATE(void) {
     myConfig.available_firmware_version = "none";
     #ifdef CFG_DEBUG
     Serial.println("Check For Update");
+    Serial.print("  URL: ");
+    Serial.println(myConfig.binary_version_address);
     Serial.print("  HTTP Code: ");
     Serial.println(httpClient.errorToString(httpCode));
     #endif  // CFG_DEBUG
@@ -925,7 +935,7 @@ void IRAM_ATTR updateEncoder(void) {
 /* Home Assistant discovery_enabled on connect; used to define entities in HA to communicate with*/
 void homeAssistantDiscovery(void) {
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryClimate(),                         myMqttHelper.buildHassDiscoveryClimate(String(myConfig.name), String(FW), String(BOARD)),    true, MQTT_QOS);    // make HA discover the climate component
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(kThermostatState),    myMqttHelper.buildHassDiscoveryBinarySensor(String(myConfig.name), kThermostatState),        true, MQTT_QOS);    // make HA discover the binary_sensor for thermostat state
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(kThermostatState),    myMqttHelper.buildHassDiscoveryBinarySensor(kThermostatState),        true, MQTT_QOS);    // make HA discover the binary_sensor for thermostat state
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kTemp),                     myMqttHelper.buildHassDiscoverySensor(String(myConfig.name),  kTemp),                        true, MQTT_QOS);    // make HA discover the temperature sensor
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kHum),                      myMqttHelper.buildHassDiscoverySensor(String(myConfig.name),  kHum),                         true, MQTT_QOS);    // make HA discover the humidity sensor
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kRestart_button),           myMqttHelper.buildHassDiscoveryButton(String(myConfig.name),  kRestart_button),              true, MQTT_QOS);    // make HA discover the reset switch
@@ -1167,7 +1177,7 @@ void handleWebServerClient(void) {
               Serial.println("Request FileSystem write.");
               #endif
               strlcpy(myConfig.update_server_address, value.c_str(), sizeof(myConfig.update_server_address));
-              requestSaveToSpiffs = true;
+              requestSaveToSpiffsWithRestart = true;
             } else {
               #ifdef CFG_DEBUG
               Serial.println("Configuration unchanged, do nothing");
