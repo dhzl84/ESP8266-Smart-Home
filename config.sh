@@ -12,6 +12,7 @@ cat > config.h << EOF
 #define LOCAL_MQTT_USER         "xxx"
 #define LOCAL_MQTT_PWD          "xxx"
 #define DEVICE_BINARY           "http://<domain or ip>/<name>.bin"
+#define TIMEZONE                "CET-1CEST,M3.5.0,M10.5.0/3"
 
 #endif /* CONFIG_H_ */
 EOF
