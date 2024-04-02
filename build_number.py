@@ -3,8 +3,8 @@
 import datetime
 import calendar
 
-YEAR = '2023'
-MONTH = '12'
+YEAR = '2024'
+MONTH = '4'
 PATCH = '0'
 
 VERSION = ".".join([YEAR,MONTH,PATCH])

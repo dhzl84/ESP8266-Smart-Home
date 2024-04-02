@@ -136,9 +136,9 @@ uint32_t FS_REFERENCE_TIME      = 0;
 /* Time */
 tm time_info;
 char time_buffer[6];  /* hold the current time in format "%H:%M" */
-#define NTP_SERVER_1 "fritz.box"
-#define NTP_SERVER_2 "0.de.pool.ntp.org"
-#define NTP_SERVER_3 "1.de.pool.ntp.org"
+#define NTP_SERVER_1 "0.de.pool.ntp.org"
+#define NTP_SERVER_2 "1.de.pool.ntp.org"
+#define NTP_SERVER_3 "pool.ntp.org"
 
 /*===================================================================================================================*/
 /* The setup function is called once at startup of the sketch */
