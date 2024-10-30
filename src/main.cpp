@@ -122,9 +122,12 @@ uint32_t display_enabled_temporary_reference_time = 0;
 #define  display_enabled_temporary_interval seconds_to_milliseconds(10)
 bool     display_enabled_temporary = false;
 bool     systemRestartRequest = false;
+bool     silentRestart = false;
+bool     restartedToday = true;
 bool     requestSaveToSpiffs = false;
 bool     requestSaveToSpiffsWithRestart = false;
-uint32_t wifiReconnectTimer = seconds_to_milliseconds(30);
+uint32_t wifiReconnectTimer = seconds_to_milliseconds(WIFI_RECONNECT_TIME);
+uint32_t systemRestartTimer = minutes_to_milliseconds(SYSTEM_RESTART_TIME);
 #ifndef WIFI_RECONNECT_TIME
   #define WIFI_RECONNECT_TIME 30
 #endif
@@ -135,7 +138,7 @@ uint32_t FS_REFERENCE_TIME      = 0;
 
 /* Time */
 tm time_info;
-char time_buffer[6];  /* hold the current time in format "%H:%M" */
+char time_buffer[6] = "00:00";  /* hold the current time in format "%H:%M" */
 #define NTP_SERVER_1 "0.de.pool.ntp.org"
 #define NTP_SERVER_2 "1.de.pool.ntp.org"
 #define NTP_SERVER_3 "pool.ntp.org"
@@ -173,8 +176,12 @@ void setup() {
   SENSOR_INIT();   /* init sensors */
   DISPLAY_INIT();  /* init Display */
   WIFI_CONNECT();  /* connect to WiFi */
+  NTP();           /* acquire time */
   OTA_INIT();      /* init over the air update */
   MQTT_CONNECT();  /* connect to MQTT host and build subscriptions, must be called after FS_INIT()*/
+  #ifdef CFG_DEBUG
+  Serial.printf("MQTT Server IP: %s\n", myConfig.mqtt_host);
+  #endif /* CFG_DEBUG */
   MDNS.begin(myConfig.name);
   configTzTime(myConfig.timezone, NTP_SERVER_1, NTP_SERVER_2, NTP_SERVER_3);  /* init network time protocol, must be called after WIFI_CONNECT() and FS_INIT() */
   webServer.begin();
@@ -507,7 +514,7 @@ void loop() {
 /* functions called by loop() */
 /*===================================================================================================================*/
 void HANDLE_SYSTEM_STATE(void) {
-  /* check WiFi connection every 30 seconds*/
+  /* check WiFi connection every 30 seconds */
   if (TimeReached(wifiReconnectTimer)) {
     SetNextTimeInterval(&wifiReconnectTimer, (seconds_to_milliseconds(WIFI_RECONNECT_TIME)));
     if (WiFi.status() != WL_CONNECTED) {
@@ -516,6 +523,44 @@ void HANDLE_SYSTEM_STATE(void) {
       #endif
       /* try to come online, debounced to avoid reconnect each loop*/
       WIFI_CONNECT();
+    } else {
+      /* WiFi is connected, reset systemRestartTimer */
+      SetNextTimeInterval(&systemRestartTimer, (minutes_to_milliseconds(SYSTEM_RESTART_TIME)));
+    }
+  }
+  if (TimeReached(systemRestartTimer)) {
+  #ifdef CFG_DEBUG
+  Serial.println("Restart requested by System State Handler");
+  #endif /* CFG_DEBUG */
+    systemRestartRequest = true;
+    silentRestart = true;
+  }
+  /* Check if the sytem shall restart at a defined time */
+  #ifdef CFG_DEBUG_PLANNED_RESTART
+  Serial.println("== PLANNED RESTART ==");
+  Serial.print("Planned Restart enabled: ");
+  Serial.println(myConfig.planned_restart);
+  Serial.print("Restarted Today: ");
+  Serial.println(restartedToday);
+  Serial.print("Time: ");
+  Serial.println(time_buffer);
+  Serial.print("Time Compare: ");
+  Serial.println(strcmp(time_buffer, "04:00"));
+  #endif /* CFG_DEBUG_PLANNED_RESTART */
+
+  if (myConfig.planned_restart == true) {
+    /* at midnight, reset restartedToday */
+    if ((strcmp(time_buffer, "00:00") == 0) && (restartedToday == true)) {
+      restartedToday = false;
+    }
+    /* at 04:00, request a silent restart */
+    if ((strcmp(time_buffer, "04:00") == 0) && (restartedToday == false)) {
+      #ifdef CFG_DEBUG
+      Serial.println("Restart requested by planned time");
+      #endif /* CFG_DEBUG */
+      systemRestartRequest = true;
+      silentRestart = true;
+      restartedToday = true;
     }
   }
   /* check if button is pushed for 10 seconds to request a reset */
@@ -525,8 +570,8 @@ void HANDLE_SYSTEM_STATE(void) {
     Serial.println("Target Time: "+ String(onOffButtonSystemResetTime + onOffButtonSystemResetInterval));
     Serial.println("Current time: "+ String(millis()));
     #endif
-
     if ((onOffButtonSystemResetTime + onOffButtonSystemResetInterval) < millis()) {
+      Serial.println("Restart requested by push button");
       systemRestartRequest = true;
     } else {
       /* waiting */
@@ -537,12 +582,17 @@ void HANDLE_SYSTEM_STATE(void) {
 
   /* restart handling */
   if (systemRestartRequest == true) {
-    DISPLAY_MAIN();
-    myMqttClient.publish(myMqttHelper.getTopicSystemRestartRequest(), "false",      false, MQTT_QOS);   /* publish restart = false on connect */
+    if (silentRestart == true) {
+      silentRestart = false;
+    } else
+    {
+      DISPLAY_MAIN();
+    }
+    myMqttClient.publish(myMqttHelper.getTopicSystemRestartRequest(), "false", false, MQTT_QOS);   /* publish restart = false on connect */
     myMqttClient.loop();
     systemRestartRequest = false;
     #ifdef CFG_DEBUG
-    Serial.println("Restarting in 3 seconds");
+    Serial.println("Restarting in 3 seconds due to Restart Request");
     #endif
     myMqttClient.disconnect();
     delay(seconds_to_milliseconds(3));
@@ -844,6 +894,7 @@ void FS_MAIN(void) {
       requestSaveToSpiffsWithRestart = false;
       requestSaveToSpiffs = false;  /* reset non reset request as well */
       systemRestartRequest = true;
+      Serial.println("Restart requested by file system handler");
       } else {
       /* write failed, retry next loop */
     }
@@ -1100,6 +1151,7 @@ String buildHtml(void) {
   webpageTableAppend4Cols(String("update_server_address"),    String("string"),                              String(myConfig.update_server_address),     String("Address of the update server"));
   webpageTableAppend4Cols(String("auto_update"),              String("0 | 1"),                               String(myConfig.auto_update),               String("Automatically apply available updates: 1 = Auto Updates enabled; 0 = Auto Updates disabled"));
   webpageTableAppend4Cols(String("update_firmware"),          String("0 | 1"),                               String("none"),                             String("On demand firmware update: 1 = update"));
+  webpageTableAppend4Cols(String("planned_restart"),          String("0 | 1"),                               String(myConfig.planned_restart),           String("Execute planned restart"));
   webpageTableAppend4Cols(String("calibration_offset"),       String("Range: -50 .. +50, LSB: 0.1 &deg;C"),  String(myConfig.calibration_offset),        String("Offset calibration for temperature sensor."));
   webpageTableAppend4Cols(String("calibration_factor"),       String("Range: +50 .. +200, LSB: 1 %"),        String(myConfig.calibration_factor),        String("Linearity calibration for temperature sensor."));
   webpageTableAppend4Cols(String("display_enabled"),          String("0 | 1"),                               String(myConfig.display_enabled),           String("Display always on or only on user interaction"));
@@ -1193,6 +1245,16 @@ void handleWebServerClient(void) {
               Serial.println("Configuration unchanged, do nothing");
               #endif
             }
+          } else if (key == "planned_restart") {
+            boolean planned_restart = static_cast<boolean>(value.toInt() & 1);
+            if (planned_restart != myConfig.planned_restart) {
+              myConfig.planned_restart = planned_restart;
+              requestSaveToSpiffs = true;
+            } else {
+              #ifdef CFG_DEBUG
+              Serial.println("Configuration unchanged, do nothing");
+              #endif
+            }
           } else if (key == "calibration_factor") {
             uint8_t u8_value = (uint8_t) value.toInt();
             if ((u8_value != myConfig.calibration_factor) && (u8_value >= 50) && (u8_value <= 200)) {
@@ -1257,7 +1319,7 @@ void handleWebServerClient(void) {
               strlcpy(myConfig.mqtt_host, value.c_str(), sizeof(myConfig.mqtt_host));
               requestSaveToSpiffs = true;
               #ifdef CFG_DEBUG
-              Serial.println("New MQTT server configured.");
+              Serial.printf("New MQTT server configured: %s\n", myConfig.mqtt_host);
               #endif
             } else {
               #ifdef CFG_DEBUG
@@ -1375,6 +1437,7 @@ void messageReceived(String &topic, String &payload) {  // NOLINT
     #endif
     if (payload == "PRESS") {
       systemRestartRequest = true;
+      Serial.println("Restart requested by MQTT");
     }
   } else if (topic == myMqttHelper.getTopicUpdateFirmware()) { /* HTTP Update */
     if (payload == "PRESS") {

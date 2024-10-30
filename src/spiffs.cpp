@@ -83,6 +83,7 @@ void loadConfiguration(Configuration &config) { // NOLINT: pass by reference
   strlcpy(config.timezone,                      jsonDoc["tz"]                    | TIMEZONE, sizeof(config.timezone));
   config.display_enabled =                      jsonDoc["dispEna"]               | true;
   config.auto_update =                          jsonDoc["autoUpd"]               | true;
+  config.planned_restart =                      jsonDoc["planRestart"]           | true;
 }
 
 // Saves the Configuration to a file
@@ -90,13 +91,13 @@ bool saveConfiguration(const Configuration &config) {
   bool ret = true;
   bool writeFile = false;
   StaticJsonDocument<768> jsonDoc;
-  StaticJsonDocument<768> jsonDocNew;
+  // StaticJsonDocument<768> jsonDocNew;
 
   if (FileSystem.exists(filename)) {
     // Delete existing file, otherwise the configuration is appended to the file
     File file = FileSystem.open(filename, "r");
-
     DeserializationError error = deserializeJson(jsonDoc, file);
+    file.close();
 
     if (error) {
         #ifdef CFG_DEBUG
@@ -132,6 +133,7 @@ bool saveConfiguration(const Configuration &config) {
     Serial.print((config.timezone ==                jsonDoc["tz"]) ? false : true);
     Serial.print((config.display_enabled ==         jsonDoc["dispEna"]) ? false : true);
     Serial.print((config.auto_update ==             jsonDoc["autoUpd"]) ? false : true);
+    Serial.print((config.planned_restart ==         jsonDoc["planRestart"]) ? false : true);
     Serial.println();
     #endif /* CFG_DEBUG */
 
@@ -159,8 +161,8 @@ bool saveConfiguration(const Configuration &config) {
     writeFile |= (config.timezone ==                jsonDoc["tz"]) ? false : true;
     writeFile |= (config.display_enabled ==         jsonDoc["dispEna"]) ? false : true;
     writeFile |= (config.auto_update ==             jsonDoc["autoUpd"]) ? false : true;
+    writeFile |= (config.planned_restart ==         jsonDoc["planRestart"]) ? false : true;
 
-    file.close();
   } else {
     /* file does not exist */
     writeFile = true;
@@ -180,31 +182,32 @@ bool saveConfiguration(const Configuration &config) {
 
     File file = FileSystem.open(filename, "w");
 
-    jsonDocNew["name"] =                   config.name;
-    jsonDocNew["mode"] =                   config.thermostat_mode;
-    jsonDocNew["ssid"] =                   config.ssid;
-    jsonDocNew["wifiPwd"] =                config.wifi_password;
-    jsonDocNew["mqttHost"] =               config.mqtt_host;
-    jsonDocNew["mqttPort"] =               config.mqtt_port;
-    jsonDocNew["mqttUser"] =               config.mqtt_user;
-    jsonDocNew["mqttPwd"] =                config.mqtt_password;
-    jsonDocNew["tTemp"] =                  config.target_temperature;
-    jsonDocNew["tHyst"] =                  config.temperature_hysteresis;
-    jsonDocNew["calibF"] =                 config.calibration_factor;
-    jsonDocNew["calibO"] =                 config.calibration_offset;
-    jsonDocNew["updServer"] =              config.update_server_address;
-    jsonDocNew["sensUpdInterval"] =        config.sensor_update_interval;
-    jsonDocNew["mqttPubCycle"] =           config.mqtt_publish_cycle;
-    jsonDocNew["inputMethod"] =            config.input_method;
-    jsonDocNew["sensor"] =                 config.sensor_type;
-    jsonDocNew["dispBrightn"] =            config.display_brightness;
-    jsonDocNew["discovery"] =              config.discovery_enabled;
-    jsonDocNew["tz"] =                     config.timezone;
-    jsonDocNew["dispEna"] =                config.display_enabled;
-    jsonDocNew["autoUpd"] =                config.auto_update;
+    jsonDoc["name"] =                   config.name;
+    jsonDoc["mode"] =                   config.thermostat_mode;
+    jsonDoc["ssid"] =                   config.ssid;
+    jsonDoc["wifiPwd"] =                config.wifi_password;
+    jsonDoc["mqttHost"] =               config.mqtt_host;
+    jsonDoc["mqttPort"] =               config.mqtt_port;
+    jsonDoc["mqttUser"] =               config.mqtt_user;
+    jsonDoc["mqttPwd"] =                config.mqtt_password;
+    jsonDoc["tTemp"] =                  config.target_temperature;
+    jsonDoc["tHyst"] =                  config.temperature_hysteresis;
+    jsonDoc["calibF"] =                 config.calibration_factor;
+    jsonDoc["calibO"] =                 config.calibration_offset;
+    jsonDoc["updServer"] =              config.update_server_address;
+    jsonDoc["sensUpdInterval"] =        config.sensor_update_interval;
+    jsonDoc["mqttPubCycle"] =           config.mqtt_publish_cycle;
+    jsonDoc["inputMethod"] =            config.input_method;
+    jsonDoc["sensor"] =                 config.sensor_type;
+    jsonDoc["dispBrightn"] =            config.display_brightness;
+    jsonDoc["discovery"] =              config.discovery_enabled;
+    jsonDoc["tz"] =                     config.timezone;
+    jsonDoc["dispEna"] =                config.display_enabled;
+    jsonDoc["autoUpd"] =                config.auto_update;
+    jsonDoc["planRestart"] =            config.planned_restart;
 
     // Serialize JSON to file
-    if (serializeJson(jsonDocNew, file) == 0) {
+    if (serializeJson(jsonDoc, file) == 0) {
       ret = false;
       #ifdef CFG_DEBUG
       Serial.println("Failed to write to file");
@@ -212,7 +215,7 @@ bool saveConfiguration(const Configuration &config) {
     } else {
       #ifdef CFG_DEBUG
       Serial.println("new FileSystem content:");
-      serializeJsonPretty(jsonDocNew, Serial);
+      serializeJsonPretty(jsonDoc, Serial);
       Serial.println();
       #endif /* CFG_DEBUG */
     }

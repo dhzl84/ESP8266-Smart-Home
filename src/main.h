@@ -52,6 +52,7 @@ struct Configuration {
   char          timezone[64];                   // https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
   bool          display_enabled;
   bool          auto_update;
+  bool          planned_restart;
   String        available_firmware_version;
   String        binary_address;
   String        binary_version_address;
