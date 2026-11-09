@@ -3,8 +3,8 @@
 import datetime
 import calendar
 
-YEAR = '2024'
-MONTH = '10'
+YEAR = '2026'
+MONTH = '11'
 PATCH = '0'
 
 VERSION = ".".join([YEAR,MONTH,PATCH])
@@ -19,9 +19,9 @@ HEADER_FILE = f"""
 #ifndef VERSION_H_
 #define VERSION_H_
 
-#define FW_YEAR  = int16_t({YEAR})
-#define FW_MONTH = int16_t({MONTH})
-#define FW_PATCH = int8_t({PATCH})
+#define FW_YEAR  ({YEAR})
+#define FW_MONTH ({MONTH})
+#define FW_PATCH ({PATCH})
 
 #define VERSION "{VERSION}"
 

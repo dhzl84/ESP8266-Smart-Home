@@ -72,6 +72,7 @@ String ota_stub_address = "";
 #define rotInit  0
 volatile int16_t lastEncoded = 0b11;                   /* initial state of the rotary encoders gray code */
 volatile int16_t rotaryEncoderDirectionInts = rotInit; /* initialize rotary encoder with no direction */
+volatile bool encoderEventPending = false; /* encoder detent flag set by ISR; direction evaluated in loop() */
 const uint32_t buttonDebounceInterval = 25;
 uint32_t onOffButtonSystemResetTime = 0;
 uint32_t onOffButtonSystemResetInterval = seconds_to_milliseconds(5);
@@ -132,7 +133,7 @@ uint32_t systemRestartTimer = minutes_to_milliseconds(SYSTEM_RESTART_TIME);
   #define WIFI_RECONNECT_TIME 30
 #endif
 
-#define  FS_WRITE_DEBOUNCE      minutes_to_milliseconds(30) /* write target temperature to spiffs if it wasn't changed for 20 s (time in ms) */
+#define  FS_WRITE_DEBOUNCE      minutes_to_milliseconds(30) /* write FileSystem 30 minutes after last change */
 bool     FS_WRITTEN =           true;
 uint32_t FS_REFERENCE_TIME      = 0;
 
@@ -330,13 +331,8 @@ void WIFI_CONNECT(void) {
     WiFi.setSleep(false);
     #endif
     WiFi.begin(myConfig.ssid, myConfig.wifi_password);
-
-    /* try to connect to WiFi, proceed offline if not connecting here*/
-    if (WiFi.waitForConnectResult() != WL_CONNECTED) {
-      #ifdef CFG_DEBUG
-      Serial.println("Failed to connect to WiFi, continue offline");
-      #endif
-    }
+    /* non-blocking: connection status is checked every WIFI_RECONNECT_TIME seconds in
+       HANDLE_SYSTEM_STATE(); WiFi autoReconnect (default: true) reconnects in background */
   }
 
   #ifdef CFG_DEBUG
@@ -396,7 +392,7 @@ void MQTT_CONNECT(void) {
   if (WiFi.status() == WL_CONNECTED) {
     if (!myMqttClient.connected()) {
       myMqttClient.disconnect();
-      myMqttClient.setOptions(180, true, seconds_to_milliseconds(360));
+      myMqttClient.setOptions(180, true, seconds_to_milliseconds(30)); /* short connect timeout; exponential backoff in MQTT_MAIN() */
       myMqttClient.begin(myConfig.mqtt_host, myConfig.mqtt_port, myWiFiClient);
       myMqttClient.setWill((myMqttHelper.getTopicLastWill()).c_str(),   "offline", true, MQTT_QOS);     /* broker shall publish 'offline' on ungraceful disconnect >> Last Will */
       myMqttClient.onMessage(messageReceived);                                                        /* register callback */
@@ -468,6 +464,28 @@ void loop() {
   /* call every 30 minutes */
   if (TimeReached(loop_30_minutes_in_millis)) {
     SetNextTimeInterval(&loop_30_minutes_in_millis, loop_time_30_minutes);
+  }
+  /* rotary encoder event handling: ISR sets flag, evaluation here with critical section */
+  if (encoderEventPending) {
+    noInterrupts();
+    int16_t encoderDirection = rotaryEncoderDirectionInts;
+    rotaryEncoderDirectionInts = rotInit;
+    encoderEventPending = false;
+    interrupts();
+    SetNextTimeInterval(&display_enabled_temporary_reference_time, display_enabled_temporary_interval);
+    if (myConfig.display_enabled || display_enabled_temporary) {
+      if (encoderDirection > rotRight) { /* majority of interrupts to the right */
+        if (myThermostat.getThermostatMode() == TH_HEAT) {
+          myThermostat.increaseTargetTemperature(tempStep);
+        }
+      } else if (encoderDirection < rotLeft) { /* majority of interrupts to the left */
+        if (myThermostat.getThermostatMode() == TH_HEAT) {
+          myThermostat.decreaseTargetTemperature(tempStep);
+        }
+      } else {
+        /* left/right counts equal -> should never happen, do nothing */
+      }
+    }
   }
   /* debounce buttons */
   debounceOnOff.update();
@@ -563,21 +581,20 @@ void HANDLE_SYSTEM_STATE(void) {
       restartedToday = true;
     }
   }
-  /* check if button is pushed for 10 seconds to request a reset */
+  /* check if button is pushed for 5 seconds to request a reset (overflow-safe timer) */
   if (LOW == digitalRead(PHYS_INPUT_3_PIN)) {
     #ifdef CFG_DEBUG_ENCODER
     Serial.println("Encoder Button pressed: "+ String(digitalRead(PHYS_INPUT_3_PIN)));
-    Serial.println("Target Time: "+ String(onOffButtonSystemResetTime + onOffButtonSystemResetInterval));
     Serial.println("Current time: "+ String(millis()));
     #endif
-    if ((onOffButtonSystemResetTime + onOffButtonSystemResetInterval) < millis()) {
+    if (TimeReached(onOffButtonSystemResetTime)) {
       Serial.println("Restart requested by push button");
       systemRestartRequest = true;
     } else {
       /* waiting */
     }
   } else {
-    onOffButtonSystemResetTime = millis();
+    SetNextTimeInterval(&onOffButtonSystemResetTime, onOffButtonSystemResetInterval);
   }
 
   /* restart handling */
@@ -660,8 +677,9 @@ void SENSOR_MAIN() {
     float sensTemp(NAN), sensHumid(NAN);
 
     if (myConfig.sensor_type == cDHT22) {
-      sensHumid = myDHT22.getHumidity();
-      sensTemp  = myDHT22.getTemperature();
+      TempAndHumidity dhtResult = myDHT22.getTempAndHumidity();  /* triggers readSensor(); fields are NAN on read failure */
+      sensTemp  = dhtResult.temperature;
+      sensHumid = dhtResult.humidity;
     } else if (myConfig.sensor_type == cBME280) {  /* BME280 */
       BME280::TempUnit tempUnit(BME280::TempUnit_Celsius);
       BME280::PresUnit presUnit(BME280::PresUnit_hPa);
@@ -716,7 +734,40 @@ void SENSOR_MAIN() {
   }
 }
 
+uint32_t display_content_hash_last = 0;
+bool display_flushed = false;
+
+/* FNV-1a hash of all display-relevant content; used to skip redundant OLED flushes */
+uint32_t displayContentHash(void) {
+  char buf[64];
+  snprintf(buf, sizeof(buf), "%d%d%d%d%d%d%d%d%d%d%d%s",
+           static_cast<int>(systemRestartRequest),
+           static_cast<int>(OTA_UPDATE),
+           static_cast<int>(update_firmware),
+           static_cast<int>(myConfig.display_enabled || display_enabled_temporary),
+           static_cast<int>(myThermostat.getSensorError()),
+           static_cast<int>(myThermostat.getSensorFailureCounter()),
+           static_cast<int>(myThermostat.getFilteredTemperature()),
+           static_cast<int>(myThermostat.getOutsideTemperatureReceived()),
+           static_cast<int>(myThermostat.getOutsideTemperature()),
+           static_cast<int>(myThermostat.getThermostatMode()),
+           static_cast<int>(myThermostat.getTargetTemperature()),
+           time_buffer);
+  uint32_t hash = 2166136261u;
+  for (size_t i = 0; i < strlen(buf); i++) {
+    hash ^= static_cast<uint32_t>(buf[i]);
+    hash *= 16777619u;
+  }
+  return hash;
+}
+
 void DISPLAY_MAIN(void) {
+  const uint32_t contentHash = displayContentHash();
+  if (display_flushed && (contentHash == display_content_hash_last)) {
+    return;  /* display content unchanged: skip I2C flush */
+  }
+  display_content_hash_last = contentHash;
+  display_flushed = true;
   myDisplay.clear();
   if (myConfig.display_enabled || display_enabled_temporary) {
     if (systemRestartRequest == true) {
@@ -795,8 +846,13 @@ void DISPLAY_MAIN(void) {
 void MQTT_MAIN(void) {
   if (myMqttClient.connected() == false) {
     if (TimeReached(mqttReconnectTime)) {  /* try reconnect to MQTT broker after mqttReconnectTime expired */
-        SetNextTimeInterval(&mqttReconnectTime, mqttReconnectInterval); /* reset interval */
         MQTT_CONNECT();
+        if (myMqttClient.connected()) {
+          mqttReconnectInterval = seconds_to_milliseconds(5);  /* success: return to fast retry */
+        } else {
+          mqttReconnectInterval = min(mqttReconnectInterval * 2u, minutes_to_milliseconds(10));  /* exponential backoff, capped at 10 minutes */
+        }
+        SetNextTimeInterval(&mqttReconnectTime, mqttReconnectInterval); /* reset interval */
     } else {
       /* just wait */
     }
@@ -908,7 +964,7 @@ void FS_MAIN(void) {
   }
   /* avoid extensive writing to FileSystem, therefore check if the target temperature didn't change for a certain time before writing. */
   if ( (myThermostat.getNewCalib()) || (myThermostat.getTargetTemperature() != myConfig.target_temperature) || (myThermostat.getThermostatHysteresis() != myConfig.temperature_hysteresis) || (myThermostat.getThermostatMode() != myConfig.thermostat_mode) ) {
-    FS_REFERENCE_TIME = millis();  // ToDo: handle wrap around
+    SetNextTimeInterval(&FS_REFERENCE_TIME, FS_WRITE_DEBOUNCE);  /* overflow-safe timer at last change */
     myConfig.target_temperature  = myThermostat.getTargetTemperature();
     myConfig.calibration_factor = myThermostat.getSensorCalibFactor();
     myConfig.calibration_offset = myThermostat.getSensorCalibOffset();
@@ -926,7 +982,7 @@ void FS_MAIN(void) {
   if (FS_WRITTEN == true) {
     /* do nothing, last change was already stored in FileSystem */
   } else { /* latest change not stored in FileSystem */
-    if (FS_REFERENCE_TIME + FS_WRITE_DEBOUNCE < millis()) { /* check debounce */
+    if (TimeReached(FS_REFERENCE_TIME)) { /* check debounce, overflow-safe */
       /* debounce expired -> write */
       if (saveConfiguration(myConfig)) {
         FS_WRITTEN = true;
@@ -947,6 +1003,9 @@ void FS_MAIN(void) {
 
 /* Rotary Encoder */
 void IRAM_ATTR updateEncoder(void) {
+  /* Minimal ISR: touch volatile state only. No Serial, no non-IRAM function calls.
+     Int-to-flash access while the flash is busy (LittleFS write, OTA, WiFi storage)
+     caused exception 28/29 reboots. Direction evaluation happens in loop(). */
   int16_t MSB = digitalRead(PHYS_INPUT_1_PIN);
   int16_t LSB = digitalRead(PHYS_INPUT_2_PIN);
   int16_t encoded = (MSB << 1) |LSB;  /* converting the 2 pin value to single number */
@@ -959,28 +1018,13 @@ void IRAM_ATTR updateEncoder(void) {
     if (sum == 0b1110 || sum == 0b0111 || sum == 0b0001 || sum == 0b1000) { /* gray patterns for rotation to left */
       rotaryEncoderDirectionInts += rotLeft;
     }
-
-    if (encoded == 0b11) { /* if the encoder is in an end position, evaluate the number of interrupts to left/right. simple majority wins */
-      #ifdef CFG_DEBUG_ENCODER
-      Serial.println("Rotary encoder interrupts: " + String(rotaryEncoderDirectionInts));
-      #endif
-
-      if (rotaryEncoderDirectionInts > rotRight) { /* if there was a higher amount of interrupts to the right, consider the encoder was turned to the right */
-        if (myThermostat.getThermostatMode() == TH_HEAT) {
-          myThermostat.increaseTargetTemperature(tempStep);
-        }
-      } else if (rotaryEncoderDirectionInts < rotLeft) { /* if there was a higher amount of interrupts to the left, consider the encoder was turned to the left */
-        if (myThermostat.getThermostatMode() == TH_HEAT) {
-          myThermostat.decreaseTargetTemperature(tempStep);
-        }
-      } else {
-        /* do nothing here, left/right interrupts have occurred with same amount -> should never happen */
-      }
-      rotaryEncoderDirectionInts = rotInit; /* reset interrupt count for next sequence */
-    }
-    lastEncoded = encoded; /* store this value for next time */
   }
-  SetNextTimeInterval(&display_enabled_temporary_reference_time, display_enabled_temporary_interval);
+
+  if (encoded == 0b11) { /* encoder in end position: loop() evaluates the counted direction */
+    encoderEventPending = true;
+  }
+
+  lastEncoded = encoded; /* store this value for next time */
 }
 
 /* Home Assistant discovery_enabled on connect; used to define entities in HA to communicate with*/
@@ -1059,6 +1103,7 @@ String buildHtml(void) {
   // char html[8192];
 
   String webpage = "<!DOCTYPE html> <html>\n";
+  webpage.reserve(4096);  /* reserve to avoid heap churn from repeated += concatenation */
   /* HEAD */
   webpage +="<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
   webpage +="<title> "+ String(myConfig.name) + "</title>\n";
