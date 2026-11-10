@@ -84,10 +84,9 @@ void handleHttpReset(void);
 void messageReceived(String &topic, String &payload);  // NOLINT: pass by reference
 void updateEncoder(void);
 
-/* MACRO to append another line of the webpage table (2 columns) */
-#define webpageTableAppend2Cols(key, value) (webpage +="<tr><td>" + key + ":</td><td>"+ value + "</td></tr>");
-/* MACRO to append another line of the webpage table (4 columns) */
-#define webpageTableAppend4Cols(key, value, current_value, description) (webpage +="<tr><td>" + key + "</td><td>"+ value + "</td><td>"+ current_value + "</td><td>" + description + "</td></tr>");
+/* The status/config page is streamed in chunks (htmlStreamPage() in main.cpp): each row is
+   formatted into a small stack buffer and sent straight to the client, so there is no page
+   String to concatenate, no heap realloc, and no concatenation frames on the cont stack. */
 
 /*===================================================================================================================*/
 /* global scope functions */
@@ -109,10 +108,17 @@ String sensErrorToString(bool boolean);
 String boolToStringOnOff(bool boolean);
 String boolToStringHeatOff(bool boolean);
 String boolToStringHeatingOff(bool boolean);
+/* allocation-free variants for the MQTT publish path (static string literals) */
+const char* cstrSensStatus(bool boolean);
+const char* cstrHeatOff(bool boolean);
+const char* cstrHeatingOff(bool boolean);
+/* format a value scaled by 10 (e.g. 365 -> "36.5"), decimals = 1 or 0 (rounded) */
+void formatScaled(char* buf, size_t size, int16_t scaledBy10, uint8_t decimals);
 int32_t TimeDifference(uint32_t prev, uint32_t next);
 int32_t TimePassedSince(uint32_t timestamp);
 bool TimeReached(uint32_t timer);
 void SetNextTimeInterval(volatile uint32_t* timer, const uint32_t step);
+bool isNumericPayload(const String& payload);
 bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor);
 String millisFormatted(void);
 String wifiStatusToString(wl_status_t status);

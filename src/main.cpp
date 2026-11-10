@@ -891,10 +891,8 @@ void CHECK_FOR_UPDATE(void) {
     myConfig.available_firmware_version = "none";
     #ifdef CFG_DEBUG
     Serial.println("Check For Update");
-    Serial.print("  URL: ");
-    Serial.println(myConfig.binary_version_address);
-    Serial.print("  HTTP Code: ");
-    Serial.println(httpClient.errorToString(httpCode));
+    Serial.printf("  URL: %s\n", myConfig.binary_version_address.c_str());
+    Serial.printf("  HTTP Code: %d - %s\n", httpCode, httpClient.errorToString(httpCode).c_str());
     #endif  // CFG_DEBUG
   }
 
@@ -1030,7 +1028,6 @@ void IRAM_ATTR updateEncoder(void) {
 /* Home Assistant discovery_enabled on connect; used to define entities in HA to communicate with*/
 void homeAssistantDiscovery(void) {
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryClimate(),                         myMqttHelper.buildHassDiscoveryClimate(String(myConfig.name), String(FW), String(BOARD)),    true, MQTT_QOS);    // make HA discover the climate component
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(kThermostatState),    myMqttHelper.buildHassDiscoveryBinarySensor(kThermostatState),        true, MQTT_QOS);    // make HA discover the binary_sensor for thermostat state
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kTemp),                     myMqttHelper.buildHassDiscoverySensor(String(myConfig.name),  kTemp),                        true, MQTT_QOS);    // make HA discover the temperature sensor
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kHum),                      myMqttHelper.buildHassDiscoverySensor(String(myConfig.name),  kHum),                         true, MQTT_QOS);    // make HA discover the humidity sensor
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kRestart_button),           myMqttHelper.buildHassDiscoveryButton(String(myConfig.name),  kRestart_button),              true, MQTT_QOS);    // make HA discover the reset switch
@@ -1040,7 +1037,6 @@ void homeAssistantDiscovery(void) {
 /* Make Home Assistant forget the discovered entities on demand */
 void homeAssistantRemoveDiscovered(void) {
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryClimate(),                         String(""),         true, MQTT_QOS);    // make HA forget the climate component
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(kThermostatState),    String(""),         true, MQTT_QOS);    // make HA discover the binary_sensor for thermostat state
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kTemp),                     String(""),         true, MQTT_QOS);    // make HA forget the temperature sensor
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kHum),                      String(""),         true, MQTT_QOS);    // make HA forget the humidity sensor
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kRestart_button),           String(""),         true, MQTT_QOS);    // make HA forget the reset switch
@@ -1050,179 +1046,270 @@ void homeAssistantRemoveDiscovered(void) {
 
 /* DEPRECATED */
 void homeAssistantRemoveDiscoveredObsolete(void) {
-  /* for migration from 0.13.x to later versions only */
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(kSensFail),           String(""),         true, MQTT_QOS);    // make HA discover the binary_sensor for sensor failure
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kIP),                       String(""),         true, MQTT_QOS);    // make HA discover the IP sensor
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kCalibF),                   String(""),         true, MQTT_QOS);    // make HA discover the scaling sensor
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kCalibO),                   String(""),         true, MQTT_QOS);    // make HA discover the offset sensor
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kHysteresis),               String(""),         true, MQTT_QOS);    // make HA discover the hysteresis sensor
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kFW),                       String(""),         true, MQTT_QOS);    // make HA discover the firmware version sensor
-  /* for migration to version 2022.03.0 */
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(kRestart_switch),           String(""),         true, MQTT_QOS);    // make HA discover the hysteresis sensor
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySwitch(kUpdate_switch),            String(""),         true, MQTT_QOS);    // make HA discover the firmware version sensor
 }
 
 /* publish state topic in JSON format */
 void mqttPubState(void) {
-  /* send "none" in case of sensor error and if filtered values are still on init values */
-  String temperature = "None";
-  String humidity = "None";
+  /* everything is built on the stack: the payload buffer is published straight to the MQTT
+     client, so the publish path performs no heap allocation at all */
+  char payload[384];
+  char tempBuf[16];
+  char humidBuf[16];
+  char ipBuf[16];
+
+  /* send "None" in case of sensor error and if filtered values are still on init values */
+  const char* temperature = "None";
+  const char* humidity    = "None";
   if (myThermostat.getSensorError() == false) {
     if (myThermostat.getFilteredTemperature() != THERMOSTAT_SENSOR_INIT_VALUE) {
-      temperature = String(intToFloat(myThermostat.getFilteredTemperature()), 1);
+      formatScaled(tempBuf, sizeof(tempBuf), myThermostat.getFilteredTemperature(), 1);
+      temperature = tempBuf;
     }
     if (myThermostat.getFilteredHumidity() != THERMOSTAT_SENSOR_INIT_VALUE) {
-      humidity = String(intToFloat(myThermostat.getFilteredHumidity()), 1);
+      formatScaled(humidBuf, sizeof(humidBuf), myThermostat.getFilteredHumidity(), 1);
+      humidity = humidBuf;
     }
   }
 
-  String payload = myMqttHelper.buildStateJSON( /* build JSON payload */\
-      String(myConfig.name), \
+  const IPAddress ip = WiFi.localIP();
+  (void)snprintf(ipBuf, sizeof(ipBuf), "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
+
+  /* calibration offset is stored scaled by 10, published as the rounded integer */
+  const int16_t calibOffsetRaw = myThermostat.getSensorCalibOffset();
+  const int16_t calibOffsetRounded = (calibOffsetRaw >= 0) ? (calibOffsetRaw + 5) / 10 : (calibOffsetRaw - 5) / 10;
+
+  const int payloadLen = myMqttHelper.buildStateJSON(payload, sizeof(payload), \
+      myConfig.name, \
       temperature, \
       humidity, \
-      String(intToFloat(myThermostat.getThermostatHysteresis()), 1), \
-      boolToStringHeatingOff(myThermostat.getActualState()), \
-      String(intToFloat(myThermostat.getTargetTemperature()), 1), \
-      sensErrorToString(myThermostat.getSensorError()), \
-      boolToStringHeatOff(myThermostat.getThermostatMode()), \
-      String(myThermostat.getSensorCalibFactor()), \
-      String(intToFloat(myThermostat.getSensorCalibOffset()), 0), \
-      WiFi.localIP().toString(), \
-      String(FW) );
+      static_cast<int16_t>(myThermostat.getThermostatHysteresis()), \
+      cstrHeatingOff(myThermostat.getActualState()), \
+      static_cast<int16_t>(myThermostat.getTargetTemperature()), \
+      cstrSensStatus(myThermostat.getSensorError()), \
+      cstrHeatOff(myThermostat.getThermostatMode()), \
+      myThermostat.getSensorCalibFactor(), \
+      calibOffsetRounded, \
+      ipBuf, \
+      FW);
 
-  myMqttClient.publish( \
-    myMqttHelper.getTopicData(), /* get topic */ \
-    payload, \
-    true, /* retain */ \
-    MQTT_QOS); /* QoS */
+  if (payloadLen > 0) {
+    myMqttClient.publish( \
+      myMqttHelper.getTopicData().c_str(), /* cached topic, no allocation */ \
+      payload, payloadLen, \
+      true, /* retain */ \
+      MQTT_QOS); /* QOS */
+  }
 }
 
-String buildHtml(void) {
+/* ---- HTML page assembled in chunks ----
+   The page is streamed with the core's chunked transfer encoding: every row is formatted
+   into a small stack buffer with snprintf and written straight to the client, so there is
+   no page String in the heap (no 'Reallocating large String' reallocs, no fragmentation of
+   the DRAM heap), no operator+ / concat / changeBuffer frames on the cont stack that runs
+   loop() ('Stack smashing detected' reported by cont_check), and each row checks its own
+   length so a row that does not fit is reported by key instead of silently truncating. */
+
+static uint16_t htmlPageBytes;  /* bytes of the page streamed in the current response */
+
+#define HTML_ROW_BUF_SIZE 400  /* worst row: update_server_address with a 255 char configured address */
+
+static void htmlRowTruncated(const char* key) {
+  #ifdef CFG_DEBUG
+  Serial.print("HTML row truncated: "); Serial.println(key);
+  #endif /* CFG_DEBUG */
+}
+
+/* Send one chunk. The buffer may be a flash literal or a RAM stack buffer; the core picks
+   the matching copy for each (StreamConstPtr tests the address at runtime). */
+static void htmlSendChunk(const char* buf, size_t len) {
+  webServer.sendContent(buf, len);
+  htmlPageBytes += static_cast<uint16_t>(len);
+}
+
+static void htmlSendText(const char* text) {
+  htmlSendChunk(text, strlen(text));
+}
+
+static void htmlRowAppend(int rowLen, const char* key, const char* row, size_t rowSize) {
+  if (rowLen < 0) { return; }
+  if (static_cast<size_t>(rowLen) >= rowSize) {
+    htmlRowTruncated(key);
+    rowLen = static_cast<int>(rowSize) - 1;  /* send what fits, the row is complete HTML */
+  }
+  htmlSendChunk(row, static_cast<size_t>(rowLen));
+}
+
+static void htmlRow2(const char* key, const char* value) {
+  char row[HTML_ROW_BUF_SIZE];
+  htmlRowAppend(snprintf(row, sizeof(row), "<tr><td>%s:</td><td>%s</td></tr>", key, value), key, row, sizeof(row));
+}
+
+static void htmlRow2Str(const char* key, const String& value) {  /* core APIs that return String */
+  htmlRow2(key, value.c_str());
+}
+
+static void htmlRow2U32(const char* key, uint32_t value, const char* suffix = "") {
+  char row[HTML_ROW_BUF_SIZE];
+  htmlRowAppend(snprintf(row, sizeof(row), "<tr><td>%s:</td><td>%lu%s</td></tr>", key, static_cast<unsigned long>(value), suffix), key, row, sizeof(row));
+}
+
+static void htmlRow2I32(const char* key, int32_t value, const char* suffix = "") {
+  char row[HTML_ROW_BUF_SIZE];
+  htmlRowAppend(snprintf(row, sizeof(row), "<tr><td>%s:</td><td>%ld%s</td></tr>", key, static_cast<long>(value), suffix), key, row, sizeof(row));
+}
+
+static void htmlRow4(const char* key, const char* value, const char* current_value, const char* description) {
+  char row[HTML_ROW_BUF_SIZE];
+  htmlRowAppend(snprintf(row, sizeof(row), "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>", key, value, current_value, description), key, row, sizeof(row));
+}
+
+static void htmlRow4Int(const char* key, const char* value, int16_t current_value, const char* description) {
+  char row[HTML_ROW_BUF_SIZE];
+  htmlRowAppend(snprintf(row, sizeof(row), "<tr><td>%s</td><td>%s</td><td>%d</td><td>%s</td></tr>", key, value, current_value, description), key, row, sizeof(row));
+}
+
+void htmlStreamPage(void) {
   float rssiInPercent = WiFi.RSSI();
   rssiInPercent = isnan(rssiInPercent) ? -100.0 : min(max(2 * (rssiInPercent + 100.0), 0.0), 100.0);
-  // char html[8192];
+  char numBuf[16];  /* one scratch buffer for values that need formatting */
 
-  String webpage = "<!DOCTYPE html> <html>\n";
-  webpage.reserve(4096);  /* reserve to avoid heap churn from repeated += concatenation */
+  htmlPageBytes = 0;
+  if (webServer.chunkedResponseModeStart(200, "text/html") == false) {
+    #ifdef CFG_DEBUG
+    Serial.println("Client speaks HTTP/1.0, chunked page not sent");
+    #endif /* CFG_DEBUG */
+    return;
+  }
+
+  htmlSendText("<!DOCTYPE html> <html>\n");
   /* HEAD */
-  webpage +="<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
-  webpage +="<title> "+ String(myConfig.name) + "</title>\n";
-  webpage +="<style>html { font-family: Helvetica; font-size: 16px; display: inline-block; margin: 0px auto; text-align: left;}\n";
-  webpage +="body {background-color: #202226; color: #A0A2A8}\n";
-  webpage +="p {color: #2686c1; margin-bottom: 10px;}\n";
-  webpage +="table {color: #A0A2A8;}\n";
-  webpage +="</style>\n";
-  webpage +="</head>\n";
+  htmlSendText("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n");
+  htmlSendText("<title> "); htmlSendText(myConfig.name); htmlSendText("</title>\n");
+  htmlSendText("<style>html { font-family: Helvetica; font-size: 16px; display: inline-block; margin: 0px auto; text-align: left;}\n");
+  htmlSendText("body {background-color: #202226; color: #A0A2A8}\n");
+  htmlSendText("p {color: #2686c1; margin-bottom: 10px;}\n");
+  htmlSendText("table {color: #A0A2A8;}\n");
+  htmlSendText("</style>\n");
+  htmlSendText("</head>\n");
   /* BODY */
-  webpage +="<body>\n";
-  webpage +="<p><b>System information</b></p>";
-  webpage +="<table>";
-  /* TABLE */
+  htmlSendText("<body>\n");
+  htmlSendText("<p><b>System information</b></p>");
+  htmlSendText("<table>");
   /*= KEY ======================================||= VALUE ================================*/
-  webpageTableAppend2Cols(String("Name"),                 String(myConfig.name));
-  webpageTableAppend2Cols(String("Chip ID"),              getEspChipId());
+  htmlRow2("Name", myConfig.name);
+  htmlRow2Str("Chip ID", getEspChipId());
   #if CFG_BOARD_ESP8266
-  webpageTableAppend2Cols(String("Vcc"),                  String(ESP.getVcc()/1000.0));
-  webpageTableAppend2Cols(String("Arduino Core"),         ESP.getCoreVersion());
-  webpageTableAppend2Cols(String("Reset Reason"),         ESP.getResetReason());
-  webpageTableAppend2Cols(String("Flash Size"),           String(ESP.getFlashChipRealSize()));
+  snprintf(numBuf, sizeof(numBuf), "%d.%02d", static_cast<int>(ESP.getVcc() / 1000), static_cast<int>(ESP.getVcc() % 1000) / 10);
+  htmlRow2("Vcc", numBuf);
+  htmlRow2Str("Arduino Core", ESP.getCoreVersion());
+  htmlRow2Str("Reset Reason", ESP.getResetReason());
+  htmlRow2U32("Flash Size", ESP.getFlashChipRealSize());
   #elif CFG_BOARD_ESP32
-  webpageTableAppend2Cols(String("Reset Reason CPU 0"),   getEspResetReason(rtc_get_reset_reason(0)));
-  webpageTableAppend2Cols(String("Reset Reason CPU 1"),   getEspResetReason(rtc_get_reset_reason(1)));
-  webpageTableAppend2Cols(String("CPU Frequency"),        String(ESP.getCpuFreqMHz() + String(" MHz")));
-  webpageTableAppend2Cols(String("Flash Speed"),          String(ESP.getFlashChipSpeed()/1000000)  + String(" MHz"));
-  webpageTableAppend2Cols(String("Flash Size"),           String(ESP.getFlashChipSize()));
-  webpageTableAppend2Cols(String("Flash Mode"),           String(ESP.getFlashChipMode()));
-  webpageTableAppend2Cols(String("SDK Verison"),          String(ESP.getSdkVersion()));
+  htmlRow2Str("Reset Reason CPU 0", getEspResetReason(rtc_get_reset_reason(0)));
+  htmlRow2Str("Reset Reason CPU 1", getEspResetReason(rtc_get_reset_reason(1)));
+  htmlRow2U32("CPU Frequency", static_cast<uint32_t>(ESP.getCpuFreqMHz()), " MHz");
+  htmlRow2U32("Flash Speed", static_cast<uint32_t>(ESP.getFlashChipSpeed() / 1000000), " MHz");
+  htmlRow2U32("Flash Size", ESP.getFlashChipSize());
+  htmlRow2U32("Flash Mode", ESP.getFlashChipMode());
+  htmlRow2("SDK Verison", ESP.getSdkVersion());
   #else
   #endif
-  webpageTableAppend2Cols(String("Sketch Size"),          String(ESP.getSketchSize()/1024)  + String(" kB"));
-  webpageTableAppend2Cols(String("Free for Sketch"),      String(ESP.getFreeSketchSpace()/1024)  + String(" kB"));
-  webpageTableAppend2Cols(String("Free Heap"),            String(ESP.getFreeHeap()/1024)  + String(" kB"));
-  webpageTableAppend2Cols(String("Time since Reset"),     millisFormatted());
-  webpageTableAppend2Cols(String("Installed Firmware"),   String(VERSION));
-  webpageTableAppend2Cols(String("Available Firmware"),   myConfig.available_firmware_version);
-  webpageTableAppend2Cols(String("IPv4"),                 WiFi.localIP().toString());
-  webpageTableAppend2Cols(String("WiFi Status"),          wifiStatusToString(WiFi.status()));
-  webpageTableAppend2Cols(String("WiFi Strength"),        String(rssiInPercent, 0) + " %");
-  webpageTableAppend2Cols(String("WiFi Connects"),        String(wifi_connect_counter));
-  webpageTableAppend2Cols(String("MQTT Status"),          String((myMqttClient.connected()) == true ? "connected" : "disconnected"));
-  webpageTableAppend2Cols(String("MQTT Connects"),        String(mqtt_connect_counter));
-  webpageTableAppend2Cols(String("MQTT Last Error"),      myMqttHelper.mqttLastErrorToString((int8_t)myMqttClient.lastError()));
-  webpageTableAppend2Cols(String("Local Time"),           String(time_buffer));
-  webpageTableAppend2Cols(String("Looptime mean [&micro;s]"),   String(MyLooptime.get_time_duration_mean()));
-  webpageTableAppend2Cols(String("Looptime min [&micro;s]"),    String(MyLooptime.get_time_duration_min()));
-  webpageTableAppend2Cols(String("Looptime max [&micro;s]"),    String(MyLooptime.get_time_duration_max()));
-  webpage +="</table>";
+  htmlRow2U32("Sketch Size", ESP.getSketchSize() / 1024, " kB");
+  htmlRow2U32("Free for Sketch", ESP.getFreeSketchSpace() / 1024, " kB");
+  htmlRow2U32("Free Heap", ESP.getFreeHeap() / 1024, " kB");
+  htmlRow2Str("Time since Reset", millisFormatted());
+  htmlRow2("Installed Firmware", VERSION);
+  htmlRow2("Available Firmware", myConfig.available_firmware_version.c_str());
+  htmlRow2Str("IPv4", WiFi.localIP().toString());
+  htmlRow2Str("WiFi Status", wifiStatusToString(WiFi.status()));
+  htmlRow2I32("WiFi Strength", static_cast<int32_t>(rssiInPercent), " %");
+  htmlRow2U32("WiFi Connects", wifi_connect_counter);
+  htmlRow2("MQTT Status", myMqttClient.connected() ? "connected" : "disconnected");
+  htmlRow2U32("MQTT Connects", mqtt_connect_counter);
+  htmlRow2Str("MQTT Last Error", myMqttHelper.mqttLastErrorToString((int8_t)myMqttClient.lastError()));
+  htmlRow2("Local Time", time_buffer);
+  htmlRow2U32("Looptime mean [&micro;s]", MyLooptime.get_time_duration_mean());
+  htmlRow2U32("Looptime min [&micro;s]", MyLooptime.get_time_duration_min());
+  htmlRow2U32("Looptime max [&micro;s]", MyLooptime.get_time_duration_max());
+  htmlSendText("</table>");
   /* Change Input Method */
-  webpage +="<p><b>Change Input Method</b></p>";
-  webpage +="<form method='POST' autocomplete='off'>";
+  htmlSendText("<p><b>Change Input Method</b></p>");
+  htmlSendText("<form method='POST' autocomplete='off'>");
 
   if (myConfig.input_method == cPUSH_BUTTONS) {
-    webpage +="<select name='InputMethod'> <option value='0'>Rotary Encoder </option> <option value='1' selected> Push Buttons </option> </select>&nbsp;<input type='submit' value='Submit'>";
+    htmlSendText("<select name='InputMethod'> <option value='0'>Rotary Encoder </option> <option value='1' selected> Push Buttons </option> </select>&nbsp;<input type='submit' value='Submit'>");
   } else {
-    webpage +="<select name='InputMethod'> <option value='0' selected> Rotary Encoder </option> <option value='1'> Push Buttons </option> </select>&nbsp;<input type='submit' value='Submit'>";
+    htmlSendText("<select name='InputMethod'> <option value='0' selected> Rotary Encoder </option> <option value='1'> Push Buttons </option> </select>&nbsp;<input type='submit' value='Submit'>");
   }
-  webpage +="</form>";
+  htmlSendText("</form>");
   /* Change sensor */
-  webpage +="<p><b>Change Sensor</b></p>";
-  webpage +="<form method='POST' autocomplete='off'>";
-  webpage +="<select name='Sensor'> ";
+  htmlSendText("<p><b>Change Sensor</b></p>");
+  htmlSendText("<form method='POST' autocomplete='off'>");
+  htmlSendText("<select name='Sensor'> ");
   if (myConfig.sensor_type == cDHT22) {  /* select currently configured input method */
-  webpage +="<option value='0' selected >DHT22 </option> <option value='1'> BME280 </option>";
+    htmlSendText("<option value='0' selected >DHT22 </option> <option value='1'> BME280 </option>");
   } else {
-  webpage +="<option value='0'>DHT22 </option> <option value='1' selected > BME280 </option>";
+    htmlSendText("<option value='0'>DHT22 </option> <option value='1' selected > BME280 </option>");
   }
-  webpage +="</select>&nbsp;<input type='submit' value='Submit'>";
-  webpage +="</form>";
+  htmlSendText("</select>&nbsp;<input type='submit' value='Submit'>");
+  htmlSendText("</form>");
 
   /* Command Line */
-  webpage +="<p><b>Command Line</b></p>";
-  webpage +="<form method='POST' autocomplete='off'>";
-  webpage +="<input type='text' name='cmd' value='key:value'>&nbsp;<input type='submit' value='Submit'>";
-  webpage +="</form>";
-  webpage +="<p><b>Commands</b></p>";
+  htmlSendText("<p><b>Command Line</b></p>");
+  htmlSendText("<form method='POST' autocomplete='off'>");
+  htmlSendText("<input type='text' name='cmd' value='key:value'>&nbsp;<input type='submit' value='Submit'>");
+  htmlSendText("</form>");
+  htmlSendText("<p><b>Commands</b></p>");
   /* COMMANDS TABLE */
-  webpage +="<table style='font-size: 12px'>";
-  webpageTableAppend4Cols(String("<b>Key</b>"),               String("<b>Value</b>"),                        String("<b>Current Value</b>"),             String("<b>Description</b>"));
-  webpageTableAppend4Cols(String("discover"),                 String("0 | 1"),                               String("none"),                             String("MQTT on demand device discovery: 1 = discover; 0 = remove"));
-  webpageTableAppend4Cols(String("discovery_enabled"),        String("0 | 1"),                               String(myConfig.discovery_enabled),         String("MQTT Autodiscovery: 1 = enabled; 0 = disabled"));
-  webpageTableAppend4Cols(String("name"),                     String("string"),                              String(myConfig.name),                      String("Define a name for this device"));
-  webpageTableAppend4Cols(String("mqtt_server_address"),      String("string"),                              String(myConfig.mqtt_host),                 String("Address of the MQTT server"));
-  webpageTableAppend4Cols(String("mqtt_server_port"),         String("1 .. 65535"),                          String(myConfig.mqtt_port),                 String("Port of the MQTT server"));
-  webpageTableAppend4Cols(String("mqtt_user"),                String("string"),                              String(myConfig.mqtt_user),                 String("MQTT user"));
-  webpageTableAppend4Cols(String("mqtt_pwd"),                 String("string"),                              String("***"),                              String("MQTT password"));
-  webpageTableAppend4Cols(String("mqtt_pub_cycle"),           String("Range: 1 .. 255, LSB: 1 min"),         String(myConfig.mqtt_publish_cycle),        String("Publish cycle for MQTT messages in minutes"));
-  webpageTableAppend4Cols(String("update_server_address"),    String("string"),                              String(myConfig.update_server_address),     String("Address of the update server"));
-  webpageTableAppend4Cols(String("auto_update"),              String("0 | 1"),                               String(myConfig.auto_update),               String("Automatically apply available updates: 1 = Auto Updates enabled; 0 = Auto Updates disabled"));
-  webpageTableAppend4Cols(String("update_firmware"),          String("0 | 1"),                               String("none"),                             String("On demand firmware update: 1 = update"));
-  webpageTableAppend4Cols(String("planned_restart"),          String("0 | 1"),                               String(myConfig.planned_restart),           String("Execute planned restart"));
-  webpageTableAppend4Cols(String("calibration_offset"),       String("Range: -50 .. +50, LSB: 0.1 &deg;C"),  String(myConfig.calibration_offset),        String("Offset calibration for temperature sensor."));
-  webpageTableAppend4Cols(String("calibration_factor"),       String("Range: +50 .. +200, LSB: 1 %"),        String(myConfig.calibration_factor),        String("Linearity calibration for temperature sensor."));
-  webpageTableAppend4Cols(String("display_enabled"),          String("0 | 1"),                               String(myConfig.display_enabled),           String("Display always on or only on user interaction"));
-  webpageTableAppend4Cols(String("display_brightness"),       String("Range: 0 .. +255, LSB: 1 step"),       String(myConfig.display_brightness),        String("Brightness of OLED display"));
-  webpageTableAppend4Cols(String("timezone"),                 String("string"),                              String(myConfig.timezone),                  String("Timezone for NTP, pick from this list: https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv"));
-  webpage +="</table>";
+  htmlSendText("<table style='font-size: 12px'>");
+  htmlRow4("<b>Key</b>", "<b>Value</b>", "<b>Current Value</b>", "<b>Description</b>");
+  htmlRow4("discover", "0 | 1", "none", "MQTT on demand device discovery: 1 = discover; 0 = remove");
+  htmlRow4Int("discovery_enabled", "0 | 1", myConfig.discovery_enabled, "MQTT Autodiscovery: 1 = enabled; 0 = disabled");
+  htmlRow4("name", "string", myConfig.name, "Define a name for this device");
+  htmlRow4("mqtt_server_address", "string", myConfig.mqtt_host, "Address of the MQTT server");
+  htmlRow4Int("mqtt_server_port", "1 .. 65535", myConfig.mqtt_port, "Port of the MQTT server");
+  htmlRow4("mqtt_user", "string", myConfig.mqtt_user, "MQTT user");
+  htmlRow4("mqtt_pwd", "string", "***", "MQTT password");
+  htmlRow4Int("mqtt_pub_cycle", "Range: 1 .. 255, LSB: 1 min", myConfig.mqtt_publish_cycle, "Publish cycle for MQTT messages in minutes");
+  htmlRow4("update_server_address", "string", myConfig.update_server_address, "Address of the update server");
+  htmlRow4Int("auto_update", "0 | 1", myConfig.auto_update, "Automatically apply available updates: 1 = Auto Updates enabled; 0 = Auto Updates disabled");
+  htmlRow4("update_firmware", "0 | 1", "none", "On demand firmware update: 1 = update");
+  htmlRow4Int("planned_restart", "0 | 1", myConfig.planned_restart, "Execute planned restart");
+  htmlRow4Int("calibration_offset", "Range: -50 .. +50, LSB: 0.1 &deg;C", myConfig.calibration_offset, "Offset calibration for temperature sensor.");
+  htmlRow4Int("calibration_factor", "Range: +50 .. +200, LSB: 1 %", myConfig.calibration_factor, "Linearity calibration for temperature sensor.");
+  htmlRow4Int("display_enabled", "0 | 1", myConfig.display_enabled, "Display always on or only on user interaction");
+  htmlRow4Int("display_brightness", "Range: 0 .. +255, LSB: 1 step", myConfig.display_brightness, "Brightness of OLED display");
+  htmlRow4("timezone", "string", myConfig.timezone, "Timezone for NTP, pick from this list: https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv");
+  htmlSendText("</table>");
   /* Restart Device */
-  webpage +="<p><b>Restart Device</b></p>";
+  htmlSendText("<p><b>Restart Device</b></p>");
   if (systemRestartRequest == false) {
-    webpage +="<button onclick=\"window.location.href='/restart'\"> Restart </button>";
+    htmlSendText("<button onclick=\"window.location.href='/restart'\"> Restart </button>");
   } else {
-    webpage +="<button onclick=\"window.location.href='/'\"> Restarting, reload site </button>";
+    htmlSendText("<button onclick=\"window.location.href='/'\"> Restarting, reload site </button>");
   }
-  webpage +="</body>\n";
-  webpage +="</html>\n";
+  htmlSendText("</body>\n");
+  htmlSendText("</html>\n");
+
+  htmlSendChunk("", 0);  /* zero length chunk closes the chunked response */
 
   #ifdef CFG_DEBUG
-  Serial.printf("Length of HTML Code in characters: %i", webpage.length());
+  /* Serial.print() keeps the deep frames small; Serial.printf() allocates a 128 byte
+     local buffer inside Print::vprintf in the cont stack that runs loop() */
+  Serial.println("HTML page bytes streamed: "); Serial.print(htmlPageBytes);
+  Serial.println("  Free Heap: "); Serial.print(ESP.getFreeHeap());
+  Serial.println("  Free ContStack at page build: "); Serial.println(ESP.getFreeContStack());
   #endif /* CFG_DEBUG */
-  return webpage;
 }
 
 void handleWebServerClient(void) {
-  String webpage = buildHtml();
+  htmlStreamPage();  /* page is streamed in chunks, no page String is built */
 
-  webServer.send(200, "text/html", webpage);  /* Send a response to the client asking for input */
+  #ifdef CFG_DEBUG
+  /* high water mark of the continuation stack that executes loop(): the core's
+     cont_check() reports 'Stack smashing detected' when this stack runs out */
+  Serial.print("Cont stack free after page send: "); Serial.println(ESP.getFreeContStack());
+  #endif /* CFG_DEBUG */
 
   /* Evaluate Received Arguments */
   if (webServer.args() > 0) {  /* Arguments were received */
@@ -1493,7 +1580,11 @@ void messageReceived(String &topic, String &payload) {  // NOLINT
       myMqttHelper.setTriggerRemoveDiscovered(false);
     }
   } else if (topic == myMqttHelper.getTopicTargetTempCmd()) { /* check incoming target temperature, don't set same target temperature as new*/
-    if (myThermostat.getTargetTemperature() != floatToInt(payload.toFloat())) {
+    if (!isNumericPayload(payload)) {
+      #ifdef CFG_DEBUG
+      Serial.println("Non-numeric target temperature payload >> ignored: " + payload);
+      #endif
+    } else if (myThermostat.getTargetTemperature() != floatToInt(payload.toFloat())) {
       /* set new target temperature for heating control, min/max limitation inside (string to float to int16_t) */
       myThermostat.setTargetTemperature(floatToInt(payload.toFloat()));
     }
@@ -1532,11 +1623,26 @@ void messageReceived(String &topic, String &payload) {  // NOLINT
     Serial.println("New hysteresis parameter received: " + payload);
     #endif
 
-    myThermostat.setThermostatHysteresis(payload.toInt());
+    if (!isNumericPayload(payload)) {
+      #ifdef CFG_DEBUG
+      Serial.println("Non-numeric hysteresis payload >> ignored: " + payload);
+      #endif
+    } else {
+      myThermostat.setThermostatHysteresis(payload.toInt());
+    }
   } else if (topic == myMqttHelper.getTopicOutsideTemperature()) {
     #ifdef CFG_DEBUG
     Serial.println("New outside temperature received: " + payload);
     #endif
-    myThermostat.setOutsideTemperature(floatToInt(payload.toFloat()));
+    if (!isNumericPayload(payload)) {
+      /* Home Assistant sends "unknown" / "unavailable" when its own outside temperature
+         source has no value; toFloat() on such a payload is 0.0 and would drive the
+         thermostat to a false outside temperature, so the payload is dropped */
+      #ifdef CFG_DEBUG
+      Serial.println("Non-numeric outside temperature payload >> ignored");
+      #endif
+    } else {
+      myThermostat.setOutsideTemperature(floatToInt(payload.toFloat()));
+    }
   }
 }

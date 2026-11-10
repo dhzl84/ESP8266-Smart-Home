@@ -5,6 +5,23 @@ int16_t  floatToInt(float floatValue)         { return (static_cast<int16_t>(flo
 String boolToStringOnOff(bool boolean)        { return (boolean == true ? "on" : "off"); }
 String boolToStringHeatOff(bool boolean)      { return (boolean == true ? "heat" : "off"); }
 String boolToStringHeatingOff(bool boolean)   { return (boolean == true ? "heating" : "off"); }
+const char* cstrSensStatus(bool boolean)      { return (boolean == true ? "error" : "ok"); }
+const char* cstrHeatOff(bool boolean)         { return (boolean == true ? "heat" : "off"); }
+const char* cstrHeatingOff(bool boolean)      { return (boolean == true ? "heating" : "off"); }
+
+/* format a value that is scaled by 10 (e.g. 365 -> "36.5"). decimals = 1 writes one
+   decimal digit, decimals = 0 rounds to the nearest integer. No heap allocation. */
+void formatScaled(char* buf, size_t size, int16_t scaledBy10, uint8_t decimals) {
+  if (decimals == 0) {
+    const int16_t rounded = (scaledBy10 >= 0) ? (scaledBy10 + 5) / 10 : (scaledBy10 - 5) / 10;
+    (void)snprintf(buf, size, "%d", rounded);
+  } else {
+    const int whole = scaledBy10 / 10;
+    int fraction = scaledBy10 % 10;
+    if (fraction < 0) { fraction = -fraction; }  /* sign lives on the whole part: -35 -> -3.5 */
+    (void)snprintf(buf, size, "%d.%d", whole, fraction);
+  }
+}
 String sensErrorToString(bool boolean)        { return (boolean == true ? "error" : "ok"); }
 
 /* Thanks to Tasmota  for timer functions */
@@ -63,6 +80,36 @@ void SetNextTimeInterval(volatile uint32_t *timer, const uint32_t step) {
   *timer = millis() + (step - passed);
 }
 
+/* Home Assistant publishes "unknown"/"unavailable" for entities that currently have no value.
+   payload.toFloat() on such a string returns 0.0 silently, so numeric topics must be validated
+   before they are turned into a temperature, hysteresis or calibration value. */
+bool isNumericPayload(const String& payload) {
+  size_t i = 0;
+  if (payload.length() == 0) {
+    return false;
+  }
+  if (payload[0] == '-' || payload[0] == '+') {
+    i = 1;
+  }
+  bool hasDigit = false;
+  bool hasDot = false;
+  for (; i < payload.length(); i++) {
+    const char c = payload[i];
+    if (c == '.') {
+      if (hasDot) {
+        return false;  /* more than one decimal point */
+      }
+      hasDot = true;
+      continue;
+    }
+    if (c < '0' || c > '9') {
+      return false;
+    }
+    hasDigit = true;
+  }
+  return hasDigit;
+}
+
 /* sensor calibration parameters are received and stored as a string <offset>;<factor> */
 bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor) {
   bool ret = false;
@@ -73,9 +120,13 @@ bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor)
 
   /* don't accept empty substring or strings without delimiter */
   if ((pos > 0) && (pos < UINT32_MAX)) {
-    ret = true;
-    *offset = (sensorCalib.substring(0, pos)).toInt();
-    *factor = (sensorCalib.substring(pos+1)).toInt();
+    String offsetPart = sensorCalib.substring(0, pos);
+    String factorPart = sensorCalib.substring(pos+1);
+    if (isNumericPayload(offsetPart) && isNumericPayload(factorPart)) {
+      ret = true;
+      *offset = offsetPart.toInt();
+      *factor = factorPart.toInt();
+    }
   } else {
     #ifdef CFG_DEBUG
     Serial.println("Malformed sensor calibration string >> calibration update denied");

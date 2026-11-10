@@ -14,7 +14,6 @@ typedef enum {
   kSensorState  /* DEPRECATED */
 } Sensor_t;
 
-
 typedef enum {
   kSensFail,  /* DEPRECATED */
   kThermostatState
@@ -35,11 +34,12 @@ class mqttHelper {
   mqttHelper(void);
   ~mqttHelper(void);
   void   setup(String nodeId);
-  void   buildBaseTopic(void);
   void   setTriggerDiscovery(bool discover);
   bool   getTriggerDiscovery(void);
   void   setTriggerRemoveDiscovered(bool remove);
   bool   getTriggerRemoveDiscovered(void);
+  /* topic getters return cached topic strings built once in setup(), so that the
+     MQTT callback and the publish path do not allocate a new String per call */
   String getTopicUpdateFirmware(void);
   String getTopicChangeName(void);
   String getTopicLastWill(void);
@@ -53,17 +53,22 @@ class mqttHelper {
   String getTopicHassDiscoverySensor(Sensor_t sensor);
   String getTopicHassDiscoverySwitch(Switch_t switches);
   String getTopicHassDiscoveryButton(Button_t buttons);
-  String buildStateJSON(String name, String temp, String humid, String hysteresis, String actState, String tarTemp, String sensError, String thermoMode, String calibration_factor, String calibration_offset, String ip, String firmware);
+  String getTopicData(void);
+  String getTopicOutsideTemperature(void);
+  /* parameters are passed by const reference: 12 String copies per publish avoided */
+  /* state JSON is formatted into the caller's buffer (no heap String at all on the
+     publish path); returns the number of bytes written, -1 if the buffer was too small */
+  int buildStateJSON(char* buf, size_t size, const char* name, const char* temp, const char* humid, int16_t hysteresis, const char* actState, int16_t tarTemp, const char* sensError, const char* thermoMode, int16_t calibration_factor, int16_t calibration_offset, const char* ip, const char* firmware);
   String buildHassDiscoveryClimate(String name, String firmware, String model);
   String buildHassDiscoveryBinarySensor(BinarySensor_t binarySensor);
   String buildHassDiscoverySensor(String name, Sensor_t sensor);
   String buildHassDiscoveryButton(String name, Button_t buttons);
-  String buildHassDiscoverySwitch(String name, Switch_t switches);
-  String getTopicData(void);
-  String getTopicOutsideTemperature(void);
   String mqttLastErrorToString(int8_t last_error);
 
  private:
+  void   buildBaseTopic(void);
+  void   buildTopics(void);
+
   bool   mqttTriggerDiscovery_;
   bool   mqttTriggerRemoveDiscovered_;
   String mqttData_;
@@ -87,6 +92,23 @@ class mqttHelper {
   String mqttThermostatModeCmd_;
   String mqttTargetTempCmd_;
   String mqttOutsideTemperature_;
+  /* fully qualified topics, built once per connection in buildTopics() */
+  String mqttTopicData_;
+  String mqttTopicUpdateFirmware_;
+  String mqttTopicChangeName_;
+  String mqttTopicLastWill_;
+  String mqttTopicSystemRestartRequest_;
+  String mqttTopicChangeSensorCalib_;
+  String mqttTopicChangeHysteresis_;
+  String mqttTopicTargetTempCmd_;
+  String mqttTopicThermostatModeCmd_;
+  String mqttTopicOutsideTemperature_;
+  String mqttTopicDiscoveryClimate_;
+  String mqttTopicDiscoveryBinarySensorState_;
+  String mqttTopicDiscoverySensorTemp_;
+  String mqttTopicDiscoverySensorHum_;
+  String mqttTopicDiscoveryButtonUpdateButton_;
+  String mqttTopicDiscoveryButtonRestartButton_;
 };
 
 #endif  // C_MQTT_H_
