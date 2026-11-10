@@ -1050,52 +1050,63 @@ void homeAssistantRemoveDiscoveredObsolete(void) {
 
 /* publish state topic in JSON format */
 void mqttPubState(void) {
-  /* everything is built on the stack: the payload buffer is published straight to the MQTT
-     client, so the publish path performs no heap allocation at all */
   char payload[384];
   char tempBuf[16];
-  char humidBuf[16];
+  char humBuf[16];
+  char hystBuf[16];
+  char tarTempBuf[16];
+  char calOffsetBuf[16];
   char ipBuf[16];
 
   /* send "None" in case of sensor error and if filtered values are still on init values */
   const char* temperature = "None";
   const char* humidity    = "None";
+  const char* hysteresis  = "None";
+  const char* tarTemp     = "None";
+  const char* calOffset   = "None";
+
   if (myThermostat.getSensorError() == false) {
     if (myThermostat.getFilteredTemperature() != THERMOSTAT_SENSOR_INIT_VALUE) {
       formatScaled(tempBuf, sizeof(tempBuf), myThermostat.getFilteredTemperature(), 1);
       temperature = tempBuf;
     }
     if (myThermostat.getFilteredHumidity() != THERMOSTAT_SENSOR_INIT_VALUE) {
-      formatScaled(humidBuf, sizeof(humidBuf), myThermostat.getFilteredHumidity(), 1);
-      humidity = humidBuf;
+      formatScaled(humBuf, sizeof(humBuf), myThermostat.getFilteredHumidity(), 1);
+      humidity = humBuf;
     }
   }
 
+  formatScaled(hystBuf, sizeof(hystBuf), myThermostat.getThermostatHysteresis(), 1);
+  hysteresis = hystBuf;
+
+  formatScaled(tarTempBuf, sizeof(tarTempBuf), myThermostat.getTargetTemperature(), 1);
+  tarTemp = tarTempBuf;
+
+  formatScaled(calOffsetBuf, sizeof(calOffsetBuf), myThermostat.getSensorCalibOffset(), 1);
+  calOffset = calOffsetBuf;
+
   const IPAddress ip = WiFi.localIP();
   (void)snprintf(ipBuf, sizeof(ipBuf), "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
-
-  /* calibration offset is stored scaled by 10, published as the rounded integer */
-  const int16_t calibOffsetRaw = myThermostat.getSensorCalibOffset();
-  const int16_t calibOffsetRounded = (calibOffsetRaw >= 0) ? (calibOffsetRaw + 5) / 10 : (calibOffsetRaw - 5) / 10;
 
   const int payloadLen = myMqttHelper.buildStateJSON(payload, sizeof(payload), \
       myConfig.name, \
       temperature, \
       humidity, \
-      static_cast<int16_t>(myThermostat.getThermostatHysteresis()), \
+      hysteresis, \
       cstrHeatingOff(myThermostat.getActualState()), \
-      static_cast<int16_t>(myThermostat.getTargetTemperature()), \
+      tarTemp, \
       cstrSensStatus(myThermostat.getSensorError()), \
       cstrHeatOff(myThermostat.getThermostatMode()), \
       myThermostat.getSensorCalibFactor(), \
-      calibOffsetRounded, \
+      calOffset, \
       ipBuf, \
       FW);
 
   if (payloadLen > 0) {
     myMqttClient.publish( \
-      myMqttHelper.getTopicData().c_str(), /* cached topic, no allocation */ \
-      payload, payloadLen, \
+      myMqttHelper.getTopicData().c_str(), \
+      payload, \
+      payloadLen, \
       true, /* retain */ \
       MQTT_QOS); /* QOS */
   }
@@ -1296,9 +1307,12 @@ void htmlStreamPage(void) {
   #ifdef CFG_DEBUG
   /* Serial.print() keeps the deep frames small; Serial.printf() allocates a 128 byte
      local buffer inside Print::vprintf in the cont stack that runs loop() */
-  Serial.println("HTML page bytes streamed: "); Serial.print(htmlPageBytes);
-  Serial.println("  Free Heap: "); Serial.print(ESP.getFreeHeap());
-  Serial.println("  Free ContStack at page build: "); Serial.println(ESP.getFreeContStack());
+  Serial.print("HTML page bytes streamed: ");
+  Serial.println(htmlPageBytes);
+  Serial.print("  Free Heap: ");
+  Serial.println(ESP.getFreeHeap());
+  Serial.print("  Free ContStack at page build: ");
+  Serial.println(ESP.getFreeContStack());
   #endif /* CFG_DEBUG */
 }
 
@@ -1308,7 +1322,8 @@ void handleWebServerClient(void) {
   #ifdef CFG_DEBUG
   /* high water mark of the continuation stack that executes loop(): the core's
      cont_check() reports 'Stack smashing detected' when this stack runs out */
-  Serial.print("Cont stack free after page send: "); Serial.println(ESP.getFreeContStack());
+  Serial.print("Free ContStack after page send: ");
+  Serial.println(ESP.getFreeContStack());
   #endif /* CFG_DEBUG */
 
   /* Evaluate Received Arguments */
@@ -1321,7 +1336,9 @@ void handleWebServerClient(void) {
         String key = "";
         String value = "";
         if (splitHtmlCommand(webServer.arg(i), &key, &value)) {
+          #ifdef CFG_DEBUG
           Serial.println(key + " : " + value);
+          #endif /* CFG_DEBUG */
           if (key == "discover") {
             if ((value.toInt() & 1) == true) {
               myMqttHelper.setTriggerDiscovery(true);

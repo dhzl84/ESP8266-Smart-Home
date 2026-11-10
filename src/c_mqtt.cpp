@@ -66,13 +66,7 @@ void mqttHelper::buildTopics(void) {
   mqttTopicDiscoveryButtonUpdateButton_   = mqttPrefix_ + mqttCompButton_ + mqttNodeId_ + mqttObjectId_ + "Update" + mqttHassDiscoveryTopic_;
 }
 
-int mqttHelper::buildStateJSON(char* buf, size_t size, const char* name, const char* temp, const char* humid, int16_t hysteresis, const char* actState, int16_t tarTemp, const char* sensError, const char* thermoMode, int16_t calibration_factor, int16_t calibration_offset, const char* ip, const char* firmware) {
-  /* hysteresis and tarTemp are scaled by 10, so the decimals are split with integer math;
-     no heap allocation: the JSON lives in the caller's buffer and is published from there */
-  const int hysteresisWhole = hysteresis / 10;
-  const int hysteresisFrac  = (hysteresis % 10 < 0) ? -(hysteresis % 10) : (hysteresis % 10);
-  const int targetWhole     = tarTemp / 10;
-  const int targetFrac      = (tarTemp % 10 < 0) ? -(tarTemp % 10) : (tarTemp % 10);
+int mqttHelper::buildStateJSON(char* buf, size_t size, const char* name, const char* temp, const char* humid, const char* hysteresis, const char* actState, const char* tarTemp, const char* sensError, const char* thermoMode, int16_t calibration_factor, const char* calibration_offset, const char* ip, const char* firmware) {
 
   int written = snprintf(buf, size,
     "{\n"
@@ -80,25 +74,23 @@ int mqttHelper::buildStateJSON(char* buf, size_t size, const char* name, const c
     "  \"dev\":\"%s\",\n"
     "  \"mode\":\"%s\",\n"
     "  \"state\":\"%s\",\n"
-    "  \"target_temp\":\"%d.%d\",\n"
+    "  \"target_temp\":\"%s\",\n"
     "  \"current_temp\":\"%s\",\n"
     "  \"humidity\":\"%s\",\n"
-    "  \"hysteresis\":\"%d.%d\",\n"
+    "  \"hysteresis\":\"%s\",\n"
     "  \"sens_status\":\"%s\",\n"
     "  \"sens_scale\":\"%d\",\n"
-    "  \"sens_offs\":\"%d\",\n"
+    "  \"sens_offs\":\"%s\",\n"
     "  \"fw\":\"%s\",\n"
     "  \"ip\":\"%s\"\n"
     "}",
-    name, mqttNodeId_.c_str(), thermoMode, actState, targetWhole, targetFrac,
-    temp, humid, hysteresisWhole, hysteresisFrac, sensError,
-    calibration_factor, calibration_offset, firmware, ip);
+    name, mqttNodeId_.c_str(), thermoMode, actState, tarTemp, temp, humid, hysteresis, sensError, calibration_factor, calibration_offset, firmware, ip);
 
   if (written < 0 || static_cast<size_t>(written) >= size) {
     #ifdef CFG_DEBUG
     Serial.println("State JSON truncated, name too long for the buffer");
     #endif
-    return -1;
+    written = -1;
   }
   return written;
 }
