@@ -588,7 +588,9 @@ void HANDLE_SYSTEM_STATE(void) {
     Serial.println("Current time: "+ String(millis()));
     #endif
     if (TimeReached(onOffButtonSystemResetTime)) {
+      #ifdef CFG_DEBUG_ENCODER
       Serial.println("Restart requested by push button");
+      #endif
       systemRestartRequest = true;
     } else {
       /* waiting */
@@ -661,7 +663,9 @@ void SENSOR_INIT() {
     }
   } else if (myConfig.sensor_type == cDHT22) {
       myDHT22.setup(DHT_PIN, DHTesp::DHT22); /* init DHT sensor */
+      #ifdef CFG_DEBUG
       Serial.println("DHT22 init: " + String(myDHT22.getStatusString()));
+      #endif
   } else {
       #ifdef CFG_DEBUG
       Serial.println("Sensor misconfiguration!");
@@ -741,18 +745,18 @@ bool display_flushed = false;
 uint32_t displayContentHash(void) {
   char buf[64];
   snprintf(buf, sizeof(buf), "%d%d%d%d%d%d%d%d%d%d%d%s",
-           static_cast<int>(systemRestartRequest),
-           static_cast<int>(OTA_UPDATE),
-           static_cast<int>(update_firmware),
-           static_cast<int>(myConfig.display_enabled || display_enabled_temporary),
-           static_cast<int>(myThermostat.getSensorError()),
-           static_cast<int>(myThermostat.getSensorFailureCounter()),
-           static_cast<int>(myThermostat.getFilteredTemperature()),
-           static_cast<int>(myThermostat.getOutsideTemperatureReceived()),
-           static_cast<int>(myThermostat.getOutsideTemperature()),
-           static_cast<int>(myThermostat.getThermostatMode()),
-           static_cast<int>(myThermostat.getTargetTemperature()),
-           time_buffer);
+    static_cast<int>(systemRestartRequest),
+    static_cast<int>(OTA_UPDATE),
+    static_cast<int>(update_firmware),
+    static_cast<int>(myConfig.display_enabled || display_enabled_temporary),
+    static_cast<int>(myThermostat.getSensorError()),
+    static_cast<int>(myThermostat.getSensorFailureCounter()),
+    static_cast<int>(myThermostat.getFilteredTemperature()),
+    static_cast<int>(myThermostat.getOutsideTemperatureReceived()),
+    static_cast<int>(myThermostat.getOutsideTemperature()),
+    static_cast<int>(myThermostat.getThermostatMode()),
+    static_cast<int>(myThermostat.getTargetTemperature()),
+    time_buffer);
   uint32_t hash = 2166136261u;
   for (size_t i = 0; i < strlen(buf); i++) {
     hash ^= static_cast<uint32_t>(buf[i]);
@@ -948,7 +952,9 @@ void FS_MAIN(void) {
       requestSaveToSpiffsWithRestart = false;
       requestSaveToSpiffs = false;  /* reset non reset request as well */
       systemRestartRequest = true;
+      #ifdef CFG_DEBUG
       Serial.println("Restart requested by file system handler");
+      #endif
       } else {
       /* write failed, retry next loop */
     }
