@@ -106,13 +106,23 @@ int mqttHelper::buildStateJSON(char* buf, size_t size, const char* name, const c
  */
 String mqttHelper::buildHassDiscoveryClimate(String name, String firmware, String model) {
   // DynamicJsonDocument reuses the same buffer, avoiding heap fragmentation
-  DynamicJsonDocument doc(512);  // ~400 bytes for climate discovery payload
+  DynamicJsonDocument doc(1024);  // Increased from 512 - climate discovery can be larger
   
   JsonObject root = doc.to<JsonObject>();
   
-  // Add device object with identifiers (Home Assistant requires at least one identifier)
-  JsonObject devObj = root.createNestedObject("dev");
+  // Create device object FIRST (Home Assistant requires "device" with identifiers)
+  JsonObject devObj = root.createNestedObject("device");  // HA expects "device", not "dev"
   
+  // Populate device object immediately
+  JsonArray idsArr = devObj.createNestedArray("identifiers");  // Home Assistant field name
+  idsArr.add(mqttNodeId_);
+  
+  devObj["model"] = model + " Thermostat";
+  devObj["name"] = "Thermostat " + name;
+  devObj["manufacturer"] = "dhzl84";
+  devObj["config_url"] = "http://" + name + "/";
+  
+  // Populate root properties
   root["~"] = mqttGeneralBaseTopic_;
   root["name"] = name;
   root["mode_cmd_t"] = "~" + mqttThermostatModeCmd_;
@@ -139,15 +149,8 @@ String mqttHelper::buildHassDiscoveryClimate(String name, String firmware, Strin
   root["uniq_id"] = mqttNodeId_ + "_climate";
   root["ic"] = "mdi:thermostat-box";
   
-  devObj["ids"] = JsonArray().add(mqttNodeId_);
-  devObj["mdl"] = model + " Thermostat";
-  devObj["name"] = "Thermostat " + name;
-  devObj["sw"] = firmware;
-  devObj["mf"] = "dhzl84";
-  devObj["cu"] = "http://" + name + "/";
-  
   // Serialize to char buffer, then convert to String for MQTT publish (single allocation)
-  char jsonBuffer[600];  // Sufficient for climate discovery payload
+  char jsonBuffer[1200];  // Increased from 600 - larger payload needs more space
   serializeJson(doc, jsonBuffer);
   return String(jsonBuffer);
 }
@@ -156,12 +159,12 @@ String mqttHelper::buildHassDiscoveryClimate(String name, String firmware, Strin
  * buildHassDiscoveryBinarySensor - Zero-allocation using ArduinoJson DynamicJsonDocument
  */
 String mqttHelper::buildHassDiscoveryBinarySensor(BinarySensor_t binarySensor) {
-  DynamicJsonDocument doc(256);  // Smaller payload, less memory needed
+  DynamicJsonDocument doc(512);  // Increased from 256 - device object needs space
   
   JsonObject root = doc.to<JsonObject>();
   
   // Add device object with identifiers (Home Assistant requires at least one identifier)
-  JsonObject devObj = root.createNestedObject("dev");
+  JsonObject devObj = root.createNestedObject("device");
   
   switch (binarySensor) {
     case kThermostatState:
@@ -180,14 +183,15 @@ String mqttHelper::buildHassDiscoveryBinarySensor(BinarySensor_t binarySensor) {
       root["uniq_id"] = mqttNodeId_ + "_state";
       root["ic"] = "mdi:radiator";
       
-      devObj["ids"] = JsonArray().add(mqttNodeId_);
+      JsonArray idsArr = devObj.createNestedArray("identifiers");
+      idsArr.add(mqttNodeId_);
       break;
     }
     default:
       return String("");  // No binary sensor discovery for this type
   }
   
-  char jsonBuffer[400];
+  char jsonBuffer[800];
   serializeJson(doc, jsonBuffer);
   return String(jsonBuffer);
 }
@@ -196,12 +200,12 @@ String mqttHelper::buildHassDiscoveryBinarySensor(BinarySensor_t binarySensor) {
  * buildHassDiscoverySensor - Zero-allocation using ArduinoJson DynamicJsonDocument
  */
 String mqttHelper::buildHassDiscoverySensor(String name, Sensor_t sensor) {
-  DynamicJsonDocument doc(300);  // Medium payload size
+  DynamicJsonDocument doc(600);  // Increased from 300 - device object needs space
   
   JsonObject root = doc.to<JsonObject>();
   
   // Add device object with identifiers (Home Assistant requires at least one identifier)
-  JsonObject devObj = root.createNestedObject("dev");
+  JsonObject devObj = root.createNestedObject("device");
   
   switch (sensor) {
     case kTemp:
@@ -219,7 +223,8 @@ String mqttHelper::buildHassDiscoverySensor(String name, Sensor_t sensor) {
       root["uniq_id"] = mqttNodeId_ + "_sensTemp";
       root["ic"] = "mdi:thermometer";
       
-      devObj["ids"] = JsonArray().add(mqttNodeId_);
+      JsonArray idsArr = devObj.createNestedArray("identifiers");
+      idsArr.add(mqttNodeId_);
       break;
     }
     case kHum:
@@ -237,14 +242,15 @@ String mqttHelper::buildHassDiscoverySensor(String name, Sensor_t sensor) {
       root["uniq_id"] = mqttNodeId_ + "_sensHum";
       root["ic"] = "mdi:water-percent";
       
-      devObj["ids"] = JsonArray().add(mqttNodeId_);
+      JsonArray idsArr = devObj.createNestedArray("identifiers");
+      idsArr.add(mqttNodeId_);
       break;
     }
     default:
       return String("");  // No discovery for this sensor type
   }
   
-  char jsonBuffer[500];
+  char jsonBuffer[1000];
   serializeJson(doc, jsonBuffer);
   return String(jsonBuffer);
 }
@@ -253,12 +259,12 @@ String mqttHelper::buildHassDiscoverySensor(String name, Sensor_t sensor) {
  * buildHassDiscoveryButton - Zero-allocation using ArduinoJson DynamicJsonDocument
  */
 String mqttHelper::buildHassDiscoveryButton(String name, Button_t buttons) {
-  DynamicJsonDocument doc(256);  // Smaller payload for button commands
+  DynamicJsonDocument doc(512);  // Increased from 256 - device object needs space
   
   JsonObject root = doc.to<JsonObject>();
   
   // Add device object with identifiers (Home Assistant requires at least one identifier)
-  JsonObject devObj = root.createNestedObject("dev");
+  JsonObject devObj = root.createNestedObject("device");
   
   switch (buttons) {
     case kRestart_button:
@@ -274,7 +280,8 @@ String mqttHelper::buildHassDiscoveryButton(String name, Button_t buttons) {
       root["uniq_id"] = mqttNodeId_ + "_swRestart";
       root["ic"] = "mdi:restart";
       
-      devObj["ids"] = JsonArray().add(mqttNodeId_);
+      JsonArray idsArr = devObj.createNestedArray("identifiers");
+      idsArr.add(mqttNodeId_);
       break;
     }
     case kUpdate_button:
@@ -290,14 +297,15 @@ String mqttHelper::buildHassDiscoveryButton(String name, Button_t buttons) {
       root["uniq_id"] = mqttNodeId_ + "_swUpdate";
       root["ic"] = "mdi:cellphone-arrow-down";
       
-      devObj["ids"] = JsonArray().add(mqttNodeId_);
+      JsonArray idsArr = devObj.createNestedArray("identifiers");
+      idsArr.add(mqttNodeId_);
       break;
     }
     default:
       return String("");  // No discovery for this button type
   }
   
-  char jsonBuffer[400];
+  char jsonBuffer[800];
   serializeJson(doc, jsonBuffer);
   return String(jsonBuffer);
 }
