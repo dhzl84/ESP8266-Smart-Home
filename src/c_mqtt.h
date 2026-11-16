@@ -63,7 +63,7 @@ class mqttHelper {
   String buildHassDiscoveryBinarySensor(BinarySensor_t binarySensor);
   String buildHassDiscoverySensor(String name, Sensor_t sensor);
   String buildHassDiscoveryButton(String name, Button_t buttons);
-  String mqttLastErrorToString(int8_t last_error);
+  const char* mqttLastErrorToString(int8_t last_error);  // Returns pointer to static array, not heap String
 
  private:
   void   buildBaseTopic(void);
