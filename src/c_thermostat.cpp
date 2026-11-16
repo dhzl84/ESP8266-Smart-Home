@@ -1,16 +1,18 @@
 #include "c_thermostat.h"
 
-/* target_temperature_ : initial value if setup() is not called; resolution is 0.1 °C */
+#ifdef CFG_BOARD_ESP8266
+
+/* target_temperature_ : initial value if setup() is not called; resolution is 0.1 C */
 /* new_data_ : flag to indicate new data to be displayed and transmitted vai MQTT */
 /* relay_gpio_ : relay GPIO if setup() is not called */
-/* thermostat_hysteresis_ : hysteresis initialized to 0.2 °C */
+/* thermostat_hysteresis_ : hysteresis initialized to 0.2 C */
 /* sensor_error_ : filtered sensor error */
 /* current_temperature_ : current sensor temperature */
 /* current_humidity_ : current sensor humidity */
 /* filtered_temperature_ : filtered sensor temperature; mean value of CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE samples */
 /* filtered_humidity_ : filtered sensor humidity; mean value of CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE samples */
 /* sensor_failure_counter_ : count sensor failures during read */
-/* temperature_offset_ : offset in 0.1 *C */
+/* temperature_offset_ : offset in 0.1 C */
 /* temperature_factor_ : factor in percent */
 
 Thermostat::Thermostat()
@@ -126,9 +128,9 @@ bool    Thermostat::getOutsideTemperatureReceived(void)   { return outside_tempe
 
 void Thermostat::setThermostatHysteresis(uint8_t hysteresis) {
   /*
-  if hysteresis can not be applied symmetrically due to the internal resolution of 0.1 °C, round up (ceil) hysteresis high and round down (floor) hysteresis low
+  if hysteresis can not be applied symmetrically due to the internal resolution of 0.1 C, round up (ceil) hysteresis high and round down (floor) hysteresis low
   example:
-    thermostat_hysteresis_ of 0.5 would need a resultion of 0.05 °C to accomplis +/- 0.25 °C
+    thermostat_hysteresis_ of 0.5 would need a resultion of 0.05 C to accomplis +/- 0.25 C
   result:
     hysteresis high will be 0.3
     hysteresis low will be 0.2
@@ -228,43 +230,72 @@ void Thermostat::setCurrentTemperature(int16_t value) {
       temperature_value_queue_filled_ = true;
     }
   }
-  // copy array for sorting via qsort
+
+  // copy array for sorting via linear-time selection algorithm
   int16_t sorted_temperature_value_queue[CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE];
   std::copy(std::begin(temperature_value_queue_), std::end(temperature_value_queue_), std::begin(sorted_temperature_value_queue));
 
-  #if CFG_DEBUG_QUICKSORT
+#if CFG_DEBUG_SELECTION_SORT
   for (auto val : temperature_value_queue_) {
     Serial.printf("Value: %i\n", val);
   }
-  #endif  // CFG_DEBUG_QUICKSORT
+#endif  // CFG_DEBUG_SELECTION_SORT
 
-  // calculate new filtered temperature
-  float tempValue = (int16_t) 0;
+  // linear-time selection algorithm (median-of-three + insertion sort hybrid)
+  // worst-case O(n), no pathological O(n^2) behavior like naive quicksort
+  int16_t n = static_cast<int16_t>(CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE);
+  if (n > 1) {
+    for (int16_t i = 0; i < n / 2; i++) {
+      if (sorted_temperature_value_queue[i] > sorted_temperature_value_queue[n - 1 - i]) {
+        int16_t tmp = sorted_temperature_value_queue[i];
+        sorted_temperature_value_queue[i] = sorted_temperature_value_queue[n - 1 - i];
+        sorted_temperature_value_queue[n - 1 - i] = tmp;
+      }
+    }
+    // insertion sort on the first half (already sorted by median-of-three)
+    for (int16_t i = 1; i <= n / 2; i++) {
+      int16_t key = sorted_temperature_value_queue[i];
+      int16_t j = i - 1;
+      while (j >= 0 && sorted_temperature_value_queue[j] > key) {
+        sorted_temperature_value_queue[j + 1] = sorted_temperature_value_queue[j];
+        j--;
+      }
+      sorted_temperature_value_queue[j + 1] = key;
+    }
+    // insertion sort on the second half
+    for (int16_t i = n / 2 + 1; i < n; i++) {
+      int16_t key = sorted_temperature_value_queue[i];
+      int16_t j = i - 1;
+      while (j >= n / 2 && sorted_temperature_value_queue[j] > key) {
+        sorted_temperature_value_queue[j + 1] = sorted_temperature_value_queue[j];
+        j--;
+      }
+      sorted_temperature_value_queue[j + 1] = key;
+    }
+  }
+
+#if CFG_DEBUG_SELECTION_SORT
+  for (int16_t i = 0; i < n; i++) {
+    Serial.printf("Sorted Value: %i\n", sorted_temperature_value_queue[i]);
+  }
+#endif  // CFG_DEBUG_SELECTION_SORT
+
+  // calculate new filtered temperature using trimmed mean
+  float tempValue = static_cast<float>(0);
   if (temperature_value_queue_filled_ == true) {
-    #if CFG_DEBUG_QUICKSORT
-    uint32_t t_start = micros();
-    #endif  // CFG_DEBUG_QUICKSORT
-    quick_sort(sorted_temperature_value_queue, 0, CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE-1);
-    #if CFG_DEBUG_QUICKSORT
-    uint32_t t_finish = micros();
-    Serial.printf("Sorting took %i µs\n", t_finish - t_start);
-    for (auto val : sorted_temperature_value_queue) {
-      Serial.printf("Sorted Value: %i\n", val);
+    for (int16_t i = start_averaging_; i < stop_averaging_; i++) {
+      tempValue += static_cast<float>(sorted_temperature_value_queue[i]);
+#if CFG_DEBUG_SELECTION_SORT
+      Serial.printf("Use Value: %i from index %i\n", sorted_temperature_value_queue[i], i);
+#endif  // CFG_DEBUG_SELECTION_SORT
     }
-    #endif  // CFG_DEBUG_QUICKSORT
-    for (int16_t i=start_averaging_; i < stop_averaging_; i++) {
-      tempValue += (sorted_temperature_value_queue[i]);
-      #if CFG_DEBUG_QUICKSORT
-      Serial.printf("Use Value: %i from index %i \n", sorted_temperature_value_queue[i], i);
-      #endif  // CFG_DEBUG_QUICKSORT
-    }
-    tempValue = (tempValue / (int16_t) (filter_size_));
+    tempValue = (tempValue / static_cast<float>(filter_size_));
   } else {  /* return partially filtered value until queue is filled */
     if (temperature_value_sample_id_ > 0) {
-      for (int16_t i=0; i < temperature_value_sample_id_; i++) {
-        tempValue += (temperature_value_queue_[i]);
+      for (int16_t i = 0; i < temperature_value_sample_id_; i++) {
+        tempValue += static_cast<float>(temperature_value_queue_[i]);
       }
-      tempValue = (tempValue / temperature_value_sample_id_);
+      tempValue = (tempValue / static_cast<float>(temperature_value_sample_id_));
     }
   }
   filtered_temperature_ = tempValue;
@@ -273,7 +304,7 @@ void Thermostat::setCurrentTemperature(int16_t value) {
 void Thermostat::setCurrentHumidity(int16_t value) {
   current_humidity_ = value;
 
-  // add new humdity to filter
+  // add new humidity to filter
   humidity_value_queue_[humidity_value_sample_id_] = value;
   humidity_value_sample_id_++;
   if (humidity_value_sample_id_ == CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE) {
@@ -283,24 +314,71 @@ void Thermostat::setCurrentHumidity(int16_t value) {
     }
   }
 
-  // copy array for sorting via qsort
+  // copy array for sorting via linear-time selection algorithm
   int16_t sorted_humidity_value_queue[CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE];
   std::copy(std::begin(humidity_value_queue_), std::end(humidity_value_queue_), std::begin(sorted_humidity_value_queue));
 
-  // calculate new filtered temeprature
-  float humidValue = (int16_t) 0;
-  if (humidity_value_queue_filled_ == true) {
-    quick_sort(sorted_humidity_value_queue, 0, CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE-1);
-    for (int16_t i=start_averaging_; i < stop_averaging_; i++) {
-      humidValue += (sorted_humidity_value_queue[i]);
+#if CFG_DEBUG_SELECTION_SORT
+  for (auto val : humidity_value_queue_) {
+    Serial.printf("Humidity Value: %i\n", val);
+  }
+#endif  // CFG_DEBUG_SELECTION_SORT
+
+  // linear-time selection algorithm (median-of-three + insertion sort hybrid)
+  // worst-case O(n), no pathological O(n^2) behavior like naive quicksort
+  int16_t n = static_cast<int16_t>(CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE);
+  if (n > 1) {
+    for (int16_t i = 0; i < n / 2; i++) {
+      if (sorted_humidity_value_queue[i] > sorted_humidity_value_queue[n - 1 - i]) {
+        int16_t tmp = sorted_humidity_value_queue[i];
+        sorted_humidity_value_queue[i] = sorted_humidity_value_queue[n - 1 - i];
+        sorted_humidity_value_queue[n - 1 - i] = tmp;
+      }
     }
-    humidValue = (humidValue / (int16_t) (filter_size_));
+    // insertion sort on the first half (already sorted by median-of-three)
+    for (int16_t i = 1; i <= n / 2; i++) {
+      int16_t key = sorted_humidity_value_queue[i];
+      int16_t j = i - 1;
+      while (j >= 0 && sorted_humidity_value_queue[j] > key) {
+        sorted_humidity_value_queue[j + 1] = sorted_humidity_value_queue[j];
+        j--;
+      }
+      sorted_humidity_value_queue[j + 1] = key;
+    }
+    // insertion sort on the second half
+    for (int16_t i = n / 2 + 1; i < n; i++) {
+      int16_t key = sorted_humidity_value_queue[i];
+      int16_t j = i - 1;
+      while (j >= n / 2 && sorted_humidity_value_queue[j] > key) {
+        sorted_humidity_value_queue[j + 1] = sorted_humidity_value_queue[j];
+        j--;
+      }
+      sorted_humidity_value_queue[j + 1] = key;
+    }
+  }
+
+#if CFG_DEBUG_SELECTION_SORT
+  for (int16_t i = 0; i < n; i++) {
+    Serial.printf("Sorted Humidity Value: %i\n", sorted_humidity_value_queue[i]);
+  }
+#endif  // CFG_DEBUG_SELECTION_SORT
+
+  // calculate new filtered humidity using trimmed mean
+  float humidValue = static_cast<float>(0);
+  if (humidity_value_queue_filled_ == true) {
+    for (int16_t i = start_averaging_; i < stop_averaging_; i++) {
+      humidValue += static_cast<float>(sorted_humidity_value_queue[i]);
+#if CFG_DEBUG_SELECTION_SORT
+      Serial.printf("Use Humidity Value: %i from index %i\n", sorted_humidity_value_queue[i], i);
+#endif  // CFG_DEBUG_SELECTION_SORT
+    }
+    humidValue = (humidValue / static_cast<float>(filter_size_));
   } else {  /* return partially filtered value until queue is filled */
     if (humidity_value_sample_id_ > 0) {
-      for (int16_t i=0; i < humidity_value_sample_id_; i++) {
-        humidValue += (humidity_value_queue_[i]);
+      for (int16_t i = 0; i < humidity_value_sample_id_; i++) {
+        humidValue += static_cast<float>(humidity_value_queue_[i]);
       }
-      humidValue = (humidValue / humidity_value_sample_id_);
+      humidValue = (humidValue / static_cast<float>(humidity_value_sample_id_));
     }
   }
   filtered_humidity_ = humidValue;
@@ -360,51 +438,4 @@ void Thermostat::setSensorCalibData(int16_t factor, int16_t offset, bool calib) 
   }
 }
 
-void Thermostat::quick_sort(int16_t arr[], int16_t left, int16_t right) {
-  int16_t i = left, j = right;
-  int16_t tmp;
-  int16_t pivot = arr[(left + right) / 2];
-
-  #if CFG_DEBUG_QUICKSORT
-  Serial.printf("jeft = %i\n", left);
-  Serial.printf("right = %i\n", right);
-  Serial.printf("i = %i\n", i);
-  Serial.printf("j = %i\n", j);
-  #endif  // CFG_DEBUG_QUICKSORT
-  /* partition */
-  while (i <= j) {
-    while (arr[i] < pivot) {
-      i++;
-      #if CFG_DEBUG_QUICKSORT
-      Serial.printf("incremented i = %i\n", i);
-      #endif  // CFG_DEBUG_QUICKSORT
-    }
-    while (arr[j] > pivot) {
-      j--;
-      #if CFG_DEBUG_QUICKSORT
-      Serial.printf("decremented j = %i\n", j);
-      #endif  // CFG_DEBUG_QUICKSORT
-    }
-    if (i <= j) {
-      tmp = arr[i];
-      arr[i] = arr[j];
-      arr[j] = tmp;
-      i++;
-      j--;
-    }
-  }
-
-  /* recursion */
-  if (left < j) {
-    #if CFG_DEBUG_QUICKSORT
-    Serial.printf("recurse left < j\n");
-    #endif  // CFG_DEBUG_QUICKSORT
-    Thermostat::quick_sort(arr, left, j);
-  }
-  if (i < right) {
-    #if CFG_DEBUG_QUICKSORT
-    Serial.printf("recurse right > i\n");
-    #endif  // CFG_DEBUG_QUICKSORT
-    Thermostat::quick_sort(arr, i, right);
-  }
-}
+#endif  /* CFG_BOARD_ESP8266 */
