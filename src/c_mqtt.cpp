@@ -109,7 +109,9 @@ String mqttHelper::buildHassDiscoveryClimate(String name, String firmware, Strin
   DynamicJsonDocument doc(512);  // ~400 bytes for climate discovery payload
   
   JsonObject root = doc.to<JsonObject>();
-  JsonObject devObj = root.createNestedObject("dev");  // createNestedObject returns JsonObject
+  
+  // Add device object with identifiers (Home Assistant requires at least one identifier)
+  JsonObject devObj = root.createNestedObject("dev");
   
   root["~"] = mqttGeneralBaseTopic_;
   root["name"] = name;
@@ -158,6 +160,9 @@ String mqttHelper::buildHassDiscoveryBinarySensor(BinarySensor_t binarySensor) {
   
   JsonObject root = doc.to<JsonObject>();
   
+  // Add device object with identifiers (Home Assistant requires at least one identifier)
+  JsonObject devObj = root.createNestedObject("dev");
+  
   switch (binarySensor) {
     case kThermostatState:
     {
@@ -175,7 +180,6 @@ String mqttHelper::buildHassDiscoveryBinarySensor(BinarySensor_t binarySensor) {
       root["uniq_id"] = mqttNodeId_ + "_state";
       root["ic"] = "mdi:radiator";
       
-      JsonObject devObj = root.createNestedObject("dev");  // createNestedObject returns JsonObject
       devObj["ids"] = JsonArray().add(mqttNodeId_);
       break;
     }
@@ -196,6 +200,9 @@ String mqttHelper::buildHassDiscoverySensor(String name, Sensor_t sensor) {
   
   JsonObject root = doc.to<JsonObject>();
   
+  // Add device object with identifiers (Home Assistant requires at least one identifier)
+  JsonObject devObj = root.createNestedObject("dev");
+  
   switch (sensor) {
     case kTemp:
     {
@@ -212,7 +219,6 @@ String mqttHelper::buildHassDiscoverySensor(String name, Sensor_t sensor) {
       root["uniq_id"] = mqttNodeId_ + "_sensTemp";
       root["ic"] = "mdi:thermometer";
       
-      JsonObject devObj = root.createNestedObject("dev");  // createNestedObject returns JsonObject
       devObj["ids"] = JsonArray().add(mqttNodeId_);
       break;
     }
@@ -231,7 +237,6 @@ String mqttHelper::buildHassDiscoverySensor(String name, Sensor_t sensor) {
       root["uniq_id"] = mqttNodeId_ + "_sensHum";
       root["ic"] = "mdi:water-percent";
       
-      JsonObject devObj = root.createNestedObject("dev");  // createNestedObject returns JsonObject
       devObj["ids"] = JsonArray().add(mqttNodeId_);
       break;
     }
@@ -252,6 +257,9 @@ String mqttHelper::buildHassDiscoveryButton(String name, Button_t buttons) {
   
   JsonObject root = doc.to<JsonObject>();
   
+  // Add device object with identifiers (Home Assistant requires at least one identifier)
+  JsonObject devObj = root.createNestedObject("dev");
+  
   switch (buttons) {
     case kRestart_button:
     {
@@ -266,7 +274,6 @@ String mqttHelper::buildHassDiscoveryButton(String name, Button_t buttons) {
       root["uniq_id"] = mqttNodeId_ + "_swRestart";
       root["ic"] = "mdi:restart";
       
-      JsonObject devObj = root.createNestedObject("dev");  // createNestedObject returns JsonObject
       devObj["ids"] = JsonArray().add(mqttNodeId_);
       break;
     }
@@ -283,7 +290,6 @@ String mqttHelper::buildHassDiscoveryButton(String name, Button_t buttons) {
       root["uniq_id"] = mqttNodeId_ + "_swUpdate";
       root["ic"] = "mdi:cellphone-arrow-down";
       
-      JsonObject devObj = root.createNestedObject("dev");  // createNestedObject returns JsonObject
       devObj["ids"] = JsonArray().add(mqttNodeId_);
       break;
     }
