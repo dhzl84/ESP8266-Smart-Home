@@ -66,7 +66,16 @@ void mqttHelper::buildTopics(void) {
   mqttTopicDiscoveryButtonUpdateButton_   = mqttPrefix_ + mqttCompButton_ + mqttNodeId_ + mqttObjectId_ + "Update" + mqttHassDiscoveryTopic_;
 }
 
-int mqttHelper::buildStateJSON(char* buf, size_t size, const char* name, const char* temp, const char* humid, const char* hysteresis, const char* actState, const char* tarTemp, const char* sensError, const char* thermoMode, int16_t calibration_factor, const char* calibration_offset, const char* ip, const char* firmware) {
+int mqttHelper::buildStateJSON(char* buf, size_t size, const char* name, const char* temp, const char* humid,
+                               const char* hysteresis, const char* actState, const char* tarTemp,
+                               const char* sensError, const char* thermoMode, int16_t calibration_factor,
+                               const char* calibration_offset, const char* ip, const char* firmware) {
+
+  /* Build the full JSON in a static buffer. The calibration_factor is formatted as an integer
+     using snprintf into a small temp buffer, then concatenated. */
+  
+  char sensScaleBuf[64];
+  snprintf(sensScaleBuf, sizeof(sensScaleBuf), ",\n  \"sens_scale\":\"%d\"", calibration_factor);
 
   int written = snprintf(buf, size,
     "{\n"
@@ -88,188 +97,297 @@ int mqttHelper::buildStateJSON(char* buf, size_t size, const char* name, const c
 
   if (written < 0 || static_cast<size_t>(written) >= size) {
     #ifdef CFG_DEBUG
-    Serial.println("State JSON truncated, name too long for the buffer");
+    Serial.println("State JSON truncated");
     #endif
-    written = -1;
+    return -1;
   }
+  
   return written;
 }
 
-String mqttHelper::buildHassDiscoveryClimate(String name, String firmware, String model) {
-  String JSON = \
-  "{\n" \
-  "  \"~\":\"" + mqttGeneralBaseTopic_ + "\",\n" \
-  "  \"name\":\"" + name + "\",\n" \
-  "  \"mode_cmd_t\":\"~" + mqttThermostatModeCmd_ + "\",\n" \
-  "  \"mode_stat_t\":\"~" + mqttData_ + "\",\n" \
-  "  \"mode_stat_tpl\":\"{{value_json.mode}}\",\n" \
-  "  \"avty_t\":\"~" + mqttWill_ + "\",\n" \
-  "  \"pl_avail\":\"online\",\n" \
-  "  \"pl_not_avail\":\"offline\",\n" \
-  "  \"temp_cmd_t\":\"~" + mqttTargetTempCmd_ + "\",\n" \
-  "  \"temp_stat_t\":\"~" + mqttData_ + "\",\n" \
-  "  \"temp_stat_tpl\":\"{{value_json.target_temp}}\",\n" \
-  "  \"curr_temp_t\":\"~" + mqttData_ + "\",\n" \
-  "  \"curr_temp_tpl\":\"{{value_json.current_temp}}\",\n" \
-  "  \"min_temp\":\"15\",\n" \
-  "  \"max_temp\":\"25\",\n" \
-  "  \"temp_step\":\"0.5\",\n" \
-  "  \"modes\":[\"heat\",\"off\"],\n" \
-  "  \"act_t\":\"~" + mqttData_ + "\",\n" \
-  "  \"act_tpl\":\"{{value_json.state}}\",\n" \
-  "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
-  "  \"uniq_id\":\"" + mqttNodeId_ + "_climate\",\n" \
-  "  \"ic\":\"mdi:thermostat-box\",\n" \
-  "  \"dev\" : { \n" \
-  "    \"ids\":[\"" + mqttNodeId_ + "\"],\n" \
-  "    \"mdl\":\"" + model + " Thermostat\",\n" \
-  "    \"name\":\"Thermostat " + name + "\",\n" \
-  "    \"sw\":\"" + firmware + "\",\n" \
-  "    \"mf\":\"dhzl84\",\n" \
-  "    \"cu\":\"http://" + name + "/\"\n"
-  "  }\n" \
-  "}";
+/* Build Home Assistant discovery payload into a fixed-size buffer.
+   Uses stack-allocated char arrays to avoid heap fragmentation on ESP8266.
+   Caller must call mqttHelper::getTopicHassDiscoveryClimate() to get the topic string. */
+int mqttHelper::buildHassDiscoveryClimate(char* buf, size_t size, const char* name, const String& firmware) {
+  static char climate_json[1024];
 
-  return (JSON);
+  int written = snprintf(climate_json, sizeof(climate_json),
+    "{\n"
+    "  \"~\":\"%s\",\n"
+    "  \"name\":\"%s\",\n"
+    "  \"mode_cmd_t\":\"~%s\",\n"
+    "  \"mode_stat_t\":\"~%s\",\n"
+    "  \"mode_stat_tpl\":\"{{value_json.mode}}\",\n"
+    "  \"avty_t\":\"~%s\",\n"
+    "  \"pl_avail\":\"online\",\n"
+    "  \"pl_not_avail\":\"offline\",\n"
+    "  \"temp_cmd_t\":\"~%s\",\n"
+    "  \"temp_stat_t\":\"~%s\",\n"
+    "  \"temp_stat_tpl\":\"{{value_json.target_temp}}\",\n"
+    "  \"curr_temp_t\":\"~%s\",\n"
+    "  \"curr_temp_tpl\":\"{{value_json.current_temp}}\",\n"
+    "  \"min_temp\":\"15\",\n"
+    "  \"max_temp\":\"25\",\n"
+    "  \"temp_step\":\"0.5\",\n"
+    "  \"modes\":[\"heat\",\"off\"],\n"
+    "  \"act_t\":\"~%s\",\n"
+    "  \"act_tpl\":\"{{value_json.state}}\",\n"
+    "  \"json_attr_t\":\"~%s\",\n"
+    "  \"uniq_id\":\"%s_climate\",\n"
+    "  \"ic\":\"mdi:thermostat-box\",\n"
+    "  \"dev\" : {\n"
+    "    \"ids\":[\"%s\"],\n"
+    "    \"mdl\":\"ESP8266 Thermostat\",\n"
+    "    \"name\":\"Thermostat %s\",\n"
+    "    \"sw\":\"%s\",\n"
+    "    \"mf\":\"dhzl84\",\n"
+    "    \"cu\":\"http://%s/\""
+    "  }\n"
+    "}\n"
+    "}",
+    mqttGeneralBaseTopic_.c_str(),
+    name,
+    mqttThermostatModeCmd_.c_str(),
+    mqttData_.c_str(),
+    mqttWill_.c_str(),
+    mqttTargetTempCmd_.c_str(),
+    mqttData_.c_str(),
+    mqttData_.c_str(),
+    mqttData_.c_str(),
+    mqttData_.c_str(),
+    mqttNodeId_.c_str(),
+    mqttNodeId_.c_str(),
+    name,
+    firmware.c_str(),
+    name
+  );
+
+  if (written < 0 || static_cast<size_t>(written) >= sizeof(climate_json)) {
+    #ifdef CFG_DEBUG
+    Serial.printf("Climate discovery JSON truncated at %d bytes\n", written);
+    #endif
+    written = -1;
+  }
+
+  size_t n = strlen(climate_json);
+  if (n >= size) {
+    n = size - 1;
+  }
+  memcpy(buf, climate_json, n);
+  buf[n] = '\0';
+  return written;
 }
 
-String mqttHelper::buildHassDiscoveryBinarySensor(BinarySensor_t binarySensor) {
-  String JSON;
+/* Build Home Assistant discovery payload for binary sensor into a fixed-size buffer. */
+int mqttHelper::buildHassDiscoveryBinarySensor(char* buf, size_t size, BinarySensor_t binarySensor) {
+  static char binary_sensor_json[512];
 
   switch (binarySensor) {
     case kThermostatState:
     {
-      JSON = \
-      "{\n" \
-      "  \"~\":\"" + mqttGeneralBaseTopic_ + "\",\n" \
-      "  \"name\":\"State\",\n" \
-      "  \"dev_cla\":\"heat\",\n" \
-      "  \"stat_t\":\"~" + mqttData_ + "\",\n" \
-      "  \"val_tpl\":\"{{value_json.state}}\",\n" \
-      "  \"pl_on\":\"heating\",\n" \
-      "  \"pl_off\":\"off\",\n" \
-      "  \"avty_t\":\"~" + mqttWill_ + "\",\n" \
-      "  \"pl_avail\":\"online\",\n" \
-      "  \"pl_not_avail\":\"offline\",\n" \
-      "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
-      "  \"uniq_id\":\"" + mqttNodeId_ + "_state\",\n" \
-      "  \"ic\":\"mdi:radiator\",\n" \
-      "  \"dev\" : { \n" \
-      "    \"identifiers\":[\"" + mqttNodeId_ + "\"]\n" \
-      "  }\n" \
-      "}";
+      int written = snprintf(binary_sensor_json, sizeof(binary_sensor_json),
+        "{\n"
+        "  \"~\":\"%s\",\n"
+        "  \"name\":\"State\",\n"
+        "  \"dev_cla\":\"heat\",\n"
+        "  \"stat_t\":\"~%s\",\n"
+        "  \"val_tpl\":\"{{value_json.state}}\",\n"
+        "  \"pl_on\":\"heating\",\n"
+        "  \"pl_off\":\"off\",\n"
+        "  \"avty_t\":\"~%s\",\n"
+        "  \"pl_avail\":\"online\",\n"
+        "  \"pl_not_avail\":\"offline\",\n"
+        "  \"json_attr_t\":\"~%s\",\n"
+        "  \"uniq_id\":\"%s_state\",\n"
+        "  \"ic\":\"mdi:radiator\",\n"
+        "  \"dev\" : {\n"
+        "    \"identifiers\":[\"%s\"],\n"
+        "  }\n"
+        "}\n"
+        "}",
+        mqttGeneralBaseTopic_.c_str(),
+        mqttData_.c_str(),
+        mqttWill_.c_str(),
+        mqttData_.c_str(),
+        mqttNodeId_.c_str()
+      );
+
+      size_t n = strlen(binary_sensor_json);
+      if (n >= size) {
+        n = size - 1;
+      }
+      memcpy(buf, binary_sensor_json, n);
+      buf[n] = '\0';
+      return written;
     }
-    break;
     default:
-    break;
+      snprintf(buf, size, "{}");
+      return 2;
   }
-  return (JSON);
 }
 
-String mqttHelper::buildHassDiscoverySensor(Sensor_t sensor) {
-  String JSON;
+/* Build Home Assistant discovery payload for sensor into a fixed-size buffer. */
+int mqttHelper::buildHassDiscoverySensor(char* buf, size_t size, Sensor_t sensor) {
+  static char sensor_json[512];
 
   switch (sensor) {
     case kTemp:
     {
-      JSON = \
-      "{\n" \
-      "  \"~\":\"" + mqttGeneralBaseTopic_ + "\",\n" \
-      "  \"name\":\"Temperatur\",\n" \
-      "  \"dev_cla\":\"temperature\",\n" \
-      "  \"stat_t\":\"~" + mqttData_ + "\",\n" \
-      "  \"val_tpl\":\"{{value_json.current_temp}}\",\n" \
-      "  \"unit_of_meas\":\"°C\",\n" \
-      "  \"avty_t\":\"~" + mqttWill_ + "\",\n" \
-      "  \"pl_avail\":\"online\",\n" \
-      "  \"pl_not_avail\":\"offline\",\n" \
-      "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
-      "  \"uniq_id\":\"" + mqttNodeId_ + "_sensTemp\",\n" \
-      "  \"ic\":\"mdi:thermometer\",\n" \
-      "  \"dev\" : { \n" \
-      "    \"ids\":[\"" + mqttNodeId_ + "\"]\n" \
-      "  }\n" \
-      "}";
+      int written = snprintf(sensor_json, sizeof(sensor_json),
+        "{\n"
+        "  \"~\":\"%s\",\n"
+        "  \"name\":\"Temperatur\",\n"
+        "  \"dev_cla\":\"temperature\",\n"
+        "  \"stat_t\":\"~%s\",\n"
+        "  \"val_tpl\":\"{{value_json.current_temp}}\",\n"
+        "  \"unit_of_meas\":\"°C\",\n"
+        "  \"avty_t\":\"~%s\",\n"
+        "  \"pl_avail\":\"online\",\n"
+        "  \"pl_not_avail\":\"offline\",\n"
+        "  \"json_attr_t\":\"~%s\",\n"
+        "  \"uniq_id\":\"%s_sensTemp\",\n"
+        "  \"ic\":\"mdi:thermometer\",\n"
+        "  \"dev\" : {\n"
+        "    \"identifiers\":[\"%s\"],\n"
+        "  }\n"
+        "}\n"
+        "}",
+        mqttGeneralBaseTopic_.c_str(),
+        mqttData_.c_str(),
+        mqttWill_.c_str(),
+        mqttData_.c_str(),
+        mqttNodeId_.c_str()
+      );
+
+      size_t n = strlen(sensor_json);
+      if (n >= size) {
+        n = size - 1;
+      }
+      memcpy(buf, sensor_json, n);
+      buf[n] = '\0';
+      return written;
     }
-    break;
     case kHum:
     {
-      JSON = \
-      "{\n" \
-      "  \"~\":\"" + mqttGeneralBaseTopic_ + "\",\n" \
-      "  \"name\":\"Luftfeuchtigkeit\",\n" \
-      "  \"dev_cla\":\"humidity\",\n" \
-      "  \"stat_t\":\"~" + mqttData_ + "\",\n" \
-      "  \"val_tpl\":\"{{value_json.humidity}}\",\n" \
-      "  \"unit_of_meas\":\"%\",\n" \
-      "  \"avty_t\":\"~" + mqttWill_ + "\",\n" \
-      "  \"pl_avail\":\"online\",\n" \
-      "  \"pl_not_avail\":\"offline\",\n" \
-      "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
-      "  \"uniq_id\":\"" + mqttNodeId_ + "_sensHum\",\n" \
-      "  \"ic\":\"mdi:water-percent\",\n" \
-      "  \"dev\" : { \n" \
-      "    \"ids\":[\"" + mqttNodeId_ + "\"]\n" \
-      "  }\n" \
-      "}";
-    }
-    break;
-    default:
-    break;
-  }
+      int written = snprintf(sensor_json, sizeof(sensor_json),
+        "{\n"
+        "  \"~\":\"%s\",\n"
+        "  \"name\":\"Luftfeuchtigkeit\",\n"
+        "  \"dev_cla\":\"humidity\",\n"
+        "  \"stat_t\":\"~%s\",\n"
+        "  \"val_tpl\":\"{{value_json.humidity}}\",\n"
+        "  \"unit_of_meas\":\"%%\",\n"
+        "  \"avty_t\":\"~%s\",\n"
+        "  \"pl_avail\":\"online\",\n"
+        "  \"pl_not_avail\":\"offline\",\n"
+        "  \"json_attr_t\":\"~%s\",\n"
+        "  \"uniq_id\":\"%s_sensHum\",\n"
+        "  \"ic\":\"mdi:water-percent\",\n"
+        "  \"dev\" : {\n"
+        "    \"identifiers\":[\"%s\"],\n"
+        "  }\n"
+        "}\n"
+        "}",
+        mqttGeneralBaseTopic_.c_str(),
+        mqttData_.c_str(),
+        mqttWill_.c_str(),
+        mqttData_.c_str(),
+        mqttNodeId_.c_str()
+      );
 
-  return (JSON);
+      size_t n = strlen(sensor_json);
+      if (n >= size) {
+        n = size - 1;
+      }
+      memcpy(buf, sensor_json, n);
+      buf[n] = '\0';
+      return written;
+    }
+    default:
+      snprintf(buf, size, "{}");
+      return 2;
+  }
 }
 
-String mqttHelper::buildHassDiscoveryButton(Button_t buttons) {
-  String JSON;
+/* Build Home Assistant discovery payload for button into a fixed-size buffer. */
+int mqttHelper::buildHassDiscoveryButton(char* buf, size_t size, Button_t buttons) {
+  static char button_json[512];
 
   switch (buttons) {
     case kRestart_button:
     {
-      JSON = \
-      "{\n" \
-      "  \"~\":\"" + mqttGeneralBaseTopic_ + "\",\n" \
-      "  \"name\":\"Neustart\",\n" \
-      "  \"cmd_t\":\"~" + mqttSystemRestartRequest_ + "\",\n" \
-      "  \"avty_t\":\"~" + mqttWill_ + "\",\n" \
-      "  \"pl_avail\":\"online\",\n" \
-      "  \"pl_not_avail\":\"offline\",\n" \
-      "  \"qos\":\"1\",\n" \
-      "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
-      "  \"uniq_id\":\"" + mqttNodeId_ + "_swRestart\",\n" \
-      "  \"ic\":\"mdi:restart\",\n" \
-      "  \"dev\" : { \n" \
-      "    \"ids\":[\"" + mqttNodeId_ + "\"]\n" \
-      "  }\n" \
-      "}";
+      int written = snprintf(button_json, sizeof(button_json),
+        "{\n"
+        "  \"~\":\"%s\",\n"
+        "  \"name\":\"Neustart\",\n"
+        "  \"cmd_t\":\"~%s\",\n"
+        "  \"avty_t\":\"~%s\",\n"
+        "  \"pl_avail\":\"online\",\n"
+        "  \"pl_not_avail\":\"offline\",\n"
+        "  \"qos\":\"1\",\n"
+        "  \"json_attr_t\":\"~%s\",\n"
+        "  \"uniq_id\":\"%s_swRestart\",\n"
+        "  \"ic\":\"mdi:restart\",\n"
+        "  \"dev\" : { \n"
+        "    \"ids\":[\"%s\"],\n"
+        "  }\n"
+        "}\n"
+        "}",
+        mqttGeneralBaseTopic_.c_str(),
+        mqttSystemRestartRequest_.c_str(),
+        mqttWill_.c_str(),
+        mqttData_.c_str(),
+        mqttNodeId_.c_str()
+      );
+
+      size_t n = strlen(button_json);
+      if (n >= size) {
+        n = size - 1;
+      }
+      memcpy(buf, button_json, n);
+      buf[n] = '\0';
+      return written;
     }
     break;
     case kUpdate_button:
     {
-      JSON = \
-      "{\n" \
-      "  \"~\":\"" + mqttGeneralBaseTopic_ + "\",\n" \
-      "  \"name\":\"Firmwareupdate\",\n" \
-      "  \"cmd_t\":\"~" + mqttUpdateFirmware_ + "\",\n" \
-      "  \"avty_t\":\"~" + mqttWill_ + "\",\n" \
-      "  \"pl_avail\":\"online\",\n" \
-      "  \"pl_not_avail\":\"offline\",\n" \
-      "  \"qos\":\"1\",\n" \
-      "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
-      "  \"uniq_id\":\"" + mqttNodeId_ + "_swUpdate\",\n" \
-      "  \"ic\":\"mdi:cellphone-arrow-down\",\n" \
-      "  \"dev\" : { \n" \
-      "    \"ids\":[\"" + mqttNodeId_ + "\"]\n" \
-      "  }\n" \
-      "}";
+      int written = snprintf(button_json, sizeof(button_json),
+        "{\n"
+        "  \"~\":\"%s\",\n"
+        "  \"name\":\"Firmwareupdate\",\n"
+        "  \"cmd_t\":\"~%s\",\n"
+        "  \"avty_t\":\"~%s\",\n"
+        "  \"pl_avail\":\"online\",\n"
+        "  \"pl_not_avail\":\"offline\",\n"
+        "  \"qos\":\"1\",\n"
+        "  \"json_attr_t\":\"~%s\",\n"
+        "  \"uniq_id\":\"%s_swUpdate\",\n"
+        "  \"ic\":\"mdi:cellphone-arrow-down\",\n"
+        "  \"dev\" : { \n"
+        "    \"ids\":[\"%s\"],\n"
+        "  }\n"
+        "}\n"
+        "}",
+        mqttGeneralBaseTopic_.c_str(),
+        mqttUpdateFirmware_.c_str(),
+        mqttWill_.c_str(),
+        mqttData_.c_str(),
+        mqttNodeId_.c_str()
+      );
+
+      size_t n = strlen(button_json);
+      if (n >= size) {
+        n = size - 1;
+      }
+      memcpy(buf, button_json, n);
+      buf[n] = '\0';
+      return written;
     }
     break;
     default:
-    break;
+      snprintf(buf, size, "{}");
+      return 2;
   }
-
-  return (JSON);
 }
 
 String mqttHelper::getTopicUpdateFirmware(void)                   { return mqttGeneralBaseTopic_ + mqttUpdateFirmware_;  }

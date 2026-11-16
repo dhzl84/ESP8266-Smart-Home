@@ -55,15 +55,23 @@ class mqttHelper {
   String getTopicHassDiscoveryButton(Button_t buttons);
   String getTopicData(void);
   String getTopicOutsideTemperature(void);
-  /* parameters are passed by const reference: 12 String copies per publish avoided */
-  /* state JSON is formatted into the caller's buffer (no heap String at all on the
-     publish path); returns the number of bytes written, -1 if the buffer was too small */
-  int buildStateJSON(char* buf, size_t size, const char* name, const char* temp, const char* humid, const char* hysteresis, const char* actState, const char* tarTemp, const char* sensError, const char* thermoMode, int16_t calibration_factor, const char* calibration_offset, const char* ip, const char* firmware);
-  String buildHassDiscoveryClimate(String name, String firmware, String model);
-  String buildHassDiscoveryBinarySensor(BinarySensor_t binarySensor);
-  String buildHassDiscoverySensor(Sensor_t sensor);
-  String buildHassDiscoveryButton(Button_t buttons);
+  /* Build Home Assistant discovery payloads into caller-provided buffers (no heap alloc).
+     Caller must provide a buffer large enough for the JSON payload:
+       buildHassDiscoveryClimate   -> ~800 bytes
+       buildHassDiscoveryBinarySensor / buildHassDiscoverySensor -> ~512 bytes
+     Returns number of bytes written, or -1 if buffer too small.
+     Use mqttHelper::getTopicHassDiscoveryClimate() to get the topic string. */
+  int  buildHassDiscoveryClimate(char* buf, size_t size, const char* name, const String& firmware);
+  int  buildHassDiscoveryBinarySensor(char* buf, size_t size, BinarySensor_t binarySensor);
+  int  buildHassDiscoverySensor(char* buf, size_t size, Sensor_t sensor);
+  int  buildHassDiscoveryButton(char* buf, size_t size, Button_t buttons);
   String mqttLastErrorToString(int8_t last_error);
+  /* Build state topic payload into caller-provided buffer (no heap alloc).
+     Returns number of bytes written, or -1 if truncated. */
+  int  buildStateJSON(char* buf, size_t size, const char* name, const char* temp, const char* humid,
+                      const char* hysteresis, const char* actState, const char* tarTemp,
+                      const char* sensError, const char* thermoMode, int16_t calibration_factor,
+                      const char* calibration_offset, const char* ip, const char* firmware);
 
  private:
   void   buildBaseTopic(void);
