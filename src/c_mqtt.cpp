@@ -166,7 +166,7 @@ String mqttHelper::buildHassDiscoveryBinarySensor(BinarySensor_t binarySensor) {
   return (JSON);
 }
 
-String mqttHelper::buildHassDiscoverySensor(String name, Sensor_t sensor) {
+String mqttHelper::buildHassDiscoverySensor(Sensor_t sensor) {
   String JSON;
 
   switch (sensor) {
@@ -175,7 +175,7 @@ String mqttHelper::buildHassDiscoverySensor(String name, Sensor_t sensor) {
       JSON = \
       "{\n" \
       "  \"~\":\"" + mqttGeneralBaseTopic_ + "\",\n" \
-      "  \"name\":\"Temperatur " + name + "\",\n" \
+      "  \"name\":\"Temperatur\",\n" \
       "  \"dev_cla\":\"temperature\",\n" \
       "  \"stat_t\":\"~" + mqttData_ + "\",\n" \
       "  \"val_tpl\":\"{{value_json.current_temp}}\",\n" \
@@ -197,7 +197,7 @@ String mqttHelper::buildHassDiscoverySensor(String name, Sensor_t sensor) {
       JSON = \
       "{\n" \
       "  \"~\":\"" + mqttGeneralBaseTopic_ + "\",\n" \
-      "  \"name\":\"Luftfeuchtigkeit " + name + "\",\n" \
+      "  \"name\":\"Luftfeuchtigkeit\",\n" \
       "  \"dev_cla\":\"humidity\",\n" \
       "  \"stat_t\":\"~" + mqttData_ + "\",\n" \
       "  \"val_tpl\":\"{{value_json.humidity}}\",\n" \
@@ -221,7 +221,7 @@ String mqttHelper::buildHassDiscoverySensor(String name, Sensor_t sensor) {
   return (JSON);
 }
 
-String mqttHelper::buildHassDiscoveryButton(String name, Button_t buttons) {
+String mqttHelper::buildHassDiscoveryButton(Button_t buttons) {
   String JSON;
 
   switch (buttons) {
@@ -230,7 +230,7 @@ String mqttHelper::buildHassDiscoveryButton(String name, Button_t buttons) {
       JSON = \
       "{\n" \
       "  \"~\":\"" + mqttGeneralBaseTopic_ + "\",\n" \
-      "  \"name\":\"Neustart " + name + "\",\n" \
+      "  \"name\":\"Neustart\",\n" \
       "  \"cmd_t\":\"~" + mqttSystemRestartRequest_ + "\",\n" \
       "  \"avty_t\":\"~" + mqttWill_ + "\",\n" \
       "  \"pl_avail\":\"online\",\n" \
@@ -250,7 +250,7 @@ String mqttHelper::buildHassDiscoveryButton(String name, Button_t buttons) {
       JSON = \
       "{\n" \
       "  \"~\":\"" + mqttGeneralBaseTopic_ + "\",\n" \
-      "  \"name\":\"Firmwareupdate " + name + "\",\n" \
+      "  \"name\":\"Firmwareupdate\",\n" \
       "  \"cmd_t\":\"~" + mqttUpdateFirmware_ + "\",\n" \
       "  \"avty_t\":\"~" + mqttWill_ + "\",\n" \
       "  \"pl_avail\":\"online\",\n" \

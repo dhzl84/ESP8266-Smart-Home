@@ -1033,16 +1033,18 @@ void IRAM_ATTR updateEncoder(void) {
 
 /* Home Assistant discovery_enabled on connect; used to define entities in HA to communicate with*/
 void homeAssistantDiscovery(void) {
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryClimate(),                         myMqttHelper.buildHassDiscoveryClimate(String(myConfig.name), String(FW), String(BOARD)),    true, MQTT_QOS);    // make HA discover the climate component
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kTemp),                     myMqttHelper.buildHassDiscoverySensor(String(myConfig.name),  kTemp),                        true, MQTT_QOS);    // make HA discover the temperature sensor
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kHum),                      myMqttHelper.buildHassDiscoverySensor(String(myConfig.name),  kHum),                         true, MQTT_QOS);    // make HA discover the humidity sensor
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kRestart_button),           myMqttHelper.buildHassDiscoveryButton(String(myConfig.name),  kRestart_button),              true, MQTT_QOS);    // make HA discover the reset switch
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kUpdate_button),            myMqttHelper.buildHassDiscoveryButton(String(myConfig.name),  kUpdate_button),               true, MQTT_QOS);    // make HA discover the update switch
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryClimate(),                         myMqttHelper.buildHassDiscoveryClimate(String(myConfig.name), String(FW), String(BOARD)),   true, MQTT_QOS);    // make HA discover the climate component
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(kThermostatState),    myMqttHelper.buildHassDiscoveryBinarySensor(kThermostatState),                              true, MQTT_QOS);    // make HA discover the state sensor
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kTemp),                     myMqttHelper.buildHassDiscoverySensor(kTemp),                                               true, MQTT_QOS);    // make HA discover the temperature sensor
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kHum),                      myMqttHelper.buildHassDiscoverySensor(kHum),                                                true, MQTT_QOS);    // make HA discover the humidity sensor
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kRestart_button),           myMqttHelper.buildHassDiscoveryButton(kRestart_button),                                     true, MQTT_QOS);    // make HA discover the reset switch
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kUpdate_button),            myMqttHelper.buildHassDiscoveryButton(kUpdate_button),                                      true, MQTT_QOS);    // make HA discover the update switch
 }
 
 /* Make Home Assistant forget the discovered entities on demand */
 void homeAssistantRemoveDiscovered(void) {
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryClimate(),                         String(""),         true, MQTT_QOS);    // make HA forget the climate component
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(kThermostatState),    String(""),         true, MQTT_QOS);    // make HA forget the state sensor
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kTemp),                     String(""),         true, MQTT_QOS);    // make HA forget the temperature sensor
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kHum),                      String(""),         true, MQTT_QOS);    // make HA forget the humidity sensor
   myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kRestart_button),           String(""),         true, MQTT_QOS);    // make HA forget the reset switch
