@@ -1,5 +1,4 @@
 #include "c_mqtt.h"
-#include <ArduinoJson.h>  // Required for DynamicJsonDocument, JsonObject, JsonArray
 
 // The Home Asistant discovery_enabled topic need to follow a specific format:
 //
@@ -96,218 +95,181 @@ int mqttHelper::buildStateJSON(char* buf, size_t size, const char* name, const c
   return written;
 }
 
-/* 
- * buildHassDiscoveryClimate - Zero-allocation using ArduinoJson DynamicJsonDocument
- * Instead of building a String with repeated += operations (causes heap fragmentation),
- * we use DynamicJsonDocument which reuses buffer memory across calls. This prevents:
- *   - Heap fragmentation from frequent String allocations  
- *   - "Reallocating large String" warnings in ESP8266
- *   - Potential crashes under load from memory pressure
- */
 String mqttHelper::buildHassDiscoveryClimate(String name, String firmware, String model) {
-  // DynamicJsonDocument reuses the same buffer, avoiding heap fragmentation
-  DynamicJsonDocument doc(1024);  // Increased from 512 - climate discovery can be larger
-  
-  JsonObject root = doc.to<JsonObject>();
-  
-  // Create device object FIRST (Home Assistant requires "device" with identifiers)
-  JsonObject devObj = root.createNestedObject("dev");  // HA expects "device", not "dev"
-  
-  // Populate device object immediately
-  JsonArray idsArr = devObj.createNestedArray("ids");  // Home Assistant field name
-  idsArr.add(mqttNodeId_);
-  
-  devObj["model"] = model + " Thermostat";
-  devObj["name"] = "Thermostat " + name;
-  devObj["manufacturer"] = "dhzl84";
-  devObj["config_url"] = "http://" + name + "/";
-  
-  // Populate root properties
-  root["~"] = mqttGeneralBaseTopic_;
-  root["name"] = name;
-  root["mode_cmd_t"] = "~" + mqttThermostatModeCmd_;
-  root["mode_stat_t"] = "~" + mqttData_;
-  root["mode_stat_tpl"] = "{{value_json.mode}}";
-  root["avty_t"] = "~" + mqttWill_;
-  root["pl_avail"] = "online";
-  root["pl_not_avail"] = "offline";
-  root["temp_cmd_t"] = "~" + mqttTargetTempCmd_;
-  root["temp_stat_t"] = "~" + mqttData_;
-  root["temp_stat_tpl"] = "{{value_json.target_temp}}";
-  root["curr_temp_t"] = "~" + mqttData_;
-  root["curr_temp_tpl"] = "{{value_json.current_temp}}";
-  root["min_temp"] = "15";
-  root["max_temp"] = "25";
-  root["temp_step"] = "0.5";
-  // Build modes array - ArduinoJson requires chaining properly
-  JsonArray modesArr = root.createNestedArray("modes");
-  modesArr.add("heat");
-  modesArr.add("off");
-  root["act_t"] = "~" + mqttData_;
-  root["act_tpl"] = "{{value_json.state}}";
-  root["json_attr_t"] = "~" + mqttData_;
-  root["uniq_id"] = mqttNodeId_ + "_climate";
-  root["ic"] = "mdi:thermostat-box";
-  
-  // Serialize to char buffer, then convert to String for MQTT publish (single allocation)
-  char jsonBuffer[1200];  // Increased from 600 - larger payload needs more space
-  serializeJson(doc, jsonBuffer);
-  return String(jsonBuffer);
+  String JSON = \
+  "{\n" \
+  "  \"~\":\"" + mqttGeneralBaseTopic_ + "\",\n" \
+  "  \"name\":\"" + name + "\",\n" \
+  "  \"mode_cmd_t\":\"~" + mqttThermostatModeCmd_ + "\",\n" \
+  "  \"mode_stat_t\":\"~" + mqttData_ + "\",\n" \
+  "  \"mode_stat_tpl\":\"{{value_json.mode}}\",\n" \
+  "  \"avty_t\":\"~" + mqttWill_ + "\",\n" \
+  "  \"pl_avail\":\"online\",\n" \
+  "  \"pl_not_avail\":\"offline\",\n" \
+  "  \"temp_cmd_t\":\"~" + mqttTargetTempCmd_ + "\",\n" \
+  "  \"temp_stat_t\":\"~" + mqttData_ + "\",\n" \
+  "  \"temp_stat_tpl\":\"{{value_json.target_temp}}\",\n" \
+  "  \"curr_temp_t\":\"~" + mqttData_ + "\",\n" \
+  "  \"curr_temp_tpl\":\"{{value_json.current_temp}}\",\n" \
+  "  \"min_temp\":\"15\",\n" \
+  "  \"max_temp\":\"25\",\n" \
+  "  \"temp_step\":\"0.5\",\n" \
+  "  \"modes\":[\"heat\",\"off\"],\n" \
+  "  \"act_t\":\"~" + mqttData_ + "\",\n" \
+  "  \"act_tpl\":\"{{value_json.state}}\",\n" \
+  "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
+  "  \"uniq_id\":\"" + mqttNodeId_ + "_climate\",\n" \
+  "  \"ic\":\"mdi:thermostat-box\",\n" \
+  "  \"dev\" : { \n" \
+  "    \"ids\":[\"" + mqttNodeId_ + "\"],\n" \
+  "    \"mdl\":\"" + model + " Thermostat\",\n" \
+  "    \"name\":\"Thermostat " + name + "\",\n" \
+  "    \"sw\":\"" + firmware + "\",\n" \
+  "    \"mf\":\"dhzl84\",\n" \
+  "    \"cu\":\"http://" + name + "/\"\n"
+  "  }\n" \
+  "}";
+
+  return (JSON);
 }
 
-/* 
- * buildHassDiscoveryBinarySensor - Zero-allocation using ArduinoJson DynamicJsonDocument
- */
 String mqttHelper::buildHassDiscoveryBinarySensor(BinarySensor_t binarySensor) {
-  DynamicJsonDocument doc(512);  // Increased from 256 - device object needs space
-  
-  JsonObject root = doc.to<JsonObject>();
-  
-  // Add device object with identifiers (Home Assistant requires at least one identifier)
-  JsonObject devObj = root.createNestedObject("dev");
-  
+  String JSON;
+
   switch (binarySensor) {
     case kThermostatState:
     {
-      root["~"] = mqttGeneralBaseTopic_;
-      root["name"] = "State";
-      root["dev_cla"] = "heat";
-      root["stat_t"] = "~" + mqttData_;
-      root["val_tpl"] = "{{value_json.state}}";
-      root["pl_on"] = "heating";
-      root["pl_off"] = "off";
-      root["avty_t"] = "~" + mqttWill_;
-      root["pl_avail"] = "online";
-      root["pl_not_avail"] = "offline";
-      root["json_attr_t"] = "~" + mqttData_;
-      root["uniq_id"] = mqttNodeId_ + "_state";
-      root["ic"] = "mdi:radiator";
-      
-      JsonArray idsArr = devObj.createNestedArray("ids");
-      idsArr.add(mqttNodeId_);
-      break;
+      JSON = \
+      "{\n" \
+      "  \"~\":\"" + mqttGeneralBaseTopic_ + "\",\n" \
+      "  \"name\":\"State\",\n" \
+      "  \"dev_cla\":\"heat\",\n" \
+      "  \"stat_t\":\"~" + mqttData_ + "\",\n" \
+      "  \"val_tpl\":\"{{value_json.state}}\",\n" \
+      "  \"pl_on\":\"heating\",\n" \
+      "  \"pl_off\":\"off\",\n" \
+      "  \"avty_t\":\"~" + mqttWill_ + "\",\n" \
+      "  \"pl_avail\":\"online\",\n" \
+      "  \"pl_not_avail\":\"offline\",\n" \
+      "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
+      "  \"uniq_id\":\"" + mqttNodeId_ + "_state\",\n" \
+      "  \"ic\":\"mdi:radiator\",\n" \
+      "  \"dev\" : { \n" \
+      "    \"identifiers\":[\"" + mqttNodeId_ + "\"]\n" \
+      "  }\n" \
+      "}";
     }
+    break;
     default:
-      return String("");  // No binary sensor discovery for this type
+    break;
   }
-  
-  char jsonBuffer[800];
-  serializeJson(doc, jsonBuffer);
-  return String(jsonBuffer);
+  return (JSON);
 }
 
-/* 
- * buildHassDiscoverySensor - Zero-allocation using ArduinoJson DynamicJsonDocument
- */
 String mqttHelper::buildHassDiscoverySensor(String name, Sensor_t sensor) {
-  DynamicJsonDocument doc(600);  // Increased from 300 - device object needs space
-  
-  JsonObject root = doc.to<JsonObject>();
-  
-  // Add device object with identifiers (Home Assistant requires at least one identifier)
-  JsonObject devObj = root.createNestedObject("dev");
-  
+  String JSON;
+
   switch (sensor) {
     case kTemp:
     {
-      root["~"] = mqttGeneralBaseTopic_;
-      root["name"] = "Temperatur " + name;
-      root["dev_cla"] = "temperature";
-      root["stat_t"] = "~" + mqttData_;
-      root["val_tpl"] = "{{value_json.current_temp}}";
-      root["unit_of_meas"] = "°C";
-      root["avty_t"] = "~" + mqttWill_;
-      root["pl_avail"] = "online";
-      root["pl_not_avail"] = "offline";
-      root["json_attr_t"] = "~" + mqttData_;
-      root["uniq_id"] = mqttNodeId_ + "_sensTemp";
-      root["ic"] = "mdi:thermometer";
-      
-      JsonArray idsArr = devObj.createNestedArray("ids");
-      idsArr.add(mqttNodeId_);
-      break;
+      JSON = \
+      "{\n" \
+      "  \"~\":\"" + mqttGeneralBaseTopic_ + "\",\n" \
+      "  \"name\":\"Temperatur " + name + "\",\n" \
+      "  \"dev_cla\":\"temperature\",\n" \
+      "  \"stat_t\":\"~" + mqttData_ + "\",\n" \
+      "  \"val_tpl\":\"{{value_json.current_temp}}\",\n" \
+      "  \"unit_of_meas\":\"°C\",\n" \
+      "  \"avty_t\":\"~" + mqttWill_ + "\",\n" \
+      "  \"pl_avail\":\"online\",\n" \
+      "  \"pl_not_avail\":\"offline\",\n" \
+      "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
+      "  \"uniq_id\":\"" + mqttNodeId_ + "_sensTemp\",\n" \
+      "  \"ic\":\"mdi:thermometer\",\n" \
+      "  \"dev\" : { \n" \
+      "    \"ids\":[\"" + mqttNodeId_ + "\"]\n" \
+      "  }\n" \
+      "}";
     }
+    break;
     case kHum:
     {
-      root["~"] = mqttGeneralBaseTopic_;
-      root["name"] = "Luftfeuchtigkeit " + name;
-      root["dev_cla"] = "humidity";
-      root["stat_t"] = "~" + mqttData_;
-      root["val_tpl"] = "{{value_json.humidity}}";
-      root["unit_of_meas"] = "%";
-      root["avty_t"] = "~" + mqttWill_;
-      root["pl_avail"] = "online";
-      root["pl_not_avail"] = "offline";
-      root["json_attr_t"] = "~" + mqttData_;
-      root["uniq_id"] = mqttNodeId_ + "_sensHum";
-      root["ic"] = "mdi:water-percent";
-      
-      JsonArray idsArr = devObj.createNestedArray("ids");
-      idsArr.add(mqttNodeId_);
-      break;
+      JSON = \
+      "{\n" \
+      "  \"~\":\"" + mqttGeneralBaseTopic_ + "\",\n" \
+      "  \"name\":\"Luftfeuchtigkeit " + name + "\",\n" \
+      "  \"dev_cla\":\"humidity\",\n" \
+      "  \"stat_t\":\"~" + mqttData_ + "\",\n" \
+      "  \"val_tpl\":\"{{value_json.humidity}}\",\n" \
+      "  \"unit_of_meas\":\"%\",\n" \
+      "  \"avty_t\":\"~" + mqttWill_ + "\",\n" \
+      "  \"pl_avail\":\"online\",\n" \
+      "  \"pl_not_avail\":\"offline\",\n" \
+      "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
+      "  \"uniq_id\":\"" + mqttNodeId_ + "_sensHum\",\n" \
+      "  \"ic\":\"mdi:water-percent\",\n" \
+      "  \"dev\" : { \n" \
+      "    \"ids\":[\"" + mqttNodeId_ + "\"]\n" \
+      "  }\n" \
+      "}";
     }
+    break;
     default:
-      return String("");  // No discovery for this sensor type
+    break;
   }
-  
-  char jsonBuffer[1000];
-  serializeJson(doc, jsonBuffer);
-  return String(jsonBuffer);
+
+  return (JSON);
 }
 
-/* 
- * buildHassDiscoveryButton - Zero-allocation using ArduinoJson DynamicJsonDocument
- */
 String mqttHelper::buildHassDiscoveryButton(String name, Button_t buttons) {
-  DynamicJsonDocument doc(512);  // Increased from 256 - device object needs space
-  
-  JsonObject root = doc.to<JsonObject>();
-  
-  // Add device object with identifiers (Home Assistant requires at least one identifier)
-  JsonObject devObj = root.createNestedObject("dev");
-  
+  String JSON;
+
   switch (buttons) {
     case kRestart_button:
     {
-      root["~"] = mqttGeneralBaseTopic_;
-      root["name"] = "Neustart " + name;
-      root["cmd_t"] = "~" + mqttSystemRestartRequest_;
-      root["avty_t"] = "~" + mqttWill_;
-      root["pl_avail"] = "online";
-      root["pl_not_avail"] = "offline";
-      root["qos"] = "1";
-      root["json_attr_t"] = "~" + mqttData_;
-      root["uniq_id"] = mqttNodeId_ + "_swRestart";
-      root["ic"] = "mdi:restart";
-      
-      JsonArray idsArr = devObj.createNestedArray("ids");
-      idsArr.add(mqttNodeId_);
-      break;
+      JSON = \
+      "{\n" \
+      "  \"~\":\"" + mqttGeneralBaseTopic_ + "\",\n" \
+      "  \"name\":\"Neustart " + name + "\",\n" \
+      "  \"cmd_t\":\"~" + mqttSystemRestartRequest_ + "\",\n" \
+      "  \"avty_t\":\"~" + mqttWill_ + "\",\n" \
+      "  \"pl_avail\":\"online\",\n" \
+      "  \"pl_not_avail\":\"offline\",\n" \
+      "  \"qos\":\"1\",\n" \
+      "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
+      "  \"uniq_id\":\"" + mqttNodeId_ + "_swRestart\",\n" \
+      "  \"ic\":\"mdi:restart\",\n" \
+      "  \"dev\" : { \n" \
+      "    \"ids\":[\"" + mqttNodeId_ + "\"]\n" \
+      "  }\n" \
+      "}";
     }
+    break;
     case kUpdate_button:
     {
-      root["~"] = mqttGeneralBaseTopic_;
-      root["name"] = "Firmwareupdate " + name;
-      root["cmd_t"] = "~" + mqttUpdateFirmware_;
-      root["avty_t"] = "~" + mqttWill_;
-      root["pl_avail"] = "online";
-      root["pl_not_avail"] = "offline";
-      root["qos"] = "1";
-      root["json_attr_t"] = "~" + mqttData_;
-      root["uniq_id"] = mqttNodeId_ + "_swUpdate";
-      root["ic"] = "mdi:cellphone-arrow-down";
-      
-      JsonArray idsArr = devObj.createNestedArray("ids");
-      idsArr.add(mqttNodeId_);
-      break;
+      JSON = \
+      "{\n" \
+      "  \"~\":\"" + mqttGeneralBaseTopic_ + "\",\n" \
+      "  \"name\":\"Firmwareupdate " + name + "\",\n" \
+      "  \"cmd_t\":\"~" + mqttUpdateFirmware_ + "\",\n" \
+      "  \"avty_t\":\"~" + mqttWill_ + "\",\n" \
+      "  \"pl_avail\":\"online\",\n" \
+      "  \"pl_not_avail\":\"offline\",\n" \
+      "  \"qos\":\"1\",\n" \
+      "  \"json_attr_t\":\"~" + mqttData_ + "\",\n" \
+      "  \"uniq_id\":\"" + mqttNodeId_ + "_swUpdate\",\n" \
+      "  \"ic\":\"mdi:cellphone-arrow-down\",\n" \
+      "  \"dev\" : { \n" \
+      "    \"ids\":[\"" + mqttNodeId_ + "\"]\n" \
+      "  }\n" \
+      "}";
     }
+    break;
     default:
-      return String("");  // No discovery for this button type
+    break;
   }
-  
-  char jsonBuffer[800];
-  serializeJson(doc, jsonBuffer);
-  return String(jsonBuffer);
+
+  return (JSON);
 }
 
 String mqttHelper::getTopicUpdateFirmware(void)                   { return mqttGeneralBaseTopic_ + mqttUpdateFirmware_;  }
@@ -382,34 +344,24 @@ String mqttHelper::getTopicHassDiscoveryButton(Button_t buttons) {
   return topic;
 }
 
-/* 
- * mqttLastErrorToString - Zero-allocation error string lookup
- * Uses a static array instead of building String objects for each error code.
- * This prevents heap allocation on every MQTT callback.
- */
-const char* mqttHelper::mqttLastErrorToString(int8_t last_error) {
-  static const char* error_strings[] = {
-    "LWMQTT_SUCCESS",                     // 0
-    "LWMQTT_BUFFER_TOO_SHORT",            // -1
-    "LWMQTT_VARNUM_OVERFLOW",             // -2
-    "LWMQTT_NETWORK_FAILED_CONNECT",      // -3
-    "LWMQTT_NETWORK_TIMEOUT",             // -4
-    "LWMQTT_NETWORK_FAILED_READ",         // -5
-    "LWMQTT_NETWORK_FAILED_WRITE",        // -6
-    "LWMQTT_REMAINING_LENGTH_OVERFLOW",   // -7
-    "LWMQTT_REMAINING_LENGTH_MISMATCH",   // -8
-    "LWMQTT_MISSING_OR_WRONG_PACKET",     // -9
-    "LWMQTT_CONNECTION_DENIED",           // -10
-    "LWMQTT_FAILED_SUBSCRIPTION",         // -11
-    "LWMQTT_SUBACK_ARRAY_OVERFLOW",       // -12
-    "LWMQTT_PONG_TIMEOUT",                // -13
-    "UNKNOWN"                             // default
-  };
-  
-  if (last_error >= 0 && last_error < 14) {
-    return error_strings[last_error];
-  } else if (last_error < 0 && last_error > -14) {
-    return error_strings[13 + (-last_error)];
+String mqttHelper::mqttLastErrorToString(int8_t last_error) {
+  String error_string;
+  switch (last_error) {
+    case 0:   error_string = "LWMQTT_SUCCESS";                     break;
+    case -1:  error_string = "LWMQTT_BUFFER_TOO_SHORT";            break;
+    case -2:  error_string = "LWMQTT_VARNUM_OVERFLOW";             break;
+    case -3:  error_string = "LWMQTT_NETWORK_FAILED_CONNECT";      break;
+    case -4:  error_string = "LWMQTT_NETWORK_TIMEOUT";            break;
+    case -5:  error_string = "LWMQTT_NETWORK_FAILED_READ";        break;
+    case -6:  error_string = "LWMQTT_NETWORK_FAILED_WRITE";       break;
+    case -7:  error_string = "LWMQTT_REMAINING_LENGTH_OVERFLOW";   break;
+    case -8:  error_string = "LWMQTT_REMAINING_LENGTH_MISMATCH";   break;
+    case -9:  error_string = "LWMQTT_MISSING_OR_WRONG_PACKET";     break;
+    case -10: error_string = "LWMQTT_CONNECTION_DENIED";           break;
+    case -11: error_string = "LWMQTT_FAILED_SUBSCRIPTION";         break;
+    case -12: error_string = "LWMQTT_SUBACK_ARRAY_OVERFLOW";       break;
+    case -13: error_string = "LWMQTT_PONG_TIMEOUT";                break;
+    default:  error_string = "UNKNOWN";                            break;
   }
-  return error_strings[14];
+  return error_string;
 }
