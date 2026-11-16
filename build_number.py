@@ -5,13 +5,13 @@ import calendar
 
 YEAR = '2026'
 MONTH = '11'
-PATCH = '0'
+PATCH = '1'
 
 VERSION = ".".join([YEAR,MONTH,PATCH])
 
 FILENAME_VERSION_H = 'src/version.h'
 
-dt = datetime.datetime.utcnow()
+dt = datetime.datetime.now(datetime.timezone.utc)
 hex_timestamp = hex(calendar.timegm(dt.timetuple())).lstrip("0x")
 dt = dt.strftime("%Y-%m-%d %H:%M:%S")
 

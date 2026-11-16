@@ -61,8 +61,8 @@ class mqttHelper {
   int buildStateJSON(char* buf, size_t size, const char* name, const char* temp, const char* humid, const char* hysteresis, const char* actState, const char* tarTemp, const char* sensError, const char* thermoMode, int16_t calibration_factor, const char* calibration_offset, const char* ip, const char* firmware);
   String buildHassDiscoveryClimate(String name, String firmware, String model);
   String buildHassDiscoveryBinarySensor(BinarySensor_t binarySensor);
-  String buildHassDiscoverySensor(String name, Sensor_t sensor);
-  String buildHassDiscoveryButton(String name, Button_t buttons);
+  String buildHassDiscoverySensor(Sensor_t sensor);
+  String buildHassDiscoveryButton(Button_t buttons);
   String mqttLastErrorToString(int8_t last_error);
 
  private:
