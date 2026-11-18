@@ -169,12 +169,14 @@ int mqttHelper::buildHassDiscoveryClimate(char* buf, size_t size, const char* na
     written = -1;
   }
 
-  size_t n = strlen(climate_json);
-  if (n >= size) {
-    n = size - 1;
+  /* Only copy if snprintf succeeded and fits in buffer.
+     If written < 0 (snprintf truncated) or written >= size, leave buf[0] = '\0'. */
+  if (written >= 0 && static_cast<size_t>(written) < size) {
+    memcpy(buf, climate_json, static_cast<size_t>(written));
+    buf[static_cast<size_t>(written)] = '\0';
+  } else {
+    buf[0] = '\0';  /* buffer too small or truncation occurred */
   }
-  memcpy(buf, climate_json, n);
-  buf[n] = '\0';
   return written;
 }
 

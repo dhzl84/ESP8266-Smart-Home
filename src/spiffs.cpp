@@ -36,10 +36,12 @@ void loadConfiguration(Configuration &config) { // NOLINT: pass by reference
   File file = FileSystem.open(filename, "r");
   yield();  // yield after LittleFS open() to let UART ISR complete (prevents Level-1 interrupt corruption)
 
-  // Allocate the memory pool on the stack.
-  // Don't forget to change the capacity to match your JSON document.
-  // Use arduinojson.org/assistant to compute the capacity.
-  StaticJsonDocument<768> jsonDoc;
+  /* Allocate the memory pool on the stack.
+   * StaticJsonDocument<1536> is needed because:
+   * - ArduinoJson overhead (~400 bytes) + document content (~700 bytes for a full config)
+   * - The old 768-byte limit was dangerously close to causing stack corruption on ESP8266.
+   * Use arduinojson.org/assistant to compute the exact capacity needed. */
+  StaticJsonDocument<1536> jsonDoc;
 
   DeserializationError error = deserializeJson(jsonDoc, file);
 

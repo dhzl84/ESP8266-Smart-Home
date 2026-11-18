@@ -24,7 +24,7 @@
 #endif
 
 #ifndef CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE
-  #define CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE 11
+  #define CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE (int16_t)11
 #endif
 
 #define TH_HEAT true

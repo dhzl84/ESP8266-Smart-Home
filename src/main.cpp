@@ -1607,8 +1607,7 @@ void handleHttpReset(void) {
 }
 
 /* MQTT callback if a message was received */
-// cppcheck-suppress constParameter ; messageReceived is a library function
-void messageReceived(String &topic, String &payload) {  // NOLINT
+ void messageReceived(String &topic, String &payload) {  // NOLINT
   #ifdef CFG_DEBUG
   Serial.println("received: " + topic + " : " + payload);
   #endif
