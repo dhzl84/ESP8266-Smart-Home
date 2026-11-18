@@ -1,23 +1,11 @@
 #ifndef C_MQTT_H_
 #define C_MQTT_H_
 
-#define cMQTT_PAYLOAD_SIZE 1500  /* size used for reusable char buffers */
+/* buffer for the Home Assistant discovery payloads; the biggest one is the climate payload with
+   ~880 bytes for a short device name and ~1080 bytes for the maximum name length of 63 chars */
+#define cMQTT_PAYLOAD_SIZE 1280
 
 #include "Arduino.h"
-#include <stdarg.h>
-#include <stddef.h>
-#include <string.h>
-
-/* Generic snprintf wrapper that safely truncates output to fit the buffer.
- * Returns the number of bytes written (excluding null terminator), or -1 if
- * the formatted string did not fit in the buffer. Caller must ensure the
- * format string contains no %n directive and that all arguments are valid.
- *
- * If debug_prefix is non-NULL, a truncation warning is printed to Serial:
- *   "[MQTT] <prefix>: payload truncated to <size> of <max_size> bytes"
- */
-int snprintf_safe(char* buf, size_t size, const char* fmt, const char* debug_prefix, ...);
-
 
 typedef enum {
   kTemp,
@@ -56,27 +44,24 @@ class mqttHelper {
   bool   getTriggerRemoveDiscovered(void);
   /* topic getters return cached topic strings built once in setup(), so that the
      MQTT callback and the publish path do not allocate a new String per call */
-  String getTopicUpdateFirmware(void);
-  String getTopicChangeName(void);
-  String getTopicLastWill(void);
-  String getTopicSystemRestartRequest(void);
-  String getTopicChangeSensorCalib(void);
-  String getTopicChangeHysteresis(void);
-  String getTopicTargetTempCmd(void);
-  String getTopicThermostatModeCmd(void);
-  String getTopicHassDiscoveryClimate(void);
+  const String& getTopicUpdateFirmware(void);
+  const String& getTopicChangeName(void);
+  const String& getTopicLastWill(void);
+  const String& getTopicSystemRestartRequest(void);
+  const String& getTopicChangeSensorCalib(void);
+  const String& getTopicChangeHysteresis(void);
+  const String& getTopicTargetTempCmd(void);
+  const String& getTopicThermostatModeCmd(void);
+  const String& getTopicHassDiscoveryClimate(void);
   String getTopicHassDiscoveryBinarySensor(BinarySensor_t binarySensor);
   String getTopicHassDiscoverySensor(Sensor_t sensor);
   String getTopicHassDiscoverySwitch(Switch_t switches);
   String getTopicHassDiscoveryButton(Button_t buttons);
-  String getTopicData(void);
-  String getTopicOutsideTemperature(void);
+  const String& getTopicData(void);
+  const String& getTopicOutsideTemperature(void);
   /* Build Home Assistant discovery payloads into caller-provided buffers (no heap alloc).
-     Caller must provide a buffer large enough for the JSON payload:
-       buildHassDiscoveryClimate   -> ~800 bytes
-       buildHassDiscoveryBinarySensor / buildHassDiscoverySensor -> ~512 bytes
-     Returns number of bytes written, or -1 if buffer too small.
-     Use mqttHelper::getTopicHassDiscoveryClimate() to get the topic string. */
+     Use a buffer of cMQTT_PAYLOAD_SIZE bytes.
+     Returns number of bytes written, or -1 (and an empty buf) if the buffer is too small. */
   int  buildHassDiscoveryClimate(char* buf, size_t size, const char* name, const String& firmware);
   int  buildHassDiscoveryBinarySensor(char* buf, size_t size, BinarySensor_t binarySensor);
   int  buildHassDiscoverySensor(char* buf, size_t size, Sensor_t sensor);
@@ -92,6 +77,7 @@ class mqttHelper {
  private:
   void   buildBaseTopic(void);
   void   buildTopics(void);
+  int    checkPayload(char* buf, size_t size, int written, const char* what);
 
   bool   mqttTriggerDiscovery_;
   bool   mqttTriggerRemoveDiscovered_;

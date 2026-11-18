@@ -1035,26 +1035,42 @@ void IRAM_ATTR updateEncoder(void) {
   lastEncoded = encoded; /* store this value for next time */
 }
 
+/* publish one discovery payload; a payload that could not be built is not published, because an
+   empty retained message on a discovery topic makes Home Assistant delete the entity */
+static void homeAssistantPublishDiscovery(const String& topic, const char* payload, int payloadLen) {
+  if (payloadLen > 0) {
+    myMqttClient.publish(topic.c_str(), payload, payloadLen, true, MQTT_QOS);
+  } else {
+    #ifdef CFG_DEBUG
+    Serial.println("Discovery payload not published: " + topic);
+    #endif
+  }
+}
+
 /* Home Assistant discovery_enabled on connect; used to define entities in HA to communicate with*/
 void homeAssistantDiscovery(void) {
-  char buf[cMQTT_PAYLOAD_SIZE];
-  myMqttHelper.buildHassDiscoveryClimate(buf, sizeof(buf), myConfig.name, FW);
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryClimate(), buf, true, MQTT_QOS);    // make HA discover the climate component
-  
-  myMqttHelper.buildHassDiscoveryBinarySensor(buf, sizeof(buf), kThermostatState);
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(kThermostatState), buf, true, MQTT_QOS);    // make HA discover the state sensor
-  
-  myMqttHelper.buildHassDiscoverySensor(buf, sizeof(buf), kTemp);
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kTemp), buf, true, MQTT_QOS);    // make HA discover the temperature sensor
-  
-  myMqttHelper.buildHassDiscoverySensor(buf, sizeof(buf), kHum);
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kHum), buf, true, MQTT_QOS);    // make HA discover the humidity sensor
-  
-  myMqttHelper.buildHassDiscoveryButton(buf, sizeof(buf), kRestart_button);
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kRestart_button), buf, true, MQTT_QOS);    // make HA discover the reset switch
-  
-  myMqttHelper.buildHassDiscoveryButton(buf, sizeof(buf), kUpdate_button);
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kUpdate_button), buf, true, MQTT_QOS);    // make HA discover the update switch
+  /* static: a 1.3 kB local buffer on the 4 kB cont stack that runs loop() overflows it once
+     publish() -> loop() -> messageReceived() nest on top of it */
+  static char buf[cMQTT_PAYLOAD_SIZE];
+  int len;
+
+  len = myMqttHelper.buildHassDiscoveryClimate(buf, sizeof(buf), myConfig.name, FW);
+  homeAssistantPublishDiscovery(myMqttHelper.getTopicHassDiscoveryClimate(), buf, len);                         // make HA discover the climate component
+
+  len = myMqttHelper.buildHassDiscoveryBinarySensor(buf, sizeof(buf), kThermostatState);
+  homeAssistantPublishDiscovery(myMqttHelper.getTopicHassDiscoveryBinarySensor(kThermostatState), buf, len);    // make HA discover the state sensor
+
+  len = myMqttHelper.buildHassDiscoverySensor(buf, sizeof(buf), kTemp);
+  homeAssistantPublishDiscovery(myMqttHelper.getTopicHassDiscoverySensor(kTemp), buf, len);                     // make HA discover the temperature sensor
+
+  len = myMqttHelper.buildHassDiscoverySensor(buf, sizeof(buf), kHum);
+  homeAssistantPublishDiscovery(myMqttHelper.getTopicHassDiscoverySensor(kHum), buf, len);                      // make HA discover the humidity sensor
+
+  len = myMqttHelper.buildHassDiscoveryButton(buf, sizeof(buf), kRestart_button);
+  homeAssistantPublishDiscovery(myMqttHelper.getTopicHassDiscoveryButton(kRestart_button), buf, len);           // make HA discover the reset switch
+
+  len = myMqttHelper.buildHassDiscoveryButton(buf, sizeof(buf), kUpdate_button);
+  homeAssistantPublishDiscovery(myMqttHelper.getTopicHassDiscoveryButton(kUpdate_button), buf, len);            // make HA discover the update switch
 }
 
 /* Make Home Assistant forget the discovered entities on demand */
@@ -1482,16 +1498,14 @@ void handleWebServerClient(void) {
               #endif
             } else if ((value.toInt() & 1) == false) {
               myConfig.display_enabled = false;
-                  #ifdef CFG_DEBUG
-                  Serial.println("Display disabled via webpage");
-                  #endif
-                }
-                yield();  // yield before LittleFS write
-                requestSaveToSpiffs = true;
-              } else if (key == "mqtt_server_address") {
+              #ifdef CFG_DEBUG
+              Serial.println("Display disabled via webpage");
+              #endif
+            }
+            requestSaveToSpiffs = true;
+          } else if (key == "mqtt_server_address") {
             if ( (value != "") && (value != myConfig.mqtt_host) ) {
               strlcpy(myConfig.mqtt_host, value.c_str(), sizeof(myConfig.mqtt_host));
-              yield();  // yield before LittleFS write
               requestSaveToSpiffs = true;
               #ifdef CFG_DEBUG
               Serial.printf("New MQTT server configured: %s\n", myConfig.mqtt_host);
@@ -1504,7 +1518,6 @@ void handleWebServerClient(void) {
           } else if (key == "mqtt_server_port") {
             if ( (value.toInt() != myConfig.mqtt_port) && (value.toInt() > 0) && (value.toInt() <= UINT16_MAX) ) {
               myConfig.mqtt_port = value.toInt();
-              yield();  // yield before LittleFS write
               requestSaveToSpiffs = true;
               #ifdef CFG_DEBUG
               Serial.println("New MQTT port configured.");
@@ -1517,7 +1530,6 @@ void handleWebServerClient(void) {
           } else if (key == "mqtt_user") {
             if ( (value != "") && (value != myConfig.mqtt_user) ) {
               strlcpy(myConfig.mqtt_user, value.c_str(), sizeof(myConfig.mqtt_user));
-              yield();  // yield before LittleFS write
               requestSaveToSpiffs = true;
               #ifdef CFG_DEBUG
               Serial.println("New MQTT user configured.");
@@ -1530,7 +1542,6 @@ void handleWebServerClient(void) {
           } else if (key == "mqtt_pwd") {
             if ( (value != "") && (value != myConfig.mqtt_password) ) {
               strlcpy(myConfig.mqtt_password, value.c_str(), sizeof(myConfig.mqtt_password));
-              yield();  // yield before LittleFS write
               requestSaveToSpiffs = true;
               #ifdef CFG_DEBUG
               Serial.println("New MQTT password configured.");
@@ -1543,7 +1554,6 @@ void handleWebServerClient(void) {
           } else if (key == "mqtt_pub_cycle") {
             if ( (value.toInt() != myConfig.mqtt_publish_cycle) && (value.toInt() > 0) && (value.toInt() <= UINT8_MAX) ) {
               myConfig.mqtt_publish_cycle = value.toInt();
-              yield();  // yield before LittleFS write
               requestSaveToSpiffs = true;
               #ifdef CFG_DEBUG
               Serial.println("New MQTT pyblish cycle configured.");
@@ -1556,7 +1566,6 @@ void handleWebServerClient(void) {
           } else if (key == "timezone") {
             if ( (value != myConfig.timezone) && (value != "") ) {
               strlcpy(myConfig.timezone, value.c_str(), sizeof(myConfig.timezone));
-              yield();  // yield before LittleFS write
               requestSaveToSpiffsWithRestart = true;    // restarting could be prevented by reconfiguration via configTzTime()
               #ifdef CFG_DEBUG
               Serial.println("New UTC offset configured.");
@@ -1574,7 +1583,6 @@ void handleWebServerClient(void) {
           #ifdef CFG_DEBUG
           Serial.println("Request FileSystem write with restart.");
           #endif
-          yield();  // yield after webServer arg processing before LittleFS write
           myConfig.input_method = static_cast<bool>(webServer.arg(i).toInt());
           requestSaveToSpiffsWithRestart = true;
         } else {
@@ -1588,7 +1596,6 @@ void handleWebServerClient(void) {
           #ifdef CFG_DEBUG
           Serial.println("Request FileSystem write with restart.");
           #endif
-          yield();  // yield before LittleFS write
           myConfig.sensor_type = webServer.arg(i).toInt();
           requestSaveToSpiffsWithRestart = true;
         } else {
@@ -1607,7 +1614,7 @@ void handleHttpReset(void) {
 }
 
 /* MQTT callback if a message was received */
- void messageReceived(String &topic, String &payload) {  // NOLINT
+void messageReceived(String &topic, String &payload) {  // NOLINT
   #ifdef CFG_DEBUG
   Serial.println("received: " + topic + " : " + payload);
   #endif
@@ -1618,7 +1625,9 @@ void handleHttpReset(void) {
     #endif
     if (payload == "PRESS") {
       systemRestartRequest = true;
+      #ifdef CFG_DEBUG
       Serial.println("Restart requested by MQTT");
+      #endif
     }
   } else if (topic == myMqttHelper.getTopicUpdateFirmware()) { /* HTTP Update */
     if (payload == "PRESS") {

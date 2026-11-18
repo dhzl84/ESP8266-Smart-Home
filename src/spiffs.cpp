@@ -30,38 +30,55 @@
 
 #define filename "/configJSON"
 
+/* Capacity of the JSON document holding the configuration: 23 members * 16 byte slots plus all
+   key and value strings, which are copied when reading from a file. With every string field at
+   its maximum length (update server 255, name/ssid/passwords/host/user/timezone 63 chars each)
+   this is ~1.2 kB. 768 bytes, as used before, failed with NoMemory for long values, so the
+   config was loaded only partially and saved incompletely.
+   The document lives on the heap: on the 4 kB cont stack that runs loop() a document of this
+   size plus the LittleFS and MQTT call chains overflows the stack. */
+#define cCONFIG_JSON_SIZE 1536
+
 // Loads the configuration from a file
 void loadConfiguration(Configuration &config) { // NOLINT: pass by reference
   // Open file for reading
   File file = FileSystem.open(filename, "r");
-  yield();  // yield after LittleFS open() to let UART ISR complete (prevents Level-1 interrupt corruption)
+  delay(1);  // let the UART/WiFi interrupt work after LittleFS access
+  if (!file) {
+    #ifdef CFG_DEBUG
+    Serial.println("Failed to open configuration, using default configuration");
+    #endif
+    return;
+  }
 
-  /* Allocate the memory pool on the stack.
-   * StaticJsonDocument<1536> is needed because:
-   * - ArduinoJson overhead (~400 bytes) + document content (~700 bytes for a full config)
-   * - The old 768-byte limit was dangerously close to causing stack corruption on ESP8266.
-   * Use arduinojson.org/assistant to compute the exact capacity needed. */
-  StaticJsonDocument<1536> jsonDoc;
+  DynamicJsonDocument jsonDoc(cCONFIG_JSON_SIZE);  /* heap, see cCONFIG_JSON_SIZE */
+  if (jsonDoc.capacity() < cCONFIG_JSON_SIZE) {
+    file.close();
+    delay(1);  // let the UART/WiFi interrupt work after LittleFS access
+    #ifdef CFG_DEBUG
+    Serial.println("Not enough heap for configuration, using default configuration");
+    #endif
+    return;
+  }
 
   DeserializationError error = deserializeJson(jsonDoc, file);
+  file.close();
+  delay(1);  // let the UART/WiFi interrupt work after LittleFS access
 
-  if (error) {
+  if (error || jsonDoc.overflowed()) {
     #ifdef CFG_DEBUG
     Serial.print(F("deserializeJson() failed with code "));
-    Serial.println(error.c_str());
+    Serial.println(error ? error.c_str() : "NoMemory");
+    Serial.println("Using default configuration");
     #endif /* CFG_DEBUG */
-  } else {
-      serializeJsonPretty(jsonDoc, Serial);
-      Serial.println();
+    jsonDoc.clear();
+    return;
   }
 
-  file.close();
-
-  if (jsonDoc.isNull()) {
-    #ifdef CFG_DEBUG
-    Serial.println("Failed to read file, using default configuration");
-    #endif /* CFG_DEBUG */
-  }
+  #ifdef CFG_DEBUG
+  serializeJsonPretty(jsonDoc, Serial);
+  Serial.println();
+  #endif /* CFG_DEBUG */
 
   // Copy values from the jsonDoc to the Config, if the key doesn't exist, load the default config
   strlcpy(config.name,                          jsonDoc["name"]                  | getEspChipId().c_str(), sizeof(config.name));
@@ -93,8 +110,7 @@ void loadConfiguration(Configuration &config) { // NOLINT: pass by reference
 bool saveConfiguration(const Configuration &config) {
   bool ret = true;
   bool writeFile = false;
-  StaticJsonDocument<768> jsonDoc;
-  // StaticJsonDocument<768> jsonDocNew;
+  DynamicJsonDocument jsonDoc(cCONFIG_JSON_SIZE);  /* heap, see cCONFIG_JSON_SIZE */
 
   if (FileSystem.exists(filename)) {
     // Delete existing file, otherwise the configuration is appended to the file
@@ -175,18 +191,8 @@ bool saveConfiguration(const Configuration &config) {
 
   /* if FileSystem content differs current configuration, delete FileSystem and write new content*/
   if (writeFile == true) {
-    if (FileSystem.remove(filename)) {
-      #ifdef CFG_DEBUG
-      Serial.println("Removing FileSystem file succeeded");
-      #endif /* CFG_DEBUG */
-    } else {
-      #ifdef CFG_DEBUG
-      Serial.println("Removing FileSystem file failed");
-      #endif /* CFG_DEBUG */
-    }
-
-    File file = FileSystem.open(filename, "w");
-    yield();  // yield after remove() + open()
+    /* the document still holds the strings read from the file, start empty to have the full capacity */
+    jsonDoc.clear();
 
     jsonDoc["name"] =                   config.name;
     jsonDoc["mode"] =                   config.thermostat_mode;
@@ -212,21 +218,42 @@ bool saveConfiguration(const Configuration &config) {
     jsonDoc["autoUpd"] =                config.auto_update;
     jsonDoc["planRestart"] =            config.planned_restart;
 
-    // Serialize JSON to file
-    if (serializeJson(jsonDoc, file) == 0) {
+    if (jsonDoc.overflowed()) {
+      /* incomplete document, keep the old file instead of storing half a configuration */
       ret = false;
       #ifdef CFG_DEBUG
-      Serial.println("Failed to write to file");
+      Serial.println("Configuration does not fit into JSON document, file not written");
       #endif /* CFG_DEBUG */
     } else {
-      #ifdef CFG_DEBUG
-      Serial.println("new FileSystem content:");
-      serializeJsonPretty(jsonDoc, Serial);
-      Serial.println();
-      #endif /* CFG_DEBUG */
+      if (FileSystem.remove(filename)) {
+        #ifdef CFG_DEBUG
+        Serial.println("Removing FileSystem file succeeded");
+        #endif /* CFG_DEBUG */
+      } else {
+        #ifdef CFG_DEBUG
+        Serial.println("Removing FileSystem file failed");
+        #endif /* CFG_DEBUG */
+      }
+
+      File file = FileSystem.open(filename, "w");
+      yield();  // yield after remove() + open()
+
+      // Serialize JSON to file
+      if (serializeJson(jsonDoc, file) == 0) {
+        ret = false;
+        #ifdef CFG_DEBUG
+        Serial.println("Failed to write to file");
+        #endif /* CFG_DEBUG */
+      } else {
+        #ifdef CFG_DEBUG
+        Serial.println("new FileSystem content:");
+        serializeJsonPretty(jsonDoc, Serial);
+        Serial.println();
+        #endif /* CFG_DEBUG */
+      }
+      file.close();
+      yield();  // yield after close()
     }
-    file.close();
-    yield();  // yield after close()
   } else {
     #ifdef CFG_DEBUG
     Serial.println("FileSystem content equals current config, no FileSystem write necessary");

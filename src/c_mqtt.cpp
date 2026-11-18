@@ -66,16 +66,26 @@ void mqttHelper::buildTopics(void) {
   mqttTopicDiscoveryButtonUpdateButton_   = mqttPrefix_ + mqttCompButton_ + mqttNodeId_ + mqttObjectId_ + "Update" + mqttHassDiscoveryTopic_;
 }
 
+/* snprintf() returns the length the payload WOULD have had. If that does not fit into the buffer
+   the JSON is cut off and invalid, so the buffer is cleared and -1 is returned. The caller must not
+   publish an empty payload: an empty retained discovery message makes Home Assistant delete the entity. */
+int mqttHelper::checkPayload(char* buf, size_t size, int written, const char* what) {
+  if ((written < 0) || (static_cast<size_t>(written) >= size)) {
+    #ifdef CFG_DEBUG
+    Serial.print(what);
+    Serial.print(" JSON does not fit into buffer, needed bytes: ");
+    Serial.println(written + 1);
+    #endif
+    buf[0] = '\0';
+    return -1;
+  }
+  return written;
+}
+
 int mqttHelper::buildStateJSON(char* buf, size_t size, const char* name, const char* temp, const char* humid,
                                const char* hysteresis, const char* actState, const char* tarTemp,
                                const char* sensError, const char* thermoMode, int16_t calibration_factor,
                                const char* calibration_offset, const char* ip, const char* firmware) {
-
-  /* Build the full JSON in a static buffer. The calibration_factor is formatted as an integer
-     using snprintf into a small temp buffer, then concatenated. */
-  
-  char sensScaleBuf[64];
-  snprintf(sensScaleBuf, sizeof(sensScaleBuf), ",\n  \"sens_scale\":\"%d\"", calibration_factor);
 
   int written = snprintf(buf, size,
     "{\n"
@@ -95,23 +105,12 @@ int mqttHelper::buildStateJSON(char* buf, size_t size, const char* name, const c
     "}",
     name, mqttNodeId_.c_str(), thermoMode, actState, tarTemp, temp, humid, hysteresis, sensError, calibration_factor, calibration_offset, firmware, ip);
 
-  if (written < 0 || static_cast<size_t>(written) >= size) {
-    #ifdef CFG_DEBUG
-    Serial.println("State JSON truncated");
-    #endif
-    return -1;
-  }
-  
-  return written;
+  return checkPayload(buf, size, written, "State");
 }
 
-/* Build Home Assistant discovery payload into a fixed-size buffer.
-   Uses stack-allocated char arrays to avoid heap fragmentation on ESP8266.
-   Caller must call mqttHelper::getTopicHassDiscoveryClimate() to get the topic string. */
+/* Build Home Assistant discovery payload for the climate component into a fixed-size buffer. */
 int mqttHelper::buildHassDiscoveryClimate(char* buf, size_t size, const char* name, const String& firmware) {
-  static char climate_json[1024];
-
-  int written = snprintf(climate_json, sizeof(climate_json),
+  int written = snprintf(buf, size,
     "{\n"
     "  \"~\":\"%s\",\n"
     "  \"name\":\"%s\",\n"
@@ -141,9 +140,8 @@ int mqttHelper::buildHassDiscoveryClimate(char* buf, size_t size, const char* na
     "    \"name\":\"Thermostat %s\",\n"
     "    \"sw\":\"%s\",\n"
     "    \"mf\":\"dhzl84\",\n"
-    "    \"cu\":\"http://%s/\""
+    "    \"cu\":\"http://%s/\"\n"
     "  }\n"
-    "}\n"
     "}",
     mqttGeneralBaseTopic_.c_str(),
     name,
@@ -162,32 +160,15 @@ int mqttHelper::buildHassDiscoveryClimate(char* buf, size_t size, const char* na
     name
   );
 
-  if (written < 0 || static_cast<size_t>(written) >= sizeof(climate_json)) {
-    #ifdef CFG_DEBUG
-    Serial.printf("Climate discovery JSON truncated at %d bytes\n", written);
-    #endif
-    written = -1;
-  }
-
-  /* Only copy if snprintf succeeded and fits in buffer.
-     If written < 0 (snprintf truncated) or written >= size, leave buf[0] = '\0'. */
-  if (written >= 0 && static_cast<size_t>(written) < size) {
-    memcpy(buf, climate_json, static_cast<size_t>(written));
-    buf[static_cast<size_t>(written)] = '\0';
-  } else {
-    buf[0] = '\0';  /* buffer too small or truncation occurred */
-  }
-  return written;
+  return checkPayload(buf, size, written, "Climate discovery");
 }
 
 /* Build Home Assistant discovery payload for binary sensor into a fixed-size buffer. */
 int mqttHelper::buildHassDiscoveryBinarySensor(char* buf, size_t size, BinarySensor_t binarySensor) {
-  static char binary_sensor_json[cMQTT_PAYLOAD_SIZE];
-
   switch (binarySensor) {
     case kThermostatState:
     {
-      size_t str_len = snprintf(binary_sensor_json, sizeof(binary_sensor_json),
+      int written = snprintf(buf, size,
         "{\n"
         "  \"~\":\"%s\",\n"
         "  \"name\":\"State\",\n"
@@ -214,19 +195,7 @@ int mqttHelper::buildHassDiscoveryBinarySensor(char* buf, size_t size, BinarySen
         mqttNodeId_.c_str()
       );
 
-      Serial.printf("Written: %d\n", str_len);
-      Serial.printf("JSON Buffer size: %d\n", sizeof(binary_sensor_json));
-      Serial.printf("JSON Buffer length: %d\n", strlen(binary_sensor_json));
-      Serial.printf("JSON: %s\n", binary_sensor_json);
-
-      if (str_len < size) {
-        memcpy(buf, binary_sensor_json, str_len);
-        buf[str_len] = '\0';
-        Serial.printf("buf: %s\n", binary_sensor_json);
-      } else {
-        buf[0] = '\0';
-      }
-      return str_len;
+      return checkPayload(buf, size, written, "Binary sensor discovery");
     }
     default:
       buf[0] = '\0';
@@ -236,12 +205,10 @@ int mqttHelper::buildHassDiscoveryBinarySensor(char* buf, size_t size, BinarySen
 
 /* Build Home Assistant discovery payload for sensor into a fixed-size buffer. */
 int mqttHelper::buildHassDiscoverySensor(char* buf, size_t size, Sensor_t sensor) {
-  static char sensor_json[512];
-
   switch (sensor) {
     case kTemp:
     {
-      int written = snprintf(sensor_json, sizeof(sensor_json),
+      int written = snprintf(buf, size,
         "{\n"
         "  \"~\":\"%s\",\n"
         "  \"name\":\"Temperatur\",\n"
@@ -267,17 +234,11 @@ int mqttHelper::buildHassDiscoverySensor(char* buf, size_t size, Sensor_t sensor
         mqttNodeId_.c_str()
       );
 
-      size_t n = strlen(sensor_json);
-      if (n >= size) {
-        n = size - 1;
-      }
-      memcpy(buf, sensor_json, n);
-      buf[n] = '\0';
-      return written;
+      return checkPayload(buf, size, written, "Temperature sensor discovery");
     }
     case kHum:
     {
-      int written = snprintf(sensor_json, sizeof(sensor_json),
+      int written = snprintf(buf, size,
         "{\n"
         "  \"~\":\"%s\",\n"
         "  \"name\":\"Luftfeuchtigkeit\",\n"
@@ -303,13 +264,7 @@ int mqttHelper::buildHassDiscoverySensor(char* buf, size_t size, Sensor_t sensor
         mqttNodeId_.c_str()
       );
 
-      size_t n = strlen(sensor_json);
-      if (n >= size) {
-        n = size - 1;
-      }
-      memcpy(buf, sensor_json, n);
-      buf[n] = '\0';
-      return written;
+      return checkPayload(buf, size, written, "Humidity sensor discovery");
     }
     default:
       snprintf(buf, size, "{}");
@@ -319,12 +274,10 @@ int mqttHelper::buildHassDiscoverySensor(char* buf, size_t size, Sensor_t sensor
 
 /* Build Home Assistant discovery payload for button into a fixed-size buffer. */
 int mqttHelper::buildHassDiscoveryButton(char* buf, size_t size, Button_t buttons) {
-  static char button_json[512];
-
   switch (buttons) {
     case kRestart_button:
     {
-      int written = snprintf(button_json, sizeof(button_json),
+      int written = snprintf(buf, size,
         "{\n"
         "  \"~\":\"%s\",\n"
         "  \"name\":\"Neustart\",\n"
@@ -348,18 +301,12 @@ int mqttHelper::buildHassDiscoveryButton(char* buf, size_t size, Button_t button
         mqttNodeId_.c_str()
       );
 
-      size_t n = strlen(button_json);
-      if (n >= size) {
-        n = size - 1;
-      }
-      memcpy(buf, button_json, n);
-      buf[n] = '\0';
-      return written;
+      return checkPayload(buf, size, written, "Restart button discovery");
     }
     break;
     case kUpdate_button:
     {
-      int written = snprintf(button_json, sizeof(button_json),
+      int written = snprintf(buf, size,
         "{\n"
         "  \"~\":\"%s\",\n"
         "  \"name\":\"Firmwareupdate\",\n"
@@ -383,13 +330,7 @@ int mqttHelper::buildHassDiscoveryButton(char* buf, size_t size, Button_t button
         mqttNodeId_.c_str()
       );
 
-      size_t n = strlen(button_json);
-      if (n >= size) {
-        n = size - 1;
-      }
-      memcpy(buf, button_json, n);
-      buf[n] = '\0';
-      return written;
+      return checkPayload(buf, size, written, "Update button discovery");
     }
     break;
     default:
@@ -398,17 +339,17 @@ int mqttHelper::buildHassDiscoveryButton(char* buf, size_t size, Button_t button
   }
 }
 
-String mqttHelper::getTopicUpdateFirmware(void)                   { return mqttGeneralBaseTopic_ + mqttUpdateFirmware_;  }
-String mqttHelper::getTopicChangeName(void)                       { return mqttGeneralBaseTopic_ + mqttChangeName_; }
-String mqttHelper::getTopicLastWill(void)                         { return mqttGeneralBaseTopic_ + mqttWill_; }
-String mqttHelper::getTopicSystemRestartRequest(void)             { return mqttGeneralBaseTopic_ + mqttSystemRestartRequest_; }
-String mqttHelper::getTopicChangeSensorCalib(void)                { return mqttGeneralBaseTopic_ + mqttChangeSensorCalib_; }
-String mqttHelper::getTopicChangeHysteresis(void)                 { return mqttGeneralBaseTopic_ + mqttChangeHysteresis_; }
-String mqttHelper::getTopicTargetTempCmd(void)                    { return mqttGeneralBaseTopic_ + mqttTargetTempCmd_; }
-String mqttHelper::getTopicThermostatModeCmd(void)                { return mqttGeneralBaseTopic_ + mqttThermostatModeCmd_; }
-String mqttHelper::getTopicHassDiscoveryClimate(void)             { return mqttGeneralBaseTopic_ + mqttHassDiscoveryTopic_; }
-String mqttHelper::getTopicData(void)                             { return mqttGeneralBaseTopic_ + mqttData_; }
-String mqttHelper::getTopicOutsideTemperature(void)               { return mqttPrefix_ + mqttOutsideTemperature_; }
+const String& mqttHelper::getTopicUpdateFirmware(void)            { return mqttTopicUpdateFirmware_; }
+const String& mqttHelper::getTopicChangeName(void)                { return mqttTopicChangeName_; }
+const String& mqttHelper::getTopicLastWill(void)                  { return mqttTopicLastWill_; }
+const String& mqttHelper::getTopicSystemRestartRequest(void)      { return mqttTopicSystemRestartRequest_; }
+const String& mqttHelper::getTopicChangeSensorCalib(void)         { return mqttTopicChangeSensorCalib_; }
+const String& mqttHelper::getTopicChangeHysteresis(void)          { return mqttTopicChangeHysteresis_; }
+const String& mqttHelper::getTopicTargetTempCmd(void)             { return mqttTopicTargetTempCmd_; }
+const String& mqttHelper::getTopicThermostatModeCmd(void)         { return mqttTopicThermostatModeCmd_; }
+const String& mqttHelper::getTopicHassDiscoveryClimate(void)      { return mqttTopicDiscoveryClimate_; }
+const String& mqttHelper::getTopicData(void)                      { return mqttTopicData_; }
+const String& mqttHelper::getTopicOutsideTemperature(void)        { return mqttTopicOutsideTemperature_; }
 bool   mqttHelper::getTriggerDiscovery(void)                             { return mqttTriggerDiscovery_; }
 void   mqttHelper::setTriggerDiscovery(bool discover)                    { mqttTriggerDiscovery_ = discover; }
 bool   mqttHelper::getTriggerRemoveDiscovered(void)                      { return mqttTriggerRemoveDiscovered_; }

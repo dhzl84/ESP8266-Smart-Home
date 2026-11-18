@@ -1,7 +1,5 @@
 #include "c_thermostat.h"
 
-#ifdef CFG_BOARD_ESP8266
-
 /* target_temperature_ : initial value if setup() is not called; resolution is 0.1 C */
 /* new_data_ : flag to indicate new data to be displayed and transmitted vai MQTT */
 /* relay_gpio_ : relay GPIO if setup() is not called */
@@ -218,6 +216,20 @@ void Thermostat::toggleThermostatMode() {
 
 // Sensor ===============================================================
 
+/* sort the samples ascending (insertion sort). The queue holds only a few samples, so this is fast,
+   needs no extra memory and no recursion, and the trimmed mean below relies on a fully sorted array */
+void Thermostat::sort_samples(int16_t samples[], int16_t count) {
+  for (int16_t i = 1; i < count; i++) {
+    const int16_t value = samples[i];
+    int16_t j = i - 1;
+    while ((j >= 0) && (samples[j] > value)) {
+      samples[j + 1] = samples[j];
+      j--;
+    }
+    samples[j + 1] = value;
+  }
+}
+
 void Thermostat::setCurrentTemperature(int16_t value) {
   current_temperature_ = ((int16_t)( static_cast<float> (value) * (static_cast<float> (temperature_factor_) / 100)) + temperature_offset_);
 
@@ -231,7 +243,7 @@ void Thermostat::setCurrentTemperature(int16_t value) {
     }
   }
 
-  // copy array for sorting via linear-time selection algorithm
+  // copy array for sorting, the queue itself must keep the order of arrival
   int16_t sorted_temperature_value_queue[CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE];
   std::copy(std::begin(temperature_value_queue_), std::end(temperature_value_queue_), std::begin(sorted_temperature_value_queue));
 
@@ -241,41 +253,10 @@ void Thermostat::setCurrentTemperature(int16_t value) {
   }
 #endif  // CFG_DEBUG_SELECTION_SORT
 
-  // linear-time selection algorithm (median-of-three + insertion sort hybrid)
-  // worst-case O(n), no pathological O(n^2) behavior like naive quicksort
-  int16_t n = static_cast<int16_t>(CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE);
-  if (n > 1) {
-    for (int16_t i = 0; i < n / 2; i++) {
-      if (sorted_temperature_value_queue[i] > sorted_temperature_value_queue[n - 1 - i]) {
-        int16_t tmp = sorted_temperature_value_queue[i];
-        sorted_temperature_value_queue[i] = sorted_temperature_value_queue[n - 1 - i];
-        sorted_temperature_value_queue[n - 1 - i] = tmp;
-      }
-    }
-    // insertion sort on the first half (already sorted by median-of-three)
-    for (int16_t i = 1; i <= n / 2; i++) {
-      int16_t key = sorted_temperature_value_queue[i];
-      int16_t j = i - 1;
-      while (j >= 0 && sorted_temperature_value_queue[j] > key) {
-        sorted_temperature_value_queue[j + 1] = sorted_temperature_value_queue[j];
-        j--;
-      }
-      sorted_temperature_value_queue[j + 1] = key;
-    }
-    // insertion sort on the second half
-    for (int16_t i = n / 2 + 1; i < n; i++) {
-      int16_t key = sorted_temperature_value_queue[i];
-      int16_t j = i - 1;
-      while (j >= n / 2 && sorted_temperature_value_queue[j] > key) {
-        sorted_temperature_value_queue[j + 1] = sorted_temperature_value_queue[j];
-        j--;
-      }
-      sorted_temperature_value_queue[j + 1] = key;
-    }
-  }
+  sort_samples(sorted_temperature_value_queue, CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE);
 
 #if CFG_DEBUG_SELECTION_SORT
-  for (int16_t i = 0; i < n; i++) {
+  for (int16_t i = 0; i < CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE; i++) {
     Serial.printf("Sorted Value: %i\n", sorted_temperature_value_queue[i]);
   }
 #endif  // CFG_DEBUG_SELECTION_SORT
@@ -314,7 +295,7 @@ void Thermostat::setCurrentHumidity(int16_t value) {
     }
   }
 
-  // copy array for sorting via linear-time selection algorithm
+  // copy array for sorting, the queue itself must keep the order of arrival
   int16_t sorted_humidity_value_queue[CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE];
   std::copy(std::begin(humidity_value_queue_), std::end(humidity_value_queue_), std::begin(sorted_humidity_value_queue));
 
@@ -324,41 +305,10 @@ void Thermostat::setCurrentHumidity(int16_t value) {
   }
 #endif  // CFG_DEBUG_SELECTION_SORT
 
-  // linear-time selection algorithm (median-of-three + insertion sort hybrid)
-  // worst-case O(n), no pathological O(n^2) behavior like naive quicksort
-  int16_t n = static_cast<int16_t>(CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE);
-  if (n > 1) {
-    for (int16_t i = 0; i < n / 2; i++) {
-      if (sorted_humidity_value_queue[i] > sorted_humidity_value_queue[n - 1 - i]) {
-        int16_t tmp = sorted_humidity_value_queue[i];
-        sorted_humidity_value_queue[i] = sorted_humidity_value_queue[n - 1 - i];
-        sorted_humidity_value_queue[n - 1 - i] = tmp;
-      }
-    }
-    // insertion sort on the first half (already sorted by median-of-three)
-    for (int16_t i = 1; i <= n / 2; i++) {
-      int16_t key = sorted_humidity_value_queue[i];
-      int16_t j = i - 1;
-      while (j >= 0 && sorted_humidity_value_queue[j] > key) {
-        sorted_humidity_value_queue[j + 1] = sorted_humidity_value_queue[j];
-        j--;
-      }
-      sorted_humidity_value_queue[j + 1] = key;
-    }
-    // insertion sort on the second half
-    for (int16_t i = n / 2 + 1; i < n; i++) {
-      int16_t key = sorted_humidity_value_queue[i];
-      int16_t j = i - 1;
-      while (j >= n / 2 && sorted_humidity_value_queue[j] > key) {
-        sorted_humidity_value_queue[j + 1] = sorted_humidity_value_queue[j];
-        j--;
-      }
-      sorted_humidity_value_queue[j + 1] = key;
-    }
-  }
+  sort_samples(sorted_humidity_value_queue, CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE);
 
 #if CFG_DEBUG_SELECTION_SORT
-  for (int16_t i = 0; i < n; i++) {
+  for (int16_t i = 0; i < CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE; i++) {
     Serial.printf("Sorted Humidity Value: %i\n", sorted_humidity_value_queue[i]);
   }
 #endif  // CFG_DEBUG_SELECTION_SORT
@@ -438,4 +388,3 @@ void Thermostat::setSensorCalibData(int16_t factor, int16_t offset, bool calib) 
   }
 }
 
-#endif  /* CFG_BOARD_ESP8266 */

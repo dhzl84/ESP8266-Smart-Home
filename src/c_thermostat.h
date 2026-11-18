@@ -111,7 +111,7 @@ class Thermostat {
   int16_t temperature_value_queue_[CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE];
   int16_t humidity_value_sample_id_;
   int16_t humidity_value_queue_[CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE];
-  void quick_sort(int16_t arr[], int16_t left, int16_t right);
+  void sort_samples(int16_t samples[], int16_t count);
 };
 
 #endif  // C_THERMOSTAT_H_
