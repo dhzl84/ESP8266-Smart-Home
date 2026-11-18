@@ -1,7 +1,23 @@
 #ifndef C_MQTT_H_
 #define C_MQTT_H_
 
+#define cMQTT_PAYLOAD_SIZE 1500  /* size used for reusable char buffers */
+
 #include "Arduino.h"
+#include <stdarg.h>
+#include <stddef.h>
+#include <string.h>
+
+/* Generic snprintf wrapper that safely truncates output to fit the buffer.
+ * Returns the number of bytes written (excluding null terminator), or -1 if
+ * the formatted string did not fit in the buffer. Caller must ensure the
+ * format string contains no %n directive and that all arguments are valid.
+ *
+ * If debug_prefix is non-NULL, a truncation warning is printed to Serial:
+ *   "[MQTT] <prefix>: payload truncated to <size> of <max_size> bytes"
+ */
+int snprintf_safe(char* buf, size_t size, const char* fmt, const char* debug_prefix, ...);
+
 
 typedef enum {
   kTemp,

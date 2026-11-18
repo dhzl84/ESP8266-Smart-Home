@@ -180,12 +180,12 @@ int mqttHelper::buildHassDiscoveryClimate(char* buf, size_t size, const char* na
 
 /* Build Home Assistant discovery payload for binary sensor into a fixed-size buffer. */
 int mqttHelper::buildHassDiscoveryBinarySensor(char* buf, size_t size, BinarySensor_t binarySensor) {
-  static char binary_sensor_json[512];
+  static char binary_sensor_json[cMQTT_PAYLOAD_SIZE];
 
   switch (binarySensor) {
     case kThermostatState:
     {
-      int written = snprintf(binary_sensor_json, sizeof(binary_sensor_json),
+      size_t str_len = snprintf(binary_sensor_json, sizeof(binary_sensor_json),
         "{\n"
         "  \"~\":\"%s\",\n"
         "  \"name\":\"State\",\n"
@@ -201,28 +201,34 @@ int mqttHelper::buildHassDiscoveryBinarySensor(char* buf, size_t size, BinarySen
         "  \"uniq_id\":\"%s_state\",\n"
         "  \"ic\":\"mdi:radiator\",\n"
         "  \"dev\" : {\n"
-        "    \"identifiers\":[\"%s\"],\n"
+        "    \"ids\":[\"%s\"]\n"
         "  }\n"
-        "}\n"
         "}",
         mqttGeneralBaseTopic_.c_str(),
         mqttData_.c_str(),
         mqttWill_.c_str(),
         mqttData_.c_str(),
+        mqttNodeId_.c_str(),
         mqttNodeId_.c_str()
       );
 
-      size_t n = strlen(binary_sensor_json);
-      if (n >= size) {
-        n = size - 1;
+      Serial.printf("Written: %d\n", str_len);
+      Serial.printf("JSON Buffer size: %d\n", sizeof(binary_sensor_json));
+      Serial.printf("JSON Buffer length: %d\n", strlen(binary_sensor_json));
+      Serial.printf("JSON: %s\n", binary_sensor_json);
+
+      if (str_len < size) {
+        memcpy(buf, binary_sensor_json, str_len);
+        buf[str_len] = '\0';
+        Serial.printf("buf: %s\n", binary_sensor_json);
+      } else {
+        buf[0] = '\0';
       }
-      memcpy(buf, binary_sensor_json, n);
-      buf[n] = '\0';
-      return written;
+      return str_len;
     }
     default:
-      snprintf(buf, size, "{}");
-      return 2;
+      buf[0] = '\0';
+      return -1;
   }
 }
 
@@ -248,14 +254,14 @@ int mqttHelper::buildHassDiscoverySensor(char* buf, size_t size, Sensor_t sensor
         "  \"uniq_id\":\"%s_sensTemp\",\n"
         "  \"ic\":\"mdi:thermometer\",\n"
         "  \"dev\" : {\n"
-        "    \"identifiers\":[\"%s\"],\n"
+        "    \"ids\":[\"%s\"]\n"
         "  }\n"
-        "}\n"
         "}",
         mqttGeneralBaseTopic_.c_str(),
         mqttData_.c_str(),
         mqttWill_.c_str(),
         mqttData_.c_str(),
+        mqttNodeId_.c_str(),
         mqttNodeId_.c_str()
       );
 
@@ -284,14 +290,14 @@ int mqttHelper::buildHassDiscoverySensor(char* buf, size_t size, Sensor_t sensor
         "  \"uniq_id\":\"%s_sensHum\",\n"
         "  \"ic\":\"mdi:water-percent\",\n"
         "  \"dev\" : {\n"
-        "    \"identifiers\":[\"%s\"],\n"
+        "    \"ids\":[\"%s\"]\n"
         "  }\n"
-        "}\n"
         "}",
         mqttGeneralBaseTopic_.c_str(),
         mqttData_.c_str(),
         mqttWill_.c_str(),
         mqttData_.c_str(),
+        mqttNodeId_.c_str(),
         mqttNodeId_.c_str()
       );
 
@@ -329,14 +335,14 @@ int mqttHelper::buildHassDiscoveryButton(char* buf, size_t size, Button_t button
         "  \"uniq_id\":\"%s_swRestart\",\n"
         "  \"ic\":\"mdi:restart\",\n"
         "  \"dev\" : { \n"
-        "    \"ids\":[\"%s\"],\n"
+        "    \"ids\":[\"%s\"]\n"
         "  }\n"
-        "}\n"
         "}",
         mqttGeneralBaseTopic_.c_str(),
         mqttSystemRestartRequest_.c_str(),
         mqttWill_.c_str(),
         mqttData_.c_str(),
+        mqttNodeId_.c_str(),
         mqttNodeId_.c_str()
       );
 
@@ -364,14 +370,14 @@ int mqttHelper::buildHassDiscoveryButton(char* buf, size_t size, Button_t button
         "  \"uniq_id\":\"%s_swUpdate\",\n"
         "  \"ic\":\"mdi:cellphone-arrow-down\",\n"
         "  \"dev\" : { \n"
-        "    \"ids\":[\"%s\"],\n"
+        "    \"ids\":[\"%s\"]\n"
         "  }\n"
-        "}\n"
         "}",
         mqttGeneralBaseTopic_.c_str(),
         mqttUpdateFirmware_.c_str(),
         mqttWill_.c_str(),
         mqttData_.c_str(),
+        mqttNodeId_.c_str(),
         mqttNodeId_.c_str()
       );
 

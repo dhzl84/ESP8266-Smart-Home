@@ -34,6 +34,7 @@
 void loadConfiguration(Configuration &config) { // NOLINT: pass by reference
   // Open file for reading
   File file = FileSystem.open(filename, "r");
+  yield();  // yield after LittleFS open() to let UART ISR complete (prevents Level-1 interrupt corruption)
 
   // Allocate the memory pool on the stack.
   // Don't forget to change the capacity to match your JSON document.
@@ -96,8 +97,10 @@ bool saveConfiguration(const Configuration &config) {
   if (FileSystem.exists(filename)) {
     // Delete existing file, otherwise the configuration is appended to the file
     File file = FileSystem.open(filename, "r");
+    yield();  // yield after LittleFS open()
     DeserializationError error = deserializeJson(jsonDoc, file);
     file.close();
+    yield();  // yield after close()
 
     if (error) {
         #ifdef CFG_DEBUG
@@ -181,6 +184,7 @@ bool saveConfiguration(const Configuration &config) {
     }
 
     File file = FileSystem.open(filename, "w");
+    yield();  // yield after remove() + open()
 
     jsonDoc["name"] =                   config.name;
     jsonDoc["mode"] =                   config.thermostat_mode;
@@ -220,6 +224,7 @@ bool saveConfiguration(const Configuration &config) {
       #endif /* CFG_DEBUG */
     }
     file.close();
+    yield();  // yield after close()
   } else {
     #ifdef CFG_DEBUG
     Serial.println("FileSystem content equals current config, no FileSystem write necessary");
@@ -234,6 +239,7 @@ String readSpiffs(String file) {
 
   if (FileSystem.exists(file)) {
     File f = FileSystem.open(file, "r");
+    yield();  // yield after LittleFS open()
     if (!f) {
       #ifdef CFG_DEBUG
       Serial.println("oh no, failed to open file: " + file);
@@ -242,6 +248,7 @@ String readSpiffs(String file) {
     } else {
       fileContent = f.readStringUntil('\n');
       f.close();
+      yield();  // yield after close()
 
       #ifdef CFG_DEBUG
       if (fileContent == "") {

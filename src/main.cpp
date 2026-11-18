@@ -242,6 +242,7 @@ void FS_INIT(void) {  // initializes the FileSystem when first used and loads th
     Serial.println("Open file '/formatted' in write mode");
     #endif
     File f = FileSystem.open("/formatted", "w");
+    yield();  // yield after LittleFS open() to let UART ISR complete (prevents Level-1 interrupt corruption)
     if (!f) {
       #ifdef CFG_DEBUG
       Serial.println("file open failed");
@@ -249,6 +250,7 @@ void FS_INIT(void) {  // initializes the FileSystem when first used and loads th
     } else {
       f.close();
       delay(5000);
+      yield();  // yield after close()
       if (!FileSystem.exists(F("/formatted"))) {
         #ifdef CFG_DEBUG
         Serial.println("That didn't work!");
@@ -272,8 +274,10 @@ void FS_INIT(void) {  // initializes the FileSystem when first used and loads th
   #if CFG_BOARD_ESP8266
   Dir dir = FileSystem.openDir("/");
   while (dir.next()) {
+    yield();  // yield after LittleFS next() to let UART ISR complete
     Serial.print("FileSystem file found: " + dir.fileName() + " - Size in byte: ");
     File f = dir.openFile("r");
+    yield();  // yield after openFile()
     Serial.println(f.size());
   }
   #elif CFG_BOARD_ESP32
@@ -1033,18 +1037,24 @@ void IRAM_ATTR updateEncoder(void) {
 
 /* Home Assistant discovery_enabled on connect; used to define entities in HA to communicate with*/
 void homeAssistantDiscovery(void) {
-  char buf[800];
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryClimate(), String(myMqttHelper.buildHassDiscoveryClimate(buf, sizeof(buf), myConfig.name, String(FW))), true, MQTT_QOS);    // make HA discover the climate component
+  char buf[cMQTT_PAYLOAD_SIZE];
+  myMqttHelper.buildHassDiscoveryClimate(buf, sizeof(buf), myConfig.name, FW);
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryClimate(), buf, true, MQTT_QOS);    // make HA discover the climate component
   
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(kThermostatState), String(myMqttHelper.buildHassDiscoveryBinarySensor(buf, sizeof(buf), kThermostatState)), true, MQTT_QOS);    // make HA discover the state sensor
+  myMqttHelper.buildHassDiscoveryBinarySensor(buf, sizeof(buf), kThermostatState);
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryBinarySensor(kThermostatState), buf, true, MQTT_QOS);    // make HA discover the state sensor
   
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kTemp), String(myMqttHelper.buildHassDiscoverySensor(buf, sizeof(buf), kTemp)), true, MQTT_QOS);    // make HA discover the temperature sensor
+  myMqttHelper.buildHassDiscoverySensor(buf, sizeof(buf), kTemp);
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kTemp), buf, true, MQTT_QOS);    // make HA discover the temperature sensor
   
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kHum), String(myMqttHelper.buildHassDiscoverySensor(buf, sizeof(buf), kHum)), true, MQTT_QOS);    // make HA discover the humidity sensor
+  myMqttHelper.buildHassDiscoverySensor(buf, sizeof(buf), kHum);
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoverySensor(kHum), buf, true, MQTT_QOS);    // make HA discover the humidity sensor
   
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kRestart_button), String(myMqttHelper.buildHassDiscoveryButton(buf, sizeof(buf), kRestart_button)), true, MQTT_QOS);    // make HA discover the reset switch
+  myMqttHelper.buildHassDiscoveryButton(buf, sizeof(buf), kRestart_button);
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kRestart_button), buf, true, MQTT_QOS);    // make HA discover the reset switch
   
-  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kUpdate_button), String(myMqttHelper.buildHassDiscoveryButton(buf, sizeof(buf), kUpdate_button)), true, MQTT_QOS);    // make HA discover the update switch
+  myMqttHelper.buildHassDiscoveryButton(buf, sizeof(buf), kUpdate_button);
+  myMqttClient.publish(myMqttHelper.getTopicHassDiscoveryButton(kUpdate_button), buf, true, MQTT_QOS);    // make HA discover the update switch
 }
 
 /* Make Home Assistant forget the discovered entities on demand */
@@ -1472,14 +1482,16 @@ void handleWebServerClient(void) {
               #endif
             } else if ((value.toInt() & 1) == false) {
               myConfig.display_enabled = false;
-              #ifdef CFG_DEBUG
-              Serial.println("Display disabled via webpage");
-              #endif
-            }
-            requestSaveToSpiffs = true;
-          } else if (key == "mqtt_server_address") {
+                  #ifdef CFG_DEBUG
+                  Serial.println("Display disabled via webpage");
+                  #endif
+                }
+                yield();  // yield before LittleFS write
+                requestSaveToSpiffs = true;
+              } else if (key == "mqtt_server_address") {
             if ( (value != "") && (value != myConfig.mqtt_host) ) {
               strlcpy(myConfig.mqtt_host, value.c_str(), sizeof(myConfig.mqtt_host));
+              yield();  // yield before LittleFS write
               requestSaveToSpiffs = true;
               #ifdef CFG_DEBUG
               Serial.printf("New MQTT server configured: %s\n", myConfig.mqtt_host);
@@ -1492,6 +1504,7 @@ void handleWebServerClient(void) {
           } else if (key == "mqtt_server_port") {
             if ( (value.toInt() != myConfig.mqtt_port) && (value.toInt() > 0) && (value.toInt() <= UINT16_MAX) ) {
               myConfig.mqtt_port = value.toInt();
+              yield();  // yield before LittleFS write
               requestSaveToSpiffs = true;
               #ifdef CFG_DEBUG
               Serial.println("New MQTT port configured.");
@@ -1504,6 +1517,7 @@ void handleWebServerClient(void) {
           } else if (key == "mqtt_user") {
             if ( (value != "") && (value != myConfig.mqtt_user) ) {
               strlcpy(myConfig.mqtt_user, value.c_str(), sizeof(myConfig.mqtt_user));
+              yield();  // yield before LittleFS write
               requestSaveToSpiffs = true;
               #ifdef CFG_DEBUG
               Serial.println("New MQTT user configured.");
@@ -1516,6 +1530,7 @@ void handleWebServerClient(void) {
           } else if (key == "mqtt_pwd") {
             if ( (value != "") && (value != myConfig.mqtt_password) ) {
               strlcpy(myConfig.mqtt_password, value.c_str(), sizeof(myConfig.mqtt_password));
+              yield();  // yield before LittleFS write
               requestSaveToSpiffs = true;
               #ifdef CFG_DEBUG
               Serial.println("New MQTT password configured.");
@@ -1528,6 +1543,7 @@ void handleWebServerClient(void) {
           } else if (key == "mqtt_pub_cycle") {
             if ( (value.toInt() != myConfig.mqtt_publish_cycle) && (value.toInt() > 0) && (value.toInt() <= UINT8_MAX) ) {
               myConfig.mqtt_publish_cycle = value.toInt();
+              yield();  // yield before LittleFS write
               requestSaveToSpiffs = true;
               #ifdef CFG_DEBUG
               Serial.println("New MQTT pyblish cycle configured.");
@@ -1540,6 +1556,7 @@ void handleWebServerClient(void) {
           } else if (key == "timezone") {
             if ( (value != myConfig.timezone) && (value != "") ) {
               strlcpy(myConfig.timezone, value.c_str(), sizeof(myConfig.timezone));
+              yield();  // yield before LittleFS write
               requestSaveToSpiffsWithRestart = true;    // restarting could be prevented by reconfiguration via configTzTime()
               #ifdef CFG_DEBUG
               Serial.println("New UTC offset configured.");
@@ -1557,6 +1574,7 @@ void handleWebServerClient(void) {
           #ifdef CFG_DEBUG
           Serial.println("Request FileSystem write with restart.");
           #endif
+          yield();  // yield after webServer arg processing before LittleFS write
           myConfig.input_method = static_cast<bool>(webServer.arg(i).toInt());
           requestSaveToSpiffsWithRestart = true;
         } else {
@@ -1570,6 +1588,7 @@ void handleWebServerClient(void) {
           #ifdef CFG_DEBUG
           Serial.println("Request FileSystem write with restart.");
           #endif
+          yield();  // yield before LittleFS write
           myConfig.sensor_type = webServer.arg(i).toInt();
           requestSaveToSpiffsWithRestart = true;
         } else {
