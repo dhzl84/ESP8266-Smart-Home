@@ -44,35 +44,33 @@ void loadConfiguration(Configuration &config) { // NOLINT: pass by reference
   // Open file for reading
   File file = FileSystem.open(filename, "r");
   delay(1);  // let the UART/WiFi interrupt work after LittleFS access
-  if (!file) {
-    #ifdef CFG_DEBUG
-    Serial.println("Failed to open configuration, using default configuration");
-    #endif
-    return;
-  }
 
   DynamicJsonDocument jsonDoc(cCONFIG_JSON_SIZE);  /* heap, see cCONFIG_JSON_SIZE */
-  if (jsonDoc.capacity() < cCONFIG_JSON_SIZE) {
+  if (!file) {
+    #ifdef CFG_DEBUG
+    Serial.println("Failed to open configuration, using defaults");
+    #endif
+    jsonDoc.clear();
+  } else if (jsonDoc.capacity() < cCONFIG_JSON_SIZE) {
     file.close();
     delay(1);  // let the UART/WiFi interrupt work after LittleFS access
     #ifdef CFG_DEBUG
-    Serial.println("Not enough heap for configuration, using default configuration");
+    Serial.println("Not enough heap for configuration, using defaults");
     #endif
-    return;
-  }
-
-  DeserializationError error = deserializeJson(jsonDoc, file);
-  file.close();
-  delay(1);  // let the UART/WiFi interrupt work after LittleFS access
-
-  if (error || jsonDoc.overflowed()) {
-    #ifdef CFG_DEBUG
-    Serial.print(F("deserializeJson() failed with code "));
-    Serial.println(error ? error.c_str() : "NoMemory");
-    Serial.println("Using default configuration");
-    #endif /* CFG_DEBUG */
     jsonDoc.clear();
-    return;
+  } else {
+    DeserializationError error = deserializeJson(jsonDoc, file);
+    file.close();
+    delay(1);  // let the UART/WiFi interrupt work after LittleFS access
+
+    if (error || jsonDoc.overflowed()) {
+      #ifdef CFG_DEBUG
+      Serial.print(F("deserializeJson() failed with code "));
+      Serial.println(error ? error.c_str() : "NoMemory");
+      Serial.println("Using default configuration");
+      #endif /* CFG_DEBUG */
+      jsonDoc.clear();
+    }
   }
 
   #ifdef CFG_DEBUG
@@ -112,19 +110,35 @@ bool saveConfiguration(const Configuration &config) {
   bool writeFile = false;
   DynamicJsonDocument jsonDoc(cCONFIG_JSON_SIZE);  /* heap, see cCONFIG_JSON_SIZE */
 
+  if (jsonDoc.capacity() < cCONFIG_JSON_SIZE) {
+    #ifdef CFG_DEBUG
+    Serial.println("Not enough heap for configuration, file not written");
+    #endif
+    return false;
+  }
+
   if (FileSystem.exists(filename)) {
-    // Delete existing file, otherwise the configuration is appended to the file
     File file = FileSystem.open(filename, "r");
-    yield();  // yield after LittleFS open()
+    delay(1);  // let the UART/WiFi interrupt work after LittleFS access
+    if (!file) {
+      #ifdef CFG_DEBUG
+      Serial.println("Failed to open configuration, file not written");
+      #endif
+      return false;
+    }
+
     DeserializationError error = deserializeJson(jsonDoc, file);
     file.close();
-    yield();  // yield after close()
+    delay(1);  // let the UART/WiFi interrupt work after LittleFS access
 
-    if (error) {
-        #ifdef CFG_DEBUG
-        Serial.print(F("deserializeJson() failed with code "));
-        Serial.println(error.c_str());
-        #endif
+    if (error || jsonDoc.overflowed()) {
+      /* Do not compare fields from a partial document. Keep the file and retry later. */
+      jsonDoc.clear();
+      #ifdef CFG_DEBUG
+      Serial.print(F("deserializeJson() failed with code "));
+      Serial.println(error ? error.c_str() : "NoMemory");
+      #endif
+      return false;
     }
 
     #ifdef CFG_DEBUG
@@ -191,7 +205,7 @@ bool saveConfiguration(const Configuration &config) {
 
   /* if FileSystem content differs current configuration, delete FileSystem and write new content*/
   if (writeFile == true) {
-    /* the document still holds the strings read from the file, start empty to have the full capacity */
+    /* Build and validate the entire new document before replacing the current file. */
     jsonDoc.clear();
 
     jsonDoc["name"] =                   config.name;
@@ -235,8 +249,10 @@ bool saveConfiguration(const Configuration &config) {
         #endif /* CFG_DEBUG */
       }
 
+      delay(1);  // let the UART/WiFi interrupt work after LittleFS access
+
       File file = FileSystem.open(filename, "w");
-      yield();  // yield after remove() + open()
+      delay(1);  // let the UART/WiFi interrupt work after LittleFS access
 
       // Serialize JSON to file
       if (serializeJson(jsonDoc, file) == 0) {
@@ -252,7 +268,7 @@ bool saveConfiguration(const Configuration &config) {
         #endif /* CFG_DEBUG */
       }
       file.close();
-      yield();  // yield after close()
+      delay(1);  // let the UART/WiFi interrupt work after LittleFS access
     }
   } else {
     #ifdef CFG_DEBUG
@@ -277,7 +293,7 @@ String readSpiffs(String file) {
     } else {
       fileContent = f.readStringUntil('\n');
       f.close();
-      yield();  // yield after close()
+      delay(1);  // let the UART/WiFi interrupt work after LittleFS access
 
       #ifdef CFG_DEBUG
       if (fileContent == "") {
