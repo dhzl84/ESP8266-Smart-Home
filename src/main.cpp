@@ -352,7 +352,7 @@ void WIFI_CONNECT(void) {
      the WiFi port: the Level-1 UART TX ISR preempts those heap ops and corrupts the
      blocks (umm poison check -> EXC28). Chain prints instead of concatenating, and
      yield() to drain the ISR between the WiFi-library heap work and our prints. */
-  Serial.print("WiFi Status: "); Serial.print(wifiStatusToString(WiFi.status())); Serial.println();
+  Serial.printf("[WiFi] Status: %s\n", wifiStatusToString(WiFi.status()).c_str());
   WiFi.printDiag(Serial);
   yield();  // let the UART ISR drain before the next heap-heavy prints
   char ipBuf[16];
@@ -466,7 +466,7 @@ void loop() {
     SetNextTimeInterval(&loop_1000_ms_in_millis, loop_time_1000_ms);
     FS_MAIN();              /* check for new data and write FileSystem is necessary */
     if (wifiConnected == true) {
-      HANDLE_HTTP_UPDATE();   /* pull update from server if it was requested via MQTT or a new version was detected */
+      HANDLE_HTTP_UPDATE(myWiFiClient);   /* pull update from server if it was requested via MQTT or a new version was detected */
     }
   }
   /* call every 10 s */
@@ -489,7 +489,7 @@ void loop() {
   if (TimeReached(loop_5_minutes_in_millis)) {
     SetNextTimeInterval(&loop_5_minutes_in_millis, loop_time_5_minutes);
     if (wifiConnected == true) {
-      CHECK_FOR_UPDATE();    /* check for updates on update server */
+      CHECK_FOR_UPDATE(myWiFiClient);    /* check for updates on update server */
     }
   }
   /* call every 30 minutes */
@@ -567,10 +567,10 @@ void HANDLE_SYSTEM_STATE(void) {
   if (TimeReached(wifiReconnectTimer)) {
     SetNextTimeInterval(&wifiReconnectTimer, (seconds_to_milliseconds(WIFI_RECONNECT_TIME)));
     if (WiFi.status() != WL_CONNECTED) {
-      #ifdef CFG_DEBUG
-      Serial.print("Lost WiFi; Status: "); Serial.println(String(WiFi.status()));
-      #endif
       /* try to come online, debounced to avoid reconnect each loop*/
+      #ifdef CFG_DEBUG
+      Serial.printf("[WiFi] Status: %s\n", wifiStatusToString(WiFi.status()).c_str());
+      #endif
       WIFI_CONNECT();
     } else {
       /* WiFi is connected, reset systemRestartTimer */
@@ -912,10 +912,10 @@ void MQTT_MAIN(void) {
   }
 }
 
-void CHECK_FOR_UPDATE(void) {
-  WiFiClient wifiClient;
+void CHECK_FOR_UPDATE(WiFiClient &myWiFiClient) {
+  // WiFiClient wifiClient;
   HTTPClient httpClient;
-  httpClient.begin(wifiClient, myConfig.binary_version_address);
+  httpClient.begin(myWiFiClient, myConfig.binary_version_address);
   int httpCode = httpClient.GET();
   if (httpCode == 200) {
     myConfig.available_firmware_version = httpClient.getString();
@@ -944,13 +944,12 @@ void CHECK_FOR_UPDATE(void) {
   }
 }
 
-void HANDLE_HTTP_UPDATE(void) {
+void HANDLE_HTTP_UPDATE(WiFiClient &myWiFiClient) {
   if (update_firmware == true) {
     DISPLAY_MAIN();
-    CHECK_FOR_UPDATE();
+    CHECK_FOR_UPDATE(myWiFiClient);
     update_firmware = false;
-    WiFiClient client;
-    t_httpUpdate_return ret = myHttpUpdate.update(client, myConfig.binary_address, FW);
+    t_httpUpdate_return ret = myHttpUpdate.update(myWiFiClient, myConfig.binary_address, FW);
 
     #ifdef CFG_DEBUG
     Serial.println("Remote update started");
@@ -1250,6 +1249,50 @@ static void htmlRow4Int(const char* key, const char* value, int16_t current_valu
   htmlRowAppend(snprintf(row, sizeof(row), "<tr><td>%s</td><td>%s</td><td>%d</td><td>%s</td></tr>", key, value, current_value, description), key, row, sizeof(row));
 }
 
+/* ---- console output window, last window at the bottom of the page ----
+   The bytes the program captured from its Serial.print / println / printf calls (print_log.h) are replayed as
+   text, escaped for HTML, in the order the software sent them: at most LOG_MAX_LINES of the newest lines, older
+   lines dropped, a line the ring buffer cut in the middle marked. The page works on a snapshot taken before the
+   window is streamed, so bytes printed while the response is still being sent cannot change what was already sent.
+   The capture is not wrapped in CFG_DEBUG: release builds print less, but what they print is shown as well. */
+static void htmlWindowConsole(void) {
+  LogWindow window;
+  logWindowSnapshot(&window, LOG_MAX_LINES);
+
+  char numBuf[24];
+
+  htmlSendText("<p><b>Console Output</b></p>");
+  htmlSendText("<p><small>showing ");
+  snprintf(numBuf, sizeof(numBuf), "%lu", static_cast<unsigned long>(window.linesShown));
+  htmlSendText(numBuf);
+  htmlSendText(" of ");
+  snprintf(numBuf, sizeof(numBuf), "%lu", static_cast<unsigned long>(window.linesTotal));
+  htmlSendText(numBuf);
+  htmlSendText(" captured lines");
+  if ((window.start < window.end) && (logLineStart(window.start) == false)) {
+    htmlSendText(", first line cut off by the capture buffer");
+  }
+  htmlSendText("</small></p>");
+
+  htmlSendText("<pre>");
+  if (window.linesTotal > window.linesShown) {
+    htmlSendText("&hellip; older lines dropped\n");
+  }
+  char row[128];  /* text run, flushed to the client whenever it is full */
+  size_t rowLen = 0;
+  for (uint32_t i = window.start; i < window.end; i++) {
+    if (rowLen + 6 >= sizeof(row)) {  /* spare room for the longest escape sequence */
+      htmlSendChunk(row, rowLen);
+      rowLen = 0;
+    }
+    logHtmlAppend(row, &rowLen, logByteAt(i));
+  }
+  if (rowLen > 0) {
+    htmlSendChunk(row, rowLen);
+  }
+  htmlSendText("</pre>");
+}
+
 void htmlStreamPage(void) {
   float rssiInPercent = WiFi.RSSI();
   rssiInPercent = isnan(rssiInPercent) ? -100.0 : min(max(2 * (rssiInPercent + 100.0), 0.0), 100.0);
@@ -1271,6 +1314,7 @@ void htmlStreamPage(void) {
   htmlSendText("body {background-color: #202226; color: #A0A2A8}\n");
   htmlSendText("p {color: #2686c1; margin-bottom: 10px;}\n");
   htmlSendText("table {color: #A0A2A8;}\n");
+  htmlSendText("pre { color: #B8E48A; background-color: #0D0F12; border: 1px solid #41484F; border-radius: 4px; padding: 4px 8px; margin: 6px 0px 0px 0px; font-family: 'Courier'; font-size: 12px; line-height: 1.2; height: 30em; overflow-y: scroll; white-space: pre-wrap; word-break: break-all; }\n");
   htmlSendText("</style>\n");
   htmlSendText("</head>\n");
   /* BODY */
@@ -1362,6 +1406,7 @@ void htmlStreamPage(void) {
   htmlRow4Int("display_enabled", "0 | 1", myConfig.display_enabled, "Display always on or only on user interaction");
   htmlRow4Int("display_brightness", "Range: 0 .. +255, LSB: 1 step", myConfig.display_brightness, "Brightness of OLED display");
   htmlRow4("timezone", "string", myConfig.timezone, "Timezone for NTP, pick from this list: https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv");
+  htmlRow4("console_clear", "1", "none", "Clear the console output window (last window at the bottom of the page)");
   htmlSendText("</table>");
   /* Restart Device */
   htmlSendText("<p><b>Restart Device</b></p>");
@@ -1370,6 +1415,7 @@ void htmlStreamPage(void) {
   } else {
     htmlSendText("<button onclick=\"window.location.href='/'\"> Restarting, reload site </button>");
   }
+  htmlWindowConsole();  /* last window: the captured console output, see htmlWindowConsole() above */
   htmlSendText("</body>\n");
   htmlSendText("</html>\n");
 
@@ -1410,7 +1456,9 @@ void handleWebServerClient(void) {
           #ifdef CFG_DEBUG
           Serial.println(key + " : " + value);
           #endif /* CFG_DEBUG */
-          if (key == "discover") {
+          if (key == "console_clear") {  /* empty the console output window */
+            logClear();
+          } else if (key == "discover") {
             if ((value.toInt() & 1) == true) {
               myMqttHelper.setTriggerDiscovery(true);
             } else if ((value.toInt() & 1) == false) {
@@ -1657,18 +1705,18 @@ void messageReceived(String &topic, String &payload) {  // NOLINT
 
   if (topic == myMqttHelper.getTopicSystemRestartRequest()) {
     #ifdef CFG_DEBUG
-    Serial.println("Restart request received with value: " + payload);
+    Serial.println("[MQTT] Restart request received with value: " + payload);
     #endif
     if (payload == "PRESS") {
       systemRestartRequest = true;
       #ifdef CFG_DEBUG
-      Serial.println("Restart requested by MQTT");
+      Serial.println("[MQTT] Restart requested by MQTT");
       #endif
     }
   } else if (topic == myMqttHelper.getTopicUpdateFirmware()) { /* HTTP Update */
     if (payload == "PRESS") {
       #ifdef CFG_DEBUG
-      Serial.println("Firmware updated triggered via MQTT");
+      Serial.println("[MQTT] Firmware updated triggered via MQTT");
       #endif
       update_firmware = true;
       myMqttHelper.setTriggerRemoveDiscovered(false);
@@ -1676,7 +1724,7 @@ void messageReceived(String &topic, String &payload) {  // NOLINT
   } else if (topic == myMqttHelper.getTopicTargetTempCmd()) { /* check incoming target temperature, don't set same target temperature as new*/
     if (!isNumericPayload(payload)) {
       #ifdef CFG_DEBUG
-      Serial.println("Non-numeric target temperature payload >> ignored: " + payload);
+      Serial.println("[MQTT] Non-numeric target temperature payload >> ignored: " + payload);
       #endif
     } else if (myThermostat.getTargetTemperature() != floatToInt(payload.toFloat())) {
       /* set new target temperature for heating control, min/max limitation inside (string to float to int16_t) */
@@ -1692,18 +1740,18 @@ void messageReceived(String &topic, String &payload) {  // NOLINT
     }
   } else if (topic == myMqttHelper.getTopicChangeName()) {
     #ifdef CFG_DEBUG
-    Serial.println("New name received: " + payload);
+    Serial.println("[MQTT] New name received: " + payload);
     #endif
     if (payload != myConfig.name) {
       #ifdef CFG_DEBUG
-      Serial.println("Old name was: " + String(myConfig.name));
+      Serial.println("[MQTT] Old name was: " + String(myConfig.name));
       #endif
       strlcpy(myConfig.name, payload.c_str(), sizeof(myConfig.name));
       requestSaveToSpiffsWithRestart = true;
     }
   } else if (topic == myMqttHelper.getTopicChangeSensorCalib()) {
     #ifdef CFG_DEBUG
-    Serial.println("New sensor calibration parameters received: " + payload);
+    Serial.println("[MQTT] New sensor calibration parameters received: " + payload);
     #endif
 
     int16_t offset;
@@ -1714,26 +1762,26 @@ void messageReceived(String &topic, String &payload) {  // NOLINT
     }
   } else if (topic == myMqttHelper.getTopicChangeHysteresis()) {
     #ifdef CFG_DEBUG
-    Serial.println("New hysteresis parameter received: " + payload);
+    Serial.println("[MQTT] New hysteresis parameter received: " + payload);
     #endif
 
     if (!isNumericPayload(payload)) {
       #ifdef CFG_DEBUG
-      Serial.println("Non-numeric hysteresis payload >> ignored: " + payload);
+      Serial.println("[MQTT] Non-numeric hysteresis payload >> ignored: " + payload);
       #endif
     } else {
       myThermostat.setThermostatHysteresis(payload.toInt());
     }
   } else if (topic == myMqttHelper.getTopicOutsideTemperature()) {
     #ifdef CFG_DEBUG
-    Serial.println("New outside temperature received: " + payload);
+    Serial.println("[MQTT] New outside temperature received: " + payload);
     #endif
     if (!isNumericPayload(payload)) {
       /* Home Assistant sends "unknown" / "unavailable" when its own outside temperature
          source has no value; toFloat() on such a payload is 0.0 and would drive the
          thermostat to a false outside temperature, so the payload is dropped */
       #ifdef CFG_DEBUG
-      Serial.println("Non-numeric outside temperature payload >> ignored");
+      Serial.println("[MQTT] Non-numeric outside temperature payload >> ignored");
       #endif
     } else {
       myThermostat.setOutsideTemperature(floatToInt(payload.toFloat()));

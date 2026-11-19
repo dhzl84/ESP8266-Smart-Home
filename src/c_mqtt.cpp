@@ -414,21 +414,21 @@ String mqttHelper::getTopicHassDiscoveryButton(Button_t buttons) {
 String mqttHelper::mqttLastErrorToString(int8_t last_error) {
   String error_string;
   switch (last_error) {
-    case 0:   error_string = "LWMQTT_SUCCESS";                     break;
-    case -1:  error_string = "LWMQTT_BUFFER_TOO_SHORT";            break;
-    case -2:  error_string = "LWMQTT_VARNUM_OVERFLOW";             break;
-    case -3:  error_string = "LWMQTT_NETWORK_FAILED_CONNECT";      break;
-    case -4:  error_string = "LWMQTT_NETWORK_TIMEOUT";            break;
-    case -5:  error_string = "LWMQTT_NETWORK_FAILED_READ";        break;
-    case -6:  error_string = "LWMQTT_NETWORK_FAILED_WRITE";       break;
-    case -7:  error_string = "LWMQTT_REMAINING_LENGTH_OVERFLOW";   break;
-    case -8:  error_string = "LWMQTT_REMAINING_LENGTH_MISMATCH";   break;
-    case -9:  error_string = "LWMQTT_MISSING_OR_WRONG_PACKET";     break;
-    case -10: error_string = "LWMQTT_CONNECTION_DENIED";           break;
-    case -11: error_string = "LWMQTT_FAILED_SUBSCRIPTION";         break;
-    case -12: error_string = "LWMQTT_SUBACK_ARRAY_OVERFLOW";       break;
-    case -13: error_string = "LWMQTT_PONG_TIMEOUT";                break;
-    default:  error_string = "UNKNOWN";                            break;
+    case 0:   error_string = "success";                     break;
+    case -1:  error_string = "buffer_too_short";            break;
+    case -2:  error_string = "varnum_overflow";             break;
+    case -3:  error_string = "network_failed_connect";      break;
+    case -4:  error_string = "network_timeout";            break;
+    case -5:  error_string = "network_failed_read";        break;
+    case -6:  error_string = "network_failed_write";       break;
+    case -7:  error_string = "remaining_length_overflow";   break;
+    case -8:  error_string = "remaining_length_mismatch";   break;
+    case -9:  error_string = "missing_or_wrong_packet";     break;
+    case -10: error_string = "connection_denied";           break;
+    case -11: error_string = "failed_subscription";         break;
+    case -12: error_string = "suback_array_overflow";       break;
+    case -13: error_string = "pong_timeout";                break;
+    default:  error_string = "unknown";                            break;
   }
   return error_string;
 }
