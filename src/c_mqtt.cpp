@@ -1,4 +1,5 @@
 #include "c_mqtt.h"
+#include "print_log.h"
 
 // The Home Asistant discovery_enabled topic need to follow a specific format:
 //

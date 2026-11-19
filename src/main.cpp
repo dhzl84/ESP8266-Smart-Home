@@ -14,6 +14,7 @@
 #include "MQTTClient.h"
 #include <Bounce2.h>
 #include "time.h"
+#include "print_log.h"
 
 /*===================================================================================================================*/
 /* GPIO config */
@@ -336,6 +337,7 @@ void WIFI_CONNECT(void) {
     #if CFG_BOARD_ESP8266
     WiFi.setSleepMode(WIFI_NONE_SLEEP);
     WiFi.hostname(myConfig.name);
+    WiFi.setAutoReconnect(true);
     #elif CFG_BOARD_ESP32
     WiFi.setHostname(myConfig.name);
     WiFi.setSleep(false);
@@ -563,6 +565,8 @@ void loop() {
 /* functions called by loop() */
 /*===================================================================================================================*/
 void HANDLE_SYSTEM_STATE(void) {
+  
+  #if 0  /* deactivate for testing WiFi autoReconnect*/
   /* check WiFi connection every 30 seconds */
   if (TimeReached(wifiReconnectTimer)) {
     SetNextTimeInterval(&wifiReconnectTimer, (seconds_to_milliseconds(WIFI_RECONNECT_TIME)));
@@ -585,6 +589,8 @@ void HANDLE_SYSTEM_STATE(void) {
     systemRestartRequest = true;
     silentRestart = true;
   }
+  #endif
+
   /* Check if the sytem shall restart at a defined time */
   #ifdef CFG_DEBUG_PLANNED_RESTART
   Serial.println("== PLANNED RESTART ==");
