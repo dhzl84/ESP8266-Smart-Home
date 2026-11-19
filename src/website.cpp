@@ -201,7 +201,6 @@ void htmlStreamPage(void) {
   htmlRow2Str("IPv4", WiFi.localIP().toString());
   htmlRow2Str("WiFi Status", wifiStatusToString(WiFi.status()));
   htmlRow2I32("WiFi Strength", static_cast<int32_t>(rssiInPercent), " %");
-  htmlRow2U32("WiFi Connects", wifi_connect_counter);
   htmlRow2("MQTT Status", myMqttClient.connected() ? "connected" : "disconnected");
   htmlRow2U32("MQTT Connects", mqtt_connect_counter);
   htmlRow2Str("MQTT Last Error", myMqttHelper.mqttLastErrorToString((int8_t)myMqttClient.lastError()));
@@ -282,4 +281,4 @@ void htmlStreamPage(void) {
   Serial.print("  Free ContStack at page build: ");
   Serial.println(ESP.getFreeContStack());
   #endif /* CFG_DEBUG */
-}
+}

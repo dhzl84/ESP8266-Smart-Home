@@ -18,7 +18,6 @@
 /*===================================================================================================================*/
 /* objects and counters main.cpp owns; the page renders them                                                */
 /*===================================================================================================================*/
-extern uint32_t wifi_connect_counter;
 extern uint32_t mqtt_connect_counter;
 extern bool     update_firmware;
 extern struct Configuration myConfig;
