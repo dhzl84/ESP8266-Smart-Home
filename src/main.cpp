@@ -348,11 +348,23 @@ void WIFI_CONNECT(void) {
   }
 
   #ifdef CFG_DEBUG
-  Serial.println("WiFi Status: "+ wifiStatusToString(WiFi.status()));
+  /* Serial.print with String concat allocates/copies while lwIP is still reconfiguring
+     the WiFi port: the Level-1 UART TX ISR preempts those heap ops and corrupts the
+     blocks (umm poison check -> EXC28). Chain prints instead of concatenating, and
+     yield() to drain the ISR between the WiFi-library heap work and our prints. */
+  Serial.print("WiFi Status: "); Serial.print(wifiStatusToString(WiFi.status())); Serial.println();
   WiFi.printDiag(Serial);
-  Serial.println("Local IP: "+ WiFi.localIP().toString());
-  Serial.println("Gateway IP: " + WiFi.gatewayIP().toString());
-  Serial.println("DNS IP: " + WiFi.dnsIP().toString());
+  yield();  // let the UART ISR drain before the next heap-heavy prints
+  char ipBuf[16];
+  IPAddress ip = WiFi.localIP();
+  (void)snprintf(ipBuf, sizeof(ipBuf), "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
+  Serial.print("Local IP: "); Serial.println(ipBuf);
+  ip = WiFi.gatewayIP();
+  (void)snprintf(ipBuf, sizeof(ipBuf), "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
+  Serial.print("Gateway IP: "); Serial.println(ipBuf);
+  ip = WiFi.dnsIP();
+  (void)snprintf(ipBuf, sizeof(ipBuf), "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
+  Serial.print("DNS IP: "); Serial.println(ipBuf);
   #endif
 }
 
@@ -556,7 +568,7 @@ void HANDLE_SYSTEM_STATE(void) {
     SetNextTimeInterval(&wifiReconnectTimer, (seconds_to_milliseconds(WIFI_RECONNECT_TIME)));
     if (WiFi.status() != WL_CONNECTED) {
       #ifdef CFG_DEBUG
-      Serial.println("Lost WiFi; Status: "+ String(WiFi.status()));
+      Serial.print("Lost WiFi; Status: "); Serial.println(String(WiFi.status()));
       #endif
       /* try to come online, debounced to avoid reconnect each loop*/
       WIFI_CONNECT();
