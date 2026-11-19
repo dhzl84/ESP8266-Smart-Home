@@ -239,36 +239,58 @@ bool saveConfiguration(const Configuration &config) {
       Serial.println("Configuration does not fit into JSON document, file not written");
       #endif /* CFG_DEBUG */
     } else {
-      if (FileSystem.remove(filename)) {
-        #ifdef CFG_DEBUG
-        Serial.println("Removing FileSystem file succeeded");
-        #endif /* CFG_DEBUG */
-      } else {
-        #ifdef CFG_DEBUG
-        Serial.println("Removing FileSystem file failed");
-        #endif /* CFG_DEBUG */
-      }
-
+      /* Write to a temp file first, then rename: removing the config before writing
+         (previous order) lost the whole configuration on a crash between the two steps.
+         LittleFS rename refuses to overwrite, so the old file is removed only after the
+         new content has fully landed in the temp file. */
+      #define configtmpname "/configJSON.tmp"
+      File file = FileSystem.open(configtmpname, "w");
       delay(1);  // let the UART/WiFi interrupt work after LittleFS access
 
-      File file = FileSystem.open(filename, "w");
-      delay(1);  // let the UART/WiFi interrupt work after LittleFS access
-
-      // Serialize JSON to file
-      if (serializeJson(jsonDoc, file) == 0) {
+      // Serialize JSON to temp file
+      if (!file || serializeJson(jsonDoc, file) == 0) {
         ret = false;
         #ifdef CFG_DEBUG
-        Serial.println("Failed to write to file");
+        Serial.println("Failed to write temp file, keeping old configuration");
         #endif /* CFG_DEBUG */
+        if (file) { file.close(); delay(1); }
+        if (FileSystem.exists(configtmpname)) {
+          FileSystem.remove(configtmpname);
+          delay(1);  // let the UART/WiFi interrupt work after LittleFS access
+        }
       } else {
         #ifdef CFG_DEBUG
         Serial.println("new FileSystem content:");
         serializeJsonPretty(jsonDoc, Serial);
         Serial.println();
         #endif /* CFG_DEBUG */
+        file.close();
+        delay(1);  // let the UART/WiFi interrupt work after LittleFS access
+
+        if (FileSystem.remove(filename)) {
+          #ifdef CFG_DEBUG
+          Serial.println("Removing old FileSystem file succeeded");
+          #endif /* CFG_DEBUG */
+        } else if (!FileSystem.exists(filename)) {
+          #ifdef CFG_DEBUG
+          Serial.println("No old FileSystem file, nothing to remove");
+          #endif /* CFG_DEBUG */
+        } else {
+          ret = false;
+          #ifdef CFG_DEBUG
+          Serial.println("Removing old FileSystem file failed");
+          #endif /* CFG_DEBUG */
+        }
+        delay(1);  // let the UART/WiFi interrupt work after LittleFS access
+
+        if (!FileSystem.rename(configtmpname, filename)) {
+          ret = false;
+          #ifdef CFG_DEBUG
+          Serial.println("Renaming temp file over configuration failed");
+          #endif /* CFG_DEBUG */
+        }
+        delay(1);  // let the UART/WiFi interrupt work after LittleFS access
       }
-      file.close();
-      delay(1);  // let the UART/WiFi interrupt work after LittleFS access
     }
   } else {
     #ifdef CFG_DEBUG

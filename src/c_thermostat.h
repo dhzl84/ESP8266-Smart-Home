@@ -36,11 +36,11 @@ class Thermostat {
  public:
   Thermostat(void);
   ~Thermostat(void);
-  void setup(uint8_t gpio, uint8_t tarTemp, int16_t calibFactor, int16_t calibOffset, uint8_t temperature_hysteresis, bool thermostat_mode);
+  void setup(uint8_t gpio, int16_t tarTemp, int16_t calibFactor, int16_t calibOffset, uint8_t temperature_hysteresis, bool thermostat_mode);
   void loop(void);
   // heating
   void setActualState(bool value);
-  void setTargetTemperature(uint8_t value);
+  void setTargetTemperature(int16_t value);
   void increaseTargetTemperature(uint8_t value);
   void decreaseTargetTemperature(uint8_t value);
   void resetTransmitRequest();

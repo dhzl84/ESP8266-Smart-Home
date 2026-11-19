@@ -128,11 +128,15 @@ bool     restartedToday = true;
 bool     requestSaveToSpiffs = false;
 bool     requestSaveToSpiffsWithRestart = false;
 bool     wifiConnected = false;
-uint32_t wifiReconnectTimer = seconds_to_milliseconds(WIFI_RECONNECT_TIME);
-uint32_t systemRestartTimer = minutes_to_milliseconds(SYSTEM_RESTART_TIME);
+/* fallback defaults must precede their first use below (see also src/config.h) */
 #ifndef WIFI_RECONNECT_TIME
   #define WIFI_RECONNECT_TIME 30
 #endif
+#ifndef SYSTEM_RESTART_TIME
+  #define SYSTEM_RESTART_TIME 360
+#endif
+uint32_t wifiReconnectTimer = seconds_to_milliseconds(WIFI_RECONNECT_TIME);
+uint32_t systemRestartTimer = minutes_to_milliseconds(SYSTEM_RESTART_TIME);
 
 #define  FS_WRITE_DEBOUNCE      minutes_to_milliseconds(30) /* write FileSystem 30 minutes after last change */
 bool     FS_WRITTEN =           true;
@@ -1466,6 +1470,9 @@ void handleWebServerClient(void) {
               Serial.println("Request FileSystem write.");
               #endif
               myConfig.calibration_factor = int16_t(u8_value);
+              /* also apply live (mirrors the MQTT changeSensorCalib path); without this the
+                 Thermostat object kept the old factor and FS_MAIN synced the stale value back */
+              myThermostat.setSensorCalibData(int16_t(u8_value), myThermostat.getSensorCalibOffset(), true);
               requestSaveToSpiffs = true;
             } else {
               #ifdef CFG_DEBUG
@@ -1479,6 +1486,8 @@ void handleWebServerClient(void) {
               Serial.println("Request FileSystem write.");
               #endif
               myConfig.calibration_offset = int16_t(i16_value);
+              /* apply live as well (see calibration_factor note) */
+              myThermostat.setSensorCalibData(myThermostat.getSensorCalibFactor(), i16_value, true);
               requestSaveToSpiffs = true;
             } else {
               #ifdef CFG_DEBUG

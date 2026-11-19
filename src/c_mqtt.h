@@ -1,9 +1,10 @@
 #ifndef C_MQTT_H_
 #define C_MQTT_H_
 
-/* buffer for the Home Assistant discovery payloads; the biggest one is the climate payload with
-   ~880 bytes for a short device name and ~1080 bytes for the maximum name length of 63 chars */
-#define cMQTT_PAYLOAD_SIZE 1280
+/* buffer for the Home Assistant discovery payloads; the biggest one is the climate payload:
+   measured 1171 B for a short device name, 1345 B for the maximum name length of 63 chars
+   (name appears 3 times, topics and dev block expand too) -> 1536 keeps the worst case safe */
+#define cMQTT_PAYLOAD_SIZE 1536
 
 #include "Arduino.h"
 

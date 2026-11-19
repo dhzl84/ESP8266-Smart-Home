@@ -54,7 +54,7 @@ Thermostat::~Thermostat() {
   /* do nothing */
 }
 
-void Thermostat::setup(uint8_t gpio, uint8_t tarTemp, int16_t calibFactor, int16_t calibOffset, uint8_t temperature_hysteresis, bool thermostat_mode) {
+void Thermostat::setup(uint8_t gpio, int16_t tarTemp, int16_t calibFactor, int16_t calibOffset, uint8_t temperature_hysteresis, bool thermostat_mode) {
   setSensorCalibData(calibFactor, calibOffset, false);
   setThermostatHysteresis(temperature_hysteresis);
   setThermostatMode(thermostat_mode);
@@ -143,12 +143,15 @@ void Thermostat::setThermostatHysteresis(uint8_t hysteresis) {
     }
     new_data_ = true;
 
-    if ((hysteresis % 2) == 0) {
-      thermostat_hysteresis_low_  = (hysteresis / 2);
-      thermostat_hysteresis_high_ = (hysteresis / 2);
+    /* derive the halves from the CLAMPED total, not the raw argument: with the raw value,
+       h=0 kept halves of 0/0 (heating churns at the setpoint) and h=30 stored halves of
+       15/15 while reporting 20 */
+    if ((thermostat_hysteresis_ % 2) == 0) {
+      thermostat_hysteresis_low_  = (thermostat_hysteresis_ / 2);
+      thermostat_hysteresis_high_ = (thermostat_hysteresis_ / 2);
     } else {
-      thermostat_hysteresis_low_  = ( (uint8_t)(floorf( static_cast<float> (hysteresis) / 2) ) );
-      thermostat_hysteresis_high_ = ( (uint8_t)(ceilf( static_cast<float> (hysteresis) / 2) ) );
+      thermostat_hysteresis_low_  = (thermostat_hysteresis_ / 2);
+      thermostat_hysteresis_high_ = (thermostat_hysteresis_ - thermostat_hysteresis_low_);
     }
   }
 }
@@ -185,14 +188,16 @@ void Thermostat::decreaseTargetTemperature(uint8_t value) {
   }
 }
 
-void Thermostat::setTargetTemperature(uint8_t value) {
-  if (value != target_temperature_) {
-    if (value > MAXIMUM_TARGET_TEMP) {
+void Thermostat::setTargetTemperature(int16_t value) {
+  if ((uint8_t)value != target_temperature_) {
+    /* clamp the full int16 range BEFORE the assignment: an MQTT payload of "300" is
+       int16 3000; truncating to uint8_t first turned it into 184 and silently set 18.4 °C */
+    if (value > (int16_t)MAXIMUM_TARGET_TEMP) {
       target_temperature_ = MAXIMUM_TARGET_TEMP;
-    } else if (value < MINIMUM_TARGET_TEMP) {
+    } else if (value < (int16_t)MINIMUM_TARGET_TEMP) {
       target_temperature_ = MINIMUM_TARGET_TEMP;
     } else {
-      target_temperature_  = value;
+      target_temperature_  = (uint8_t)value;
     }
     new_data_ = true;
   }
