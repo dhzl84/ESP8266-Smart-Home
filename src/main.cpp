@@ -40,16 +40,16 @@ uint32_t mqttPubCycleTime        = 0;
 /* loop handler */
 #define loop_time_50_ms        50
 #define loop_time_100_ms      100
-#define loop_time_500_ms      500
 #define loop_time_1000_ms     seconds_to_milliseconds(1)
+#define loop_time_10_seconds  seconds_to_milliseconds(10)
 #define loop_time_30_seconds  seconds_to_milliseconds(30)
 #define loop_time_1_minute    minutes_to_milliseconds(1)
 #define loop_time_5_minutes   minutes_to_milliseconds(5)
 #define loop_time_30_minutes  minutes_to_milliseconds(30)
 uint32_t loop_50_ms_in_millis      =  0;
 uint32_t loop_100_ms_in_millis     = 13; /* start loops with some offset to avoid calling all loops every second */
-uint32_t loop_500_ms_in_millis     = 17; /* start loops with some offset to avoid calling all loops every second */
-uint32_t loop_1000_ms_in_millis    = 19; /* start loops with some offset to avoid calling all loops every second */
+uint32_t loop_1000_ms_in_millis    = 17; /* start loops with some offset to avoid calling all loops every second */
+uint32_t loop_10_seconds_in_millis = 19; /* start loops with some offset to avoid calling all loops every second */
 uint32_t loop_30_seconds_in_millis = 23; /* start loops with some offset to avoid calling all loops every second */
 uint32_t loop_1_minute_in_millis   = 29; /* start loops with some offset to avoid calling all loops every second */
 uint32_t loop_5_minutes_in_millis  = 31; /* start loops with some offset to avoid calling all loops every second */
@@ -127,6 +127,7 @@ bool     silentRestart = false;
 bool     restartedToday = true;
 bool     requestSaveToSpiffs = false;
 bool     requestSaveToSpiffsWithRestart = false;
+bool     wifiConnected = false;
 uint32_t wifiReconnectTimer = seconds_to_milliseconds(WIFI_RECONNECT_TIME);
 uint32_t systemRestartTimer = minutes_to_milliseconds(SYSTEM_RESTART_TIME);
 #ifndef WIFI_RECONNECT_TIME
@@ -151,7 +152,21 @@ void setup() {
   #ifdef CFG_DEBUG
   Serial.begin(115200);
   Serial.println("SETUP STARTED");
+  #if CFG_BOARD_ESP8266
+  Serial.printf("Vcc: %f\n", (ESP.getVcc() / 1000.0f));
+  Serial.printf("Reset Reason: %s\n", ESP.getResetReason().c_str());
+  Serial.printf("Flash Size: %d\n", ESP.getFlashChipRealSize());
+  #elif CFG_BOARD_ESP32
+  Serial.println("CPU Frequency: " + String(ESP.getCpuFreqMHz()));
+  Serial.println("CPU 0 reset reason: " + getEspResetReason(rtc_get_reset_reason(0)));
+  Serial.println("CPU 1 reset reason: " + getEspResetReason(rtc_get_reset_reason(1)));
+  #else
   #endif
+  Serial.println("Sketch Size: " + String(ESP.getSketchSize()));
+  Serial.println("Free for Sketch: " + String(ESP.getFreeSketchSpace()));
+  Serial.println("Free Heap: " + String(ESP.getFreeHeap()));
+  #endif /* CFG_DEBUG */
+
   Wire.begin(SDA_PIN, SCL_PIN);   /* needed for I²C communication with display and BME280 */
   FS_INIT();                  /* read stuff from FileSystem */
   myConfig.binary_version_address.concat(myConfig.update_server_address);
@@ -204,24 +219,10 @@ void setup() {
     attachInterrupt(PHYS_INPUT_2_PIN, updateEncoder, CHANGE);
   }
 
-  #ifdef CFG_DEBUG
-  #if CFG_BOARD_ESP8266
-  Serial.printf("Vcc: %f\n", (ESP.getVcc() / 1000.0f));
-  Serial.printf("Reset Reason: %s\n", ESP.getResetReason().c_str());
-  Serial.printf("Flash Size: %d\n", ESP.getFlashChipRealSize());
-  #elif CFG_BOARD_ESP32
-  Serial.println("CPU Frequency: " + String(ESP.getCpuFreqMHz()));
-  Serial.println("CPU 0 reset reason: " + getEspResetReason(rtc_get_reset_reason(0)));
-  Serial.println("CPU 1 reset reason: " + getEspResetReason(rtc_get_reset_reason(1)));
-  #else
-  #endif
-  Serial.println("Sketch Size: " + String(ESP.getSketchSize()));
-  Serial.println("Free for Sketch: " + String(ESP.getFreeSketchSpace()));
-  Serial.println("Free Heap: " + String(ESP.getFreeHeap()));
-  Serial.println("SETUP COMPLETE - ENTER LOOP");
-  #endif
-
   SENSOR_MAIN();  /* acquire first sensor data before staring loop() to avoid false value reporting due to current temperature, etc. being the init value until first sensor value is read */
+  #ifdef CFG_DEBUG
+  Serial.println("SETUP COMPLETE - ENTER LOOP");
+  #endif /* CFG_DEBUG */
 }
 
 /*===================================================================================================================*/
@@ -322,6 +323,7 @@ void DISPLAY_INIT(void) {
 void WIFI_CONNECT(void) {
   wifi_connect_counter++;
   if (WiFi.status() != WL_CONNECTED) {
+    wifiConnected = false;
     #ifdef CFG_DEBUG
     Serial.println("Initialize WiFi ");
     #endif
@@ -337,6 +339,8 @@ void WIFI_CONNECT(void) {
     WiFi.begin(myConfig.ssid, myConfig.wifi_password);
     /* non-blocking: connection status is checked every WIFI_RECONNECT_TIME seconds in
        HANDLE_SYSTEM_STATE(); WiFi autoReconnect (default: true) reconnects in background */
+  } else {
+    wifiConnected = true;
   }
 
   #ifdef CFG_DEBUG
@@ -437,24 +441,29 @@ void loop() {
     HANDLE_SYSTEM_STATE();   /* handle connectivity and trigger reconnects */
     myThermostat.loop();     /* control relay for heating */
     DISPLAY_MAIN();          /* draw display each loop */
-    MQTT_MAIN();             /* handle MQTT each loop */
-  }
-  /* call every 500 ms */
-  if (TimeReached(loop_500_ms_in_millis)) {
-    SetNextTimeInterval(&loop_500_ms_in_millis, loop_time_500_ms);
-    /* nothing yet */
+    if (wifiConnected == true) {
+      MQTT_MAIN();             /* handle MQTT each loop */
+    }
   }
   /* call every second */
   if (TimeReached(loop_1000_ms_in_millis)) {
     SetNextTimeInterval(&loop_1000_ms_in_millis, loop_time_1000_ms);
-    SENSOR_MAIN();          /* get sensor data */
     FS_MAIN();              /* check for new data and write FileSystem is necessary */
-    HANDLE_HTTP_UPDATE();   /* pull update from server if it was requested via MQTT or a new version was detected */
+    if (wifiConnected == true) {
+      HANDLE_HTTP_UPDATE();   /* pull update from server if it was requested via MQTT or a new version was detected */
+    }
+  }
+  /* call every 10 s */
+  if (TimeReached(loop_10_seconds_in_millis)) {
+    SetNextTimeInterval(&loop_10_seconds_in_millis, loop_time_10_seconds);
+    SENSOR_MAIN();          /* get sensor data */
   }
   /* call every 30 s */
   if (TimeReached(loop_30_seconds_in_millis)) {
     SetNextTimeInterval(&loop_30_seconds_in_millis, loop_time_30_seconds);
-    NTP();                 /* calculate formatted time */
+    if (wifiConnected == true) {
+      NTP();                 /* calculate formatted time */
+    }
   }
   /* call every minute */
   if (TimeReached(loop_1_minute_in_millis)) {
@@ -463,7 +472,9 @@ void loop() {
   /* call every 5 minutes */
   if (TimeReached(loop_5_minutes_in_millis)) {
     SetNextTimeInterval(&loop_5_minutes_in_millis, loop_time_5_minutes);
-    CHECK_FOR_UPDATE();    /* check for updates on update server */
+    if (wifiConnected == true) {
+      CHECK_FOR_UPDATE();    /* check for updates on update server */
+    }
   }
   /* call every 30 minutes */
   if (TimeReached(loop_30_minutes_in_millis)) {
@@ -547,6 +558,7 @@ void HANDLE_SYSTEM_STATE(void) {
       WIFI_CONNECT();
     } else {
       /* WiFi is connected, reset systemRestartTimer */
+      wifiConnected = true;
       SetNextTimeInterval(&systemRestartTimer, (minutes_to_milliseconds(SYSTEM_RESTART_TIME)));
     }
   }
@@ -616,6 +628,7 @@ void HANDLE_SYSTEM_STATE(void) {
     systemRestartRequest = false;
     #ifdef CFG_DEBUG
     Serial.println("Restarting in 3 seconds due to Restart Request");
+    Serial.flush();
     #endif
     myMqttClient.disconnect();
     delay(seconds_to_milliseconds(3));
@@ -694,7 +707,9 @@ void SENSOR_MAIN() {
       float sensPres(NAN);  /* TODO: implement pressure from BME280 */
       myBME280.read(sensPres, sensTemp, sensHumid, tempUnit, presUnit);
     } else {
-      /* TODO: Houston we have a problem! */
+      #ifdef CFG_DEBUG
+      Serial.println("Unknown sensor configured " + String(myConfig.sensor_type));
+      #endif /* CFG_DEBUG */
     }
 
     /* Check if any reads failed */
@@ -823,7 +838,7 @@ void DISPLAY_MAIN(void) {
 
       if (myThermostat.getSensorError()) {
         myDisplay.drawString(128, drawTempYOffset, "err");
-      } else if (myThermostat.getSensorFailureCounter() == -1) {
+      } else if (myThermostat.getFilteredTemperature() == THERMOSTAT_SENSOR_INIT_VALUE) {
         myDisplay.drawString(128, drawTempYOffset, "init");
       } else {
         myDisplay.drawString(128, drawTempYOffset, String(intToFloat(myThermostat.getFilteredTemperature()), 1));

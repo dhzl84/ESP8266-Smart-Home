@@ -337,7 +337,7 @@ void Thermostat::setCurrentHumidity(int16_t value) {
 void Thermostat::setLastSensorReadFailed(bool value) {
   /* filter sensor read failure here to avoid switching back and forth for single failure events */
   if (value == true) {
-    if ( (sensor_failure_counter_ < INT8_MAX) && (sensor_failure_counter_ != SENSOR_FAILURE_COUNTER_INIT_VALUE) ) {
+    if (sensor_failure_counter_ < INT8_MAX) {
       sensor_failure_counter_++;
     }
   } else {
