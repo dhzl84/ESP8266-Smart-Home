@@ -86,14 +86,14 @@ void Thermostat::loop(void) {
         if (actual_state_ == TH_OFF) {  /* switch on heating if target temperature is higher than measured temperature */
           setActualState(TH_HEAT);
           #ifdef CFG_DEBUG
-          Serial.println("heating");
+          println("[Thermostat] heating");
           #endif
         }
       } else if (filtered_temperature_ >= static_cast<int16_t>(target_temperature_ + thermostat_hysteresis_high_)) {  /* check if measured temperature is higher than heating target */
         if (actual_state_ == TH_HEAT) {  /* switch off heating if target temperature is lower than measured temperature */
           setActualState(TH_OFF);
           #ifdef CFG_DEBUG
-          Serial.println("not heating");
+          println("[Thermostat] not heating");
           #endif
         }
       } else {
@@ -254,7 +254,7 @@ void Thermostat::setCurrentTemperature(int16_t value) {
 
 #if CFG_DEBUG_SELECTION_SORT
   for (auto val : temperature_value_queue_) {
-    Serial.printf("Value: %i\n", val);
+    Serial.printf("[Thermostat] Value: %i\n", val);
   }
 #endif  // CFG_DEBUG_SELECTION_SORT
 
@@ -262,7 +262,7 @@ void Thermostat::setCurrentTemperature(int16_t value) {
 
 #if CFG_DEBUG_SELECTION_SORT
   for (int16_t i = 0; i < CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE; i++) {
-    Serial.printf("Sorted Value: %i\n", sorted_temperature_value_queue[i]);
+    Serial.printf("[Thermostat] Sorted Value: %i\n", sorted_temperature_value_queue[i]);
   }
 #endif  // CFG_DEBUG_SELECTION_SORT
 
@@ -272,7 +272,7 @@ void Thermostat::setCurrentTemperature(int16_t value) {
     for (int16_t i = start_averaging_; i < stop_averaging_; i++) {
       tempValue += static_cast<float>(sorted_temperature_value_queue[i]);
 #if CFG_DEBUG_SELECTION_SORT
-      Serial.printf("Use Value: %i from index %i\n", sorted_temperature_value_queue[i], i);
+      Serial.printf("[Thermostat] Use Value: %i from index %i\n", sorted_temperature_value_queue[i], i);
 #endif  // CFG_DEBUG_SELECTION_SORT
     }
     tempValue = (tempValue / static_cast<float>(filter_size_));
@@ -306,7 +306,7 @@ void Thermostat::setCurrentHumidity(int16_t value) {
 
 #if CFG_DEBUG_SELECTION_SORT
   for (auto val : humidity_value_queue_) {
-    Serial.printf("Humidity Value: %i\n", val);
+    Serial.printf("[Thermostat] Humidity Value: %i\n", val);
   }
 #endif  // CFG_DEBUG_SELECTION_SORT
 
@@ -314,7 +314,7 @@ void Thermostat::setCurrentHumidity(int16_t value) {
 
 #if CFG_DEBUG_SELECTION_SORT
   for (int16_t i = 0; i < CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE; i++) {
-    Serial.printf("Sorted Humidity Value: %i\n", sorted_humidity_value_queue[i]);
+    Serial.printf("[Thermostat] Sorted Humidity Value: %i\n", sorted_humidity_value_queue[i]);
   }
 #endif  // CFG_DEBUG_SELECTION_SORT
 
@@ -324,7 +324,7 @@ void Thermostat::setCurrentHumidity(int16_t value) {
     for (int16_t i = start_averaging_; i < stop_averaging_; i++) {
       humidValue += static_cast<float>(sorted_humidity_value_queue[i]);
 #if CFG_DEBUG_SELECTION_SORT
-      Serial.printf("Use Humidity Value: %i from index %i\n", sorted_humidity_value_queue[i], i);
+      Serial.printf("[Thermostat] Use Humidity Value: %i from index %i\n", sorted_humidity_value_queue[i], i);
 #endif  // CFG_DEBUG_SELECTION_SORT
     }
     humidValue = (humidValue / static_cast<float>(filter_size_));
