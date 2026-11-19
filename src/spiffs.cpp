@@ -1,6 +1,6 @@
 #include "main.h"
-
 #include "ArduinoJson.h"
+#include "print_log.h"
 
 #include "print_log.h"  /* last include: renames the identifier Serial to the console capture tee, see print_log.h */
 
