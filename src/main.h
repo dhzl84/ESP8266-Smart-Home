@@ -84,7 +84,7 @@ void handleHttpReset(void);
 void messageReceived(String &topic, String &payload);  // NOLINT: pass by reference
 void updateEncoder(void);
 
-/* The status/config page is streamed in chunks (htmlStreamPage() in main.cpp): each row is
+/* The status/config page is streamed in chunks (htmlStreamPage() in website.cpp): each row is
    formatted into a small stack buffer and sent straight to the client, so there is no page
    String to concatenate, no heap realloc, and no concatenation frames on the cont stack. */
 

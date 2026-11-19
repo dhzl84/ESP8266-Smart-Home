@@ -1,5 +1,7 @@
 #include "main.h"
 
+#include "print_log.h"  /* last include: renames the identifier Serial to the console capture tee, see print_log.h */
+
 float    intToFloat(int16_t intValue)         { return (static_cast<float>(intValue/10.0f)); }
 int16_t  floatToInt(float floatValue)         { return (static_cast<int16_t>(floatValue * 10)); }
 String boolToStringOnOff(bool boolean)        { return (boolean == true ? "on" : "off"); }

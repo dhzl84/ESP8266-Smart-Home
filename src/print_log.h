@@ -6,7 +6,7 @@
 /*===================================================================================================================*/
 /* Every byte the program sends to the console (Serial.print / Serial.println / Serial.printf) is copied into a
    RAM ring buffer before it is handed to the UART, so the status page can replay the console in a window of its own
-   at the bottom (htmlWindowConsole() in main.cpp).
+   at the bottom (htmlWindowConsole() in website.cpp).
 
    The capture is NOT wrapped in CFG_DEBUG: release builds emit fewer lines (the verbose prints are compiled out by
    the source), but everything a build does print is captured and displayed, so the window is present in debug and

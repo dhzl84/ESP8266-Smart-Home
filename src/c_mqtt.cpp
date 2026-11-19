@@ -1,5 +1,7 @@
 #include "c_mqtt.h"
 
+#include "print_log.h"  /* last include: renames the identifier Serial to the console capture tee, see print_log.h */
+
 // The Home Asistant discovery_enabled topic need to follow a specific format:
 //
 //     <discovery_prefix>/<component>/[<node_id>/]<object_id>/<>
