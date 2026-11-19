@@ -1652,7 +1652,7 @@ void handleHttpReset(void) {
 /* MQTT callback if a message was received */
 void messageReceived(String &topic, String &payload) {  // NOLINT
   #ifdef CFG_DEBUG
-  Serial.println("received: " + topic + " : " + payload);
+  Serial.println("[MQTT] received: " + topic + " : " + payload);
   #endif
 
   if (topic == myMqttHelper.getTopicSystemRestartRequest()) {
