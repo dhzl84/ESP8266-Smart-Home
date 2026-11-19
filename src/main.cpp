@@ -30,7 +30,6 @@ ADC_MODE(ADC_VCC);             /* measure Vcc */
 /*===================================================================================================================*/
 /* variables, constants, types, classes, etc. definitions */
 /*===================================================================================================================*/
-uint32_t wifi_connect_counter = 0;
 uint32_t mqtt_connect_counter = 0;
 struct Configuration myConfig;
 #ifndef MQTT_QOS
@@ -130,15 +129,6 @@ bool     restartedToday = true;
 bool     requestSaveToSpiffs = false;
 bool     requestSaveToSpiffsWithRestart = false;
 bool     wifiConnected = false;
-/* fallback defaults must precede their first use below (see also src/config.h) */
-#ifndef WIFI_RECONNECT_TIME
-  #define WIFI_RECONNECT_TIME 30
-#endif
-#ifndef SYSTEM_RESTART_TIME
-  #define SYSTEM_RESTART_TIME 360
-#endif
-uint32_t wifiReconnectTimer = seconds_to_milliseconds(WIFI_RECONNECT_TIME);
-uint32_t systemRestartTimer = minutes_to_milliseconds(SYSTEM_RESTART_TIME);
 
 #define  FS_WRITE_DEBOUNCE      minutes_to_milliseconds(30) /* write FileSystem 30 minutes after last change */
 bool     FS_WRITTEN =           true;
@@ -327,28 +317,21 @@ void DISPLAY_INIT(void) {
 }
 
 void WIFI_CONNECT(void) {
-  wifi_connect_counter++;
-  if (WiFi.status() != WL_CONNECTED) {
-    wifiConnected = false;
-    #ifdef CFG_DEBUG
-    Serial.println("Initialize WiFi ");
-    #endif
-
-    WiFi.mode(WIFI_STA);
-    #if CFG_BOARD_ESP8266
-    WiFi.setSleepMode(WIFI_NONE_SLEEP);
-    WiFi.hostname(myConfig.name);
-    WiFi.setAutoReconnect(true);
-    #elif CFG_BOARD_ESP32
-    WiFi.setHostname(myConfig.name);
-    WiFi.setSleep(false);
-    #endif
-    WiFi.begin(myConfig.ssid, myConfig.wifi_password);
-    /* non-blocking: connection status is checked every WIFI_RECONNECT_TIME seconds in
-       HANDLE_SYSTEM_STATE(); WiFi autoReconnect (default: true) reconnects in background */
-  } else {
-    wifiConnected = true;
-  }
+  #ifdef CFG_DEBUG
+  Serial.println("Initialize WiFi ");
+  #endif
+  wifiConnected = false;
+  WiFi.mode(WIFI_STA);
+  #if CFG_BOARD_ESP8266
+  WiFi.setSleepMode(WIFI_NONE_SLEEP);
+  WiFi.hostname(myConfig.name);
+  WiFi.setAutoConnect(true);
+  WiFi.setAutoReconnect(true);
+  #elif CFG_BOARD_ESP32
+  WiFi.setHostname(myConfig.name);
+  WiFi.setSleep(false);
+  #endif
+  WiFi.begin(myConfig.ssid, myConfig.wifi_password);
 
   #ifdef CFG_DEBUG
   /* Serial.print with String concat allocates/copies while lwIP is still reconfiguring
@@ -566,31 +549,21 @@ void loop() {
 /* functions called by loop() */
 /*===================================================================================================================*/
 void HANDLE_SYSTEM_STATE(void) {
-  
-  #if 0  /* deactivate for testing WiFi autoReconnect*/
-  /* check WiFi connection every 30 seconds */
-  if (TimeReached(wifiReconnectTimer)) {
-    SetNextTimeInterval(&wifiReconnectTimer, (seconds_to_milliseconds(WIFI_RECONNECT_TIME)));
-    if (WiFi.status() != WL_CONNECTED) {
-      /* try to come online, debounced to avoid reconnect each loop*/
-      #ifdef CFG_DEBUG
+  if (WiFi.status() == WL_CONNECTED) {
+    #ifdef CFG_DEBUG
+    if (wifiConnected == false) {
       Serial.printf("[WiFi] Status: %s\n", wifiStatusToString(WiFi.status()).c_str());
-      #endif
-      WIFI_CONNECT();
-    } else {
-      /* WiFi is connected, reset systemRestartTimer */
-      wifiConnected = true;
-      SetNextTimeInterval(&systemRestartTimer, (minutes_to_milliseconds(SYSTEM_RESTART_TIME)));
     }
+    #endif
+    wifiConnected = true;
+  } else {
+    #ifdef CFG_DEBUG
+    if (wifiConnected == true) {
+      Serial.printf("[WiFi] Status: %s\n", wifiStatusToString(WiFi.status()).c_str());
+    }
+    #endif
+    wifiConnected = false;
   }
-  if (TimeReached(systemRestartTimer)) {
-  #ifdef CFG_DEBUG
-  Serial.println("Restart requested by System State Handler");
-  #endif /* CFG_DEBUG */
-    systemRestartRequest = true;
-    silentRestart = true;
-  }
-  #endif
 
   /* Check if the sytem shall restart at a defined time */
   #ifdef CFG_DEBUG_PLANNED_RESTART
@@ -926,7 +899,7 @@ void CHECK_FOR_UPDATE(WiFiClient &myWiFiClient) {
   int httpCode = httpClient.GET();
   if (httpCode == 200) {
     myConfig.available_firmware_version = httpClient.getString();
-    #ifdef CFG_DEBUG
+    #ifdef CFG_DEBUG_UPDATE_CHECK
     Serial.println("Check For Update");
     Serial.print("  Current firmware version: ");
     Serial.println(VERSION);
@@ -935,11 +908,11 @@ void CHECK_FOR_UPDATE(WiFiClient &myWiFiClient) {
     #endif /* CFG_DEBUG */
   } else {
     myConfig.available_firmware_version = "none";
-    #ifdef CFG_DEBUG
+    #ifdef CFG_DEBUG_UPDATE_CHECK
     Serial.println("Check For Update");
     Serial.printf("  URL: %s\n", myConfig.binary_version_address.c_str());
     Serial.printf("  HTTP Code: %d - %s\n", httpCode, httpClient.errorToString(httpCode).c_str());
-    #endif  // CFG_DEBUG
+    #endif  /* CFG_DEBUG_UPDATE_CHECK */
   }
 
   if ( (myConfig.available_firmware_version != "none") \
@@ -1193,12 +1166,12 @@ void mqttPubState(void) {
 void handleWebServerClient(void) {
   htmlStreamPage();  /* page is streamed in chunks, no page String is built */
 
-  #ifdef CFG_DEBUG
+  #ifdef CFG_DEBUG_HTML
   /* high water mark of the continuation stack that executes loop(): the core's
      cont_check() reports 'Stack smashing detected' when this stack runs out */
   Serial.print("Free ContStack after page send: ");
   Serial.println(ESP.getFreeContStack());
-  #endif /* CFG_DEBUG */
+  #endif /* CFG_DEBUG_HTML */
 
   /* Evaluate Received Arguments */
   if (webServer.args() > 0) {  /* Arguments were received */
@@ -1456,10 +1429,6 @@ void handleHttpReset(void) {
 
 /* MQTT callback if a message was received */
 void messageReceived(String &topic, String &payload) {  // NOLINT
-  #ifdef CFG_DEBUG
-  Serial.println("[MQTT] received: " + topic + " : " + payload);
-  #endif
-
   if (topic == myMqttHelper.getTopicSystemRestartRequest()) {
     #ifdef CFG_DEBUG
     Serial.println("[MQTT] Restart request received with value: " + payload);
@@ -1530,9 +1499,9 @@ void messageReceived(String &topic, String &payload) {  // NOLINT
       myThermostat.setThermostatHysteresis(payload.toInt());
     }
   } else if (topic == myMqttHelper.getTopicOutsideTemperature()) {
-    #ifdef CFG_DEBUG
+    #ifdef CFG_DEBUG_OUTSIDE_TEMP
     Serial.println("[MQTT] New outside temperature received: " + payload);
-    #endif
+    #endif /* CFG_DEBUG_OUTSIDE_TEMP */
     if (!isNumericPayload(payload)) {
       /* Home Assistant sends "unknown" / "unavailable" when its own outside temperature
          source has no value; toFloat() on such a payload is 0.0 and would drive the
@@ -1543,5 +1512,9 @@ void messageReceived(String &topic, String &payload) {  // NOLINT
     } else {
       myThermostat.setOutsideTemperature(floatToInt(payload.toFloat()));
     }
+  } else {
+    #ifdef CFG_DEBUG
+    Serial.println("[MQTT] Unknown command received: " + topic + " : " + payload);
+    #endif
   }
 }
