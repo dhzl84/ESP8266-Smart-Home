@@ -21,7 +21,9 @@ void formatScaled(char* buf, size_t size, int16_t scaledBy10, uint8_t decimals) 
   } else {
     const int whole = scaledBy10 / 10;
     int fraction = scaledBy10 % 10;
-    if (fraction < 0) { fraction = -fraction; }  /* sign lives on the whole part: -35 -> -3.5 */
+    if (fraction < 0) {
+      fraction = -fraction;
+    }  /* sign lives on the whole part: -35 -> -3.5 */
     (void)snprintf(buf, size, "%d.%d", whole, fraction);
   }
 }
@@ -73,7 +75,9 @@ bool TimeReached(uint32_t timer) {
 void SetNextTimeInterval(volatile uint32_t *timer, const uint32_t step) {
   *timer = (millis() + step);
   const int32_t passed = TimePassedSince(*timer);
-  if (passed < 0) { return; }   // Event has not yet happened, which is fine.
+  if (passed < 0) {
+    return;
+  }   // Event has not yet happened, which is fine.
   if (static_cast<uint32_t>(passed) > step) {
     // No need to keep running behind, start again.
     *timer = millis() + step;
@@ -224,7 +228,7 @@ bool splitHtmlCommand(String sInput, String *key, String *value) {
 
 String getEspChipId(void) {
   #if CFG_BOARD_ESP32
-    String str = (String(uint32_t(ESP.getEfuseMac() & 0x0000FFFF00000000), HEX) + String(uint32_t(ESP.getEfuseMac() & 0x00000000FFFFFFFF), HEX));
+    String str = (String(static_cast<uint32_t>(ESP.getEfuseMac() & 0x0000FFFF00000000), HEX) + String(static_cast<uint32_t>(ESP.getEfuseMac() & 0x00000000FFFFFFFF), HEX));
   #elif CFG_BOARD_ESP8266
     String str = String(ESP.getChipId(), HEX);
   #else

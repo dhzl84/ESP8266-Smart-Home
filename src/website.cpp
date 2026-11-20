@@ -17,6 +17,7 @@
 /*===================================================================================================================*/
 #include "website.h"
 #include "print_log.h"  /* last include: renames the identifier Serial to the console capture tee, see print_log.h */
+#include <inttypes.h>   /* PRIu32 / PRId32 for the page's format rows */
 
 /*===================================================================================================================*/
 /* page resources: the static page HTML, as flash literals                                                  */
@@ -49,17 +50,28 @@ static const char htmlStyleBlock[] =
 
 static uint16_t htmlPageBytes;  /* bytes of the page streamed in the current response */
 
+#if CFG_BOARD_ESP32
+/* ESP32's WebServer has no chunked streaming API, so the page is assembled into
+   this buffer by the same send helpers and sent once at the end of the page. */
+static String htmlPageBuffered;
+#endif
+
 #define HTML_ROW_BUF_SIZE 400  /* worst row: update_server_address with a 255 char configured address */
 
 static void htmlRowTruncated(const char* key) {
   logSetLevel(0);   /* level 0: a row the page could not send whole, in every build */
-  Serial.print("HTML row truncated: "); Serial.println(key);
+  Serial.print("HTML row truncated: ");
+  Serial.println(key);
 }
 
 /* Send one chunk. The buffer may be a flash literal or a RAM stack buffer; the core picks
    the matching copy for each (StreamConstPtr tests the address at runtime). */
 static void htmlSendChunk(const char* buf, size_t len) {
+  #if CFG_BOARD_ESP32
+  htmlPageBuffered.concat(buf, len);  /* buffer: sent as one body with webServer.send() */
+  #else
   webServer.sendContent(buf, len);
+  #endif
   htmlPageBytes += static_cast<uint16_t>(len);
 }
 
@@ -68,7 +80,9 @@ static void htmlSendText(const char* text) {
 }
 
 static void htmlRowAppend(int rowLen, const char* key, const char* row, size_t rowSize) {
-  if (rowLen < 0) { return; }
+  if (rowLen < 0) {
+    return;
+  }
   if (static_cast<size_t>(rowLen) >= rowSize) {
     htmlRowTruncated(key);
     rowLen = static_cast<int>(rowSize) - 1;  /* send what fits, the row is complete HTML */
@@ -87,12 +101,12 @@ static void htmlRow2Str(const char* key, const String& value) {  /* core APIs th
 
 static void htmlRow2U32(const char* key, uint32_t value, const char* suffix = "") {
   char row[HTML_ROW_BUF_SIZE];
-  htmlRowAppend(snprintf(row, sizeof(row), "<tr><td>%s:</td><td>%lu%s</td></tr>", key, static_cast<unsigned long>(value), suffix), key, row, sizeof(row));
+  htmlRowAppend(snprintf(row, sizeof(row), "<tr><td>%s:</td><td>%" PRIu32 "%s</td></tr>", key, value, suffix), key, row, sizeof(row));
 }
 
 static void htmlRow2I32(const char* key, int32_t value, const char* suffix = "") {
   char row[HTML_ROW_BUF_SIZE];
-  htmlRowAppend(snprintf(row, sizeof(row), "<tr><td>%s:</td><td>%ld%s</td></tr>", key, static_cast<long>(value), suffix), key, row, sizeof(row));
+  htmlRowAppend(snprintf(row, sizeof(row), "<tr><td>%s:</td><td>%" PRId32 "%s</td></tr>", key, value, suffix), key, row, sizeof(row));
 }
 
 static void htmlRow4(const char* key, const char* value, const char* current_value, const char* description) {
@@ -119,10 +133,10 @@ static void htmlWindowConsole(void) {
 
   htmlSendText("<p><b>Console Output</b></p>");
   htmlSendText("<p><small>showing ");
-  snprintf(numBuf, sizeof(numBuf), "%lu", static_cast<unsigned long>(window.linesShown));
+  snprintf(numBuf, sizeof(numBuf), "%" PRIu32, window.linesShown);
   htmlSendText(numBuf);
   htmlSendText(" of ");
-  snprintf(numBuf, sizeof(numBuf), "%lu", static_cast<unsigned long>(window.linesTotal));
+  snprintf(numBuf, sizeof(numBuf), "%" PRIu32, window.linesTotal);
   htmlSendText(numBuf);
   htmlSendText(" captured lines");
   if ((window.start < window.end) && (logLineStart(window.start) == false)) {
@@ -155,6 +169,9 @@ void htmlStreamPage(void) {
   char numBuf[16];  /* one scratch buffer for values that need formatting */
 
   htmlPageBytes = 0;
+  #if CFG_BOARD_ESP32
+  htmlPageBuffered = String();  /* buffer the whole page, sent with webServer.send() below */
+  #else
   if (webServer.chunkedResponseModeStart(200, "text/html") == false) {
     #ifdef CFG_DEBUG
     logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
@@ -162,11 +179,14 @@ void htmlStreamPage(void) {
     #endif /* CFG_DEBUG */
     return;
   }
+  #endif
 
   htmlSendText(htmlHeadDoctype);
   /* HEAD */
   htmlSendText(htmlHeadMeta);
-  htmlSendText("<title> "); htmlSendText(myConfig.name); htmlSendText("</title>\n");
+  htmlSendText("<title> ");
+  htmlSendText(myConfig.name);
+  htmlSendText("</title>\n");
   htmlSendText(htmlStyleBlock);
   htmlSendText(htmlHeadClose);
   /* BODY */
@@ -270,7 +290,11 @@ void htmlStreamPage(void) {
   htmlWindowConsole();  /* last window: the captured console output, see htmlWindowConsole() above */
   htmlSendText(htmlPageFooter);
 
+  #if CFG_BOARD_ESP32
+  webServer.send(200, "text/html", htmlPageBuffered);
+  #else
   htmlSendChunk("", 0);  /* zero length chunk closes the chunked response */
+  #endif
 
   #ifdef CFG_DEBUG
   logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */

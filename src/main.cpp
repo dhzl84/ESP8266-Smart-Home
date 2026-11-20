@@ -374,15 +374,18 @@ void WIFI_CONNECT(void) {
   IPAddress ip = WiFi.localIP();
   (void)snprintf(ipBuf, sizeof(ipBuf), "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
   logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
-  Serial.print("Local IP: "); Serial.println(ipBuf);
+  Serial.print("Local IP: ");
+  Serial.println(ipBuf);
   ip = WiFi.gatewayIP();
   (void)snprintf(ipBuf, sizeof(ipBuf), "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
   logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
-  Serial.print("Gateway IP: "); Serial.println(ipBuf);
+  Serial.print("Gateway IP: ");
+  Serial.println(ipBuf);
   ip = WiFi.dnsIP();
   (void)snprintf(ipBuf, sizeof(ipBuf), "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
   logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
-  Serial.print("DNS IP: "); Serial.println(ipBuf);
+  Serial.print("DNS IP: ");
+  Serial.println(ipBuf);
   #endif
 }
 
@@ -646,8 +649,7 @@ void HANDLE_SYSTEM_STATE(void) {
   if (systemRestartRequest == true) {
     if (silentRestart == true) {
       silentRestart = false;
-    } else
-    {
+    } else {
       DISPLAY_MAIN();
     }
     myMqttClient.publish(myMqttHelper.getTopicSystemRestartRequest(), "false", false, MQTT_QOS);   /* publish restart = false on connect */
@@ -749,8 +751,8 @@ void SENSOR_MAIN() {
       Serial.println(myThermostat.getSensorFailureCounter());
     } else {
       myThermostat.setLastSensorReadFailed(false);   /* set no failure during read sensor */
-      myThermostat.setCurrentHumidity((int16_t)(10* sensHumid));     /* read value and convert to one decimal precision integer */
-      myThermostat.setCurrentTemperature((int16_t)(10* sensTemp));   /* read value and convert to one decimal precision integer */
+      myThermostat.setCurrentHumidity(static_cast<int16_t>(10 * sensHumid));     /* read value and convert to one decimal precision integer */
+      myThermostat.setCurrentTemperature(static_cast<int16_t>(10 * sensTemp));   /* read value and convert to one decimal precision integer */
 
       #if LOG_LEVEL_BUILD >= 1
       /* level 1: the running values, compiled into every build and shown while the runtime level is 1 or above,
@@ -1324,10 +1326,10 @@ void handleWebServerClient(void) {
               logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("Request FileSystem write.");
               #endif
-              myConfig.calibration_factor = int16_t(u8_value);
+              myConfig.calibration_factor = static_cast<int16_t>(u8_value);
               /* also apply live (mirrors the MQTT changeSensorCalib path); without this the
                  Thermostat object kept the old factor and FS_MAIN synced the stale value back */
-              myThermostat.setSensorCalibData(int16_t(u8_value), myThermostat.getSensorCalibOffset(), true);
+              myThermostat.setSensorCalibData(static_cast<int16_t>(u8_value), myThermostat.getSensorCalibOffset(), true);
               requestSaveToSpiffs = true;
             } else {
               #ifdef CFG_DEBUG
@@ -1336,13 +1338,13 @@ void handleWebServerClient(void) {
               #endif
             }
           } else if (key == "calibration_offset") {
-            int16_t i16_value = (int16_t) value.toInt();
+            int16_t i16_value = static_cast<int16_t>(value.toInt());
             if ((i16_value != myConfig.calibration_offset) && (i16_value >= -50) && (i16_value <= 50)) {
               #ifdef CFG_DEBUG
               logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("Request FileSystem write.");
               #endif
-              myConfig.calibration_offset = int16_t(i16_value);
+              myConfig.calibration_offset = static_cast<int16_t>(i16_value);
               /* apply live as well (see calibration_factor note) */
               myThermostat.setSensorCalibData(myThermostat.getSensorCalibFactor(), i16_value, true);
               requestSaveToSpiffs = true;

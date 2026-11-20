@@ -90,7 +90,6 @@ int mqttHelper::buildStateJSON(char* buf, size_t size, const char* name, const c
                                const char* hysteresis, const char* actState, const char* tarTemp,
                                const char* sensError, const char* thermoMode, int16_t calibration_factor,
                                const char* calibration_offset, const char* ip, const char* firmware) {
-
   int written = snprintf(buf, size,
     "{\n"
     "  \"name\":\"%s\",\n"
@@ -161,8 +160,7 @@ int mqttHelper::buildHassDiscoveryClimate(char* buf, size_t size, const char* na
     mqttNodeId_.c_str(),
     name,
     firmware.c_str(),
-    name
-  );
+    name);
 
   return checkPayload(buf, size, written, "Climate discovery");
 }
@@ -196,8 +194,7 @@ int mqttHelper::buildHassDiscoveryBinarySensor(char* buf, size_t size, BinarySen
         mqttWill_.c_str(),
         mqttData_.c_str(),
         mqttNodeId_.c_str(),
-        mqttNodeId_.c_str()
-      );
+        mqttNodeId_.c_str());
 
       return checkPayload(buf, size, written, "Binary sensor discovery");
     }
@@ -235,8 +232,7 @@ int mqttHelper::buildHassDiscoverySensor(char* buf, size_t size, Sensor_t sensor
         mqttWill_.c_str(),
         mqttData_.c_str(),
         mqttNodeId_.c_str(),
-        mqttNodeId_.c_str()
-      );
+        mqttNodeId_.c_str());
 
       return checkPayload(buf, size, written, "Temperature sensor discovery");
     }
@@ -265,8 +261,7 @@ int mqttHelper::buildHassDiscoverySensor(char* buf, size_t size, Sensor_t sensor
         mqttWill_.c_str(),
         mqttData_.c_str(),
         mqttNodeId_.c_str(),
-        mqttNodeId_.c_str()
-      );
+        mqttNodeId_.c_str());
 
       return checkPayload(buf, size, written, "Humidity sensor discovery");
     }
@@ -302,8 +297,7 @@ int mqttHelper::buildHassDiscoveryButton(char* buf, size_t size, Button_t button
         mqttWill_.c_str(),
         mqttData_.c_str(),
         mqttNodeId_.c_str(),
-        mqttNodeId_.c_str()
-      );
+        mqttNodeId_.c_str());
 
       return checkPayload(buf, size, written, "Restart button discovery");
     }
@@ -331,8 +325,7 @@ int mqttHelper::buildHassDiscoveryButton(char* buf, size_t size, Button_t button
         mqttWill_.c_str(),
         mqttData_.c_str(),
         mqttNodeId_.c_str(),
-        mqttNodeId_.c_str()
-      );
+        mqttNodeId_.c_str());
 
       return checkPayload(buf, size, written, "Update button discovery");
     }
