@@ -50,6 +50,7 @@ void loadConfiguration(Configuration &config) { // NOLINT: pass by reference
   DynamicJsonDocument jsonDoc(cCONFIG_JSON_SIZE);  /* heap, see cCONFIG_JSON_SIZE */
   if (!file) {
     #ifdef CFG_DEBUG
+    logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("Failed to open configuration, using defaults");
     #endif
     jsonDoc.clear();
@@ -57,6 +58,7 @@ void loadConfiguration(Configuration &config) { // NOLINT: pass by reference
     file.close();
     delay(1);  // let the UART/WiFi interrupt work after LittleFS access
     #ifdef CFG_DEBUG
+    logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("Not enough heap for configuration, using defaults");
     #endif
     jsonDoc.clear();
@@ -67,8 +69,10 @@ void loadConfiguration(Configuration &config) { // NOLINT: pass by reference
 
     if (error || jsonDoc.overflowed()) {
       #ifdef CFG_DEBUG
+      logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
       Serial.print(F("deserializeJson() failed with code "));
       Serial.println(error ? error.c_str() : "NoMemory");
+      logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
       Serial.println("Using default configuration");
       #endif /* CFG_DEBUG */
       jsonDoc.clear();
@@ -77,6 +81,7 @@ void loadConfiguration(Configuration &config) { // NOLINT: pass by reference
 
   #ifdef CFG_DEBUG
   serializeJsonPretty(jsonDoc, Serial);
+  logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
   Serial.println();
   #endif /* CFG_DEBUG */
 
@@ -114,6 +119,7 @@ bool saveConfiguration(const Configuration &config) {
 
   if (jsonDoc.capacity() < cCONFIG_JSON_SIZE) {
     #ifdef CFG_DEBUG
+    logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("Not enough heap for configuration, file not written");
     #endif
     return false;
@@ -124,6 +130,7 @@ bool saveConfiguration(const Configuration &config) {
     delay(1);  // let the UART/WiFi interrupt work after LittleFS access
     if (!file) {
       #ifdef CFG_DEBUG
+      logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
       Serial.println("Failed to open configuration, file not written");
       #endif
       return false;
@@ -137,6 +144,7 @@ bool saveConfiguration(const Configuration &config) {
       /* Do not compare fields from a partial document. Keep the file and retry later. */
       jsonDoc.clear();
       #ifdef CFG_DEBUG
+      logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
       Serial.print(F("deserializeJson() failed with code "));
       Serial.println(error ? error.c_str() : "NoMemory");
       #endif
@@ -144,10 +152,14 @@ bool saveConfiguration(const Configuration &config) {
     }
 
     #ifdef CFG_DEBUG
+    logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("FileSystem content:");
     serializeJsonPretty(jsonDoc, Serial);
+    logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println();
+    logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("Check FileSystem vs. current config, 0 is equal, 1 is diff.");
+    logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.print((config.name ==                    jsonDoc["name"]) ? false : true);
     Serial.print((config.thermostat_mode ==         jsonDoc["mode"]) ? false : true);
     Serial.print((config.ssid ==                    jsonDoc["ssid"]) ? false : true);
@@ -238,6 +250,7 @@ bool saveConfiguration(const Configuration &config) {
       /* incomplete document, keep the old file instead of storing half a configuration */
       ret = false;
       #ifdef CFG_DEBUG
+      logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
       Serial.println("Configuration does not fit into JSON document, file not written");
       #endif /* CFG_DEBUG */
     } else {
@@ -253,6 +266,7 @@ bool saveConfiguration(const Configuration &config) {
       if (!file || serializeJson(jsonDoc, file) == 0) {
         ret = false;
         #ifdef CFG_DEBUG
+        logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
         Serial.println("Failed to write temp file, keeping old configuration");
         #endif /* CFG_DEBUG */
         if (file) { file.close(); delay(1); }
@@ -262,8 +276,10 @@ bool saveConfiguration(const Configuration &config) {
         }
       } else {
         #ifdef CFG_DEBUG
+        logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
         Serial.println("new FileSystem content:");
         serializeJsonPretty(jsonDoc, Serial);
+        logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
         Serial.println();
         #endif /* CFG_DEBUG */
         file.close();
@@ -271,15 +287,18 @@ bool saveConfiguration(const Configuration &config) {
 
         if (FileSystem.remove(filename)) {
           #ifdef CFG_DEBUG
+          logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
           Serial.println("Removing old FileSystem file succeeded");
           #endif /* CFG_DEBUG */
         } else if (!FileSystem.exists(filename)) {
           #ifdef CFG_DEBUG
+          logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
           Serial.println("No old FileSystem file, nothing to remove");
           #endif /* CFG_DEBUG */
         } else {
           ret = false;
           #ifdef CFG_DEBUG
+          logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
           Serial.println("Removing old FileSystem file failed");
           #endif /* CFG_DEBUG */
         }
@@ -288,6 +307,7 @@ bool saveConfiguration(const Configuration &config) {
         if (!FileSystem.rename(configtmpname, filename)) {
           ret = false;
           #ifdef CFG_DEBUG
+          logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
           Serial.println("Renaming temp file over configuration failed");
           #endif /* CFG_DEBUG */
         }
@@ -296,6 +316,7 @@ bool saveConfiguration(const Configuration &config) {
     }
   } else {
     #ifdef CFG_DEBUG
+    logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("FileSystem content equals current config, no FileSystem write necessary");
     #endif /* CFG_DEBUG */
   }
@@ -311,6 +332,7 @@ String readSpiffs(String file) {
     yield();  // yield after LittleFS open()
     if (!f) {
       #ifdef CFG_DEBUG
+      logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
       Serial.println("oh no, failed to open file: " + file);
       #endif
       /* TODO: Error handling */
@@ -321,6 +343,7 @@ String readSpiffs(String file) {
 
       #ifdef CFG_DEBUG
       if (fileContent == "") {
+        logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
         Serial.println("File " + file + " is empty");
       }
       #endif

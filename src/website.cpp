@@ -52,9 +52,8 @@ static uint16_t htmlPageBytes;  /* bytes of the page streamed in the current res
 #define HTML_ROW_BUF_SIZE 400  /* worst row: update_server_address with a 255 char configured address */
 
 static void htmlRowTruncated(const char* key) {
-  #ifdef CFG_DEBUG
+  logSetLevel(0);   /* level 0: a row the page could not send whole, in every build */
   Serial.print("HTML row truncated: "); Serial.println(key);
-  #endif /* CFG_DEBUG */
 }
 
 /* Send one chunk. The buffer may be a flash literal or a RAM stack buffer; the core picks
@@ -158,6 +157,7 @@ void htmlStreamPage(void) {
   htmlPageBytes = 0;
   if (webServer.chunkedResponseModeStart(200, "text/html") == false) {
     #ifdef CFG_DEBUG
+    logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("Client speaks HTTP/1.0, chunked page not sent");
     #endif /* CFG_DEBUG */
     return;
@@ -258,6 +258,7 @@ void htmlStreamPage(void) {
   htmlRow4Int("display_brightness", "Range: 0 .. +255, LSB: 1 step", myConfig.display_brightness, "Brightness of OLED display");
   htmlRow4("timezone", "string", myConfig.timezone, "Timezone for NTP, pick from this list: https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv");
   htmlRow4("console_clear", "1", "none", "Clear the console output window (last window at the bottom of the page)");
+  htmlRow4("log_level", "0..2", "none", "Console window verbosity: 0 failures and state, 1 the running values, 2 the field dumps");
   htmlSendText(htmlTableClose);
   /* Restart Device */
   htmlSendText("<p><b>Restart Device</b></p>");
@@ -272,12 +273,16 @@ void htmlStreamPage(void) {
   htmlSendChunk("", 0);  /* zero length chunk closes the chunked response */
 
   #ifdef CFG_DEBUG
+  logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
   /* Serial.print() keeps the deep frames small; Serial.printf() allocates a 128 byte
      local buffer inside Print::vprintf in the cont stack that runs loop() */
+  logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
   Serial.print("HTML page bytes streamed: ");
   Serial.println(htmlPageBytes);
+  logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
   Serial.print("  Free Heap: ");
   Serial.println(ESP.getFreeHeap());
+  logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
   Serial.print("  Free ContStack at page build: ");
   Serial.println(ESP.getFreeContStack());
   #endif /* CFG_DEBUG */

@@ -132,14 +132,19 @@ bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor)
     }
   } else {
     #ifdef CFG_DEBUG
+    logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("Malformed sensor calibration string >> calibration update denied");
     #endif
   }
 
   #ifdef CFG_DEBUG
+  logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
   Serial.println("Delimiter: " + delimiter);
+  logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
   Serial.println("Position of delimiter: " + String(pos));
+  logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
   Serial.println("Offset: " + String(*offset));
+  logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
   Serial.println("Factor: " + String(*factor));
   #endif
   return ret;
@@ -158,6 +163,7 @@ String millisFormatted(void) {
 
   (void) snprintf(char_buffer, sizeof(char_buffer), "%uT %02u:%02u:%02u", d, h, m, s);
   #ifdef CFG_DEBUG
+  logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
   Serial.println(char_buffer);
   #endif  // CFG_DEBUG
 
@@ -213,6 +219,7 @@ bool splitHtmlCommand(String sInput, String *key, String *value) {
     *value = (sInput.substring(pos+1));
   } else {
     #ifdef CFG_DEBUG
+    logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("Malformed HTML Command string");
     #endif
   }

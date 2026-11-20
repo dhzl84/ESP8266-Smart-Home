@@ -29,6 +29,28 @@
 #ifndef LOG_MAX_LINES
   #define LOG_MAX_LINES 200    /* newest lines the web window replays */
 #endif
+/* where the captured text goes besides the web page: the console/UART is written only when this is set, and
+   the default follows the build type. Debug builds see the same text on the serial console; release builds
+   keep the capture and the page only, so a release build that never calls Serial.begin() and has no usable
+   console still captures and still shows the window. */
+#ifndef LOG_TO_CONSOLE
+  #ifdef CFG_DEBUG
+    #define LOG_TO_CONSOLE 1
+  #else
+    #define LOG_TO_CONSOLE 0
+  #endif
+#endif
+/* how loud the capture is at build time: 0 = failures and state changes, 1 = the running values, 2 = the
+   per-field dumps. Levels 0 and 1 compile into every build; level 2 only into debug builds, because those
+   dumps cost their print sites in the release flash. Raise LOG_LEVEL_BUILD to carry more text in a
+   release image; the web command log_level selects 0/1 at runtime without recompiling. */
+#ifndef LOG_LEVEL_BUILD
+  #ifdef CFG_DEBUG
+    #define LOG_LEVEL_BUILD 2
+  #else
+    #define LOG_LEVEL_BUILD 1
+  #endif
+#endif
 #if (LOG_RING_BYTES < 256) || (LOG_RING_BYTES > 65535)
   #error "LOG_RING_BYTES must be between 256 and 65535 bytes"
 #endif
@@ -68,7 +90,29 @@ void logWindowSnapshot(LogWindow* window, uint16_t maxLines);  // NOLINT: out pa
 void logHtmlAppend(char* row, size_t* rowLen, char c);  // NOLINT: out parameters
 
 /*===================================================================================================================*/
-/* console tee                                                                                                 */
+/* print level                                                                                                   */
+/*===================================================================================================================*/
+/* Every print site carries the level of text it emits. The tee below drops a line's bytes - for the capture and
+   for the console alike - while its level is above the runtime level, so a line the level silences never exists
+   as text anywhere, and no line is reformatted or re-evaluated.
+
+   level 0  failures, state changes, restart triggers: compiled into every build, always captured
+   level 1  the running values (temperature, addresses, counters): compiled when LOG_LEVEL_BUILD >= 1, shown
+            while the runtime level is 1
+   level 2  the per-field dumps and the boot table: compiled only when LOG_LEVEL_BUILD >= 2, which is what the
+            '#ifdef CFG_DEBUG' guards around those sites already are in a debug build, shown while the runtime
+            level is 2; debug builds default the runtime level to LOG_LEVEL_BUILD, so their serial console and
+            page keep today's output, a release build never carries these lines
+
+   Wrap the level 2 sites in '#if LOG_LEVEL_BUILD >= 2' (or keep their existing '#ifdef CFG_DEBUG') and start
+   their line with logSetLevel(2); the levels 0 and 1 need nothing (a line defaults to level 1 after the first
+   line feed). */
+
+/* the runtime level the tee compares against; one byte of RAM, settable from the web page (log_level command) */
+extern uint8_t logRuntimeLevel;      /* defined in print_log.cpp; 0 = failures only, 1 = running values too */
+void logSetLevel(uint8_t level);     /* the level of the line printed next; resets to 1 after a line feed */
+/*===================================================================================================================*/
+/* console tee                                                                                                   */
 /*===================================================================================================================*/
 #include <Arduino.h>
 
@@ -85,22 +129,51 @@ class ConsoleTee : public Print {
      paths inside Print (Print::print(__FlashStringHelper*) and Print::write(buffer,len) break on a zero return) and
      the rest of the bytes would never reach the capture. Nothing in the project reads the console's write count. */
   size_t write(uint8_t c) override {
+    if (lineLevel > logRuntimeLevel) {
+      return 1;  /* a level the runtime silenced: no bytes exist, not in the capture and not on the console */
+    }
     logCaptureByte(c);
+#if LOG_TO_CONSOLE
     logConsoleStream().write(c);
+#endif
+    if (c == '\n') {
+      lineLevel = 1;  /* the next line defaults to level 1 */
+    }
     return 1;
   }
   size_t write(const uint8_t* buffer, size_t size) override {  // NOLINT: array parameter
+    if (lineLevel > logRuntimeLevel) {
+      return size;
+    }
     logCaptureBytes(buffer, size);
+#if LOG_TO_CONSOLE
     logConsoleStream().write(buffer, size);
+#endif
+    for (size_t i = 0; i < size; i++) {
+      if (buffer[i] == '\n') {
+        lineLevel = 1;
+      }
+    }
     return size;
+  }
+  /* the level of the line printed next, set by the sites above level 1 */
+  void setLevel(uint8_t level) {
+    lineLevel = level;
   }
   /* console configuration belongs to the real stream, the tee only forwards */
   void begin(unsigned long baud) {
+#if LOG_TO_CONSOLE
     logConsoleStream().begin(baud);
+#endif
   }
   void flush(void) override {
+#if LOG_TO_CONSOLE
     logConsoleStream().flush();
+#endif
   }
+
+ private:
+  uint8_t lineLevel = 1;  /* level of the line being written; kept in the tee so no call site has to reset it */
 };
 
 /* defined in print_log.cpp, one instance for the whole program */
