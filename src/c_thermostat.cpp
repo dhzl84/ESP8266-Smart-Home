@@ -193,9 +193,9 @@ void Thermostat::setTargetTemperature(int16_t value) {
   if ((uint8_t)value != target_temperature_) {
     /* clamp the full int16 range BEFORE the assignment: an MQTT payload of "300" is
        int16 3000; truncating to uint8_t first turned it into 184 and silently set 18.4 °C */
-    if (value > (int16_t)MAXIMUM_TARGET_TEMP) {
+    if (value > static_cast<int16_t>(MAXIMUM_TARGET_TEMP)) {
       target_temperature_ = MAXIMUM_TARGET_TEMP;
-    } else if (value < (int16_t)MINIMUM_TARGET_TEMP) {
+    } else if (value < static_cast<int16_t>(MINIMUM_TARGET_TEMP)) {
       target_temperature_ = MINIMUM_TARGET_TEMP;
     } else {
       target_temperature_  = (uint8_t)value;
@@ -237,7 +237,7 @@ void Thermostat::sort_samples(int16_t samples[], int16_t count) {
 }
 
 void Thermostat::setCurrentTemperature(int16_t value) {
-  current_temperature_ = ((int16_t)( static_cast<float> (value) * (static_cast<float> (temperature_factor_) / 100)) + temperature_offset_);
+  current_temperature_ = (static_cast<int16_t>(static_cast<float>(value) * (static_cast<float>(temperature_factor_) / 100)) + temperature_offset_);
 
   // add new temperature to filter
   temperature_value_queue_[temperature_value_sample_id_] = current_temperature_;

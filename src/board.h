@@ -6,6 +6,7 @@
 
 #if CFG_BOARD_ESP8266
 #define BOARD "ESP8266"
+#include <ESP8266WiFi.h>   /* WiFi, WiFiClient, wl_status_t, WL_* constants */
 #define DHT_PIN              2 /* sensor */
 #define SDA_PIN              4 /* I²C */
 #define SCL_PIN              5 /* I²C */
@@ -24,6 +25,7 @@
 #define FileSystem LittleFS
 #elif CFG_BOARD_ESP32
 #define BOARD "ESP32"
+#include <WiFi.h>  /* WiFi, WiFiClient, wl_status_t, WL_* constants */
 #define DHT_PIN             GPIO_NUM_26 /* sensor */
 #define SDA_PIN             GPIO_NUM_21 /* I²C */
 #define SCL_PIN             GPIO_NUM_22 /* I²C */

@@ -161,7 +161,7 @@ class ConsoleTee : public Print {
     lineLevel = level;
   }
   /* console configuration belongs to the real stream, the tee only forwards */
-  void begin(unsigned long baud) {
+  void begin(uint32_t baud) {
 #if LOG_TO_CONSOLE
     logConsoleStream().begin(baud);
 #endif

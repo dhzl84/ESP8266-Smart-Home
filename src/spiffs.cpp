@@ -269,7 +269,10 @@ bool saveConfiguration(const Configuration &config) {
         logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
         Serial.println("Failed to write temp file, keeping old configuration");
         #endif /* CFG_DEBUG */
-        if (file) { file.close(); delay(1); }
+        if (file) {
+          file.close();
+          delay(1);
+        }
         if (FileSystem.exists(configtmpname)) {
           FileSystem.remove(configtmpname);
           delay(1);  // let the UART/WiFi interrupt work after LittleFS access
