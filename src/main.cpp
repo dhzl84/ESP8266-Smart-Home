@@ -754,23 +754,25 @@ void SENSOR_MAIN() {
       myThermostat.setCurrentHumidity(static_cast<int16_t>(10 * sensHumid));     /* read value and convert to one decimal precision integer */
       myThermostat.setCurrentTemperature(static_cast<int16_t>(10 * sensTemp));   /* read value and convert to one decimal precision integer */
 
-      #if LOG_LEVEL_BUILD >= 1
-      /* level 1: the running values, compiled into every build and shown while the runtime level is 1 or above,
-         so the release build's window keeps the sensor heartbeat */
+      #if LOG_LEVEL_BUILD >= 2
+      /* level 2: the per-field dumps, hidden at a runtime level below 2 */
+      logSetLevel(2);
       Serial.print("Temperature: ");
       Serial.print(intToFloat(myThermostat.getCurrentTemperature()), 1);
       Serial.println(" *C ");
+      logSetLevel(2);
       Serial.print("Filtered temperature: ");
       Serial.print(intToFloat(myThermostat.getFilteredTemperature()), 1);
       Serial.println(" *C ");
-
+      logSetLevel(2);
       Serial.print("Humidity: ");
       Serial.print(intToFloat(myThermostat.getCurrentHumidity()), 1);
       Serial.println(" %");
+      logSetLevel(2);
       Serial.print("Filtered humidity: ");
       Serial.print(intToFloat(myThermostat.getFilteredHumidity()), 1);
       Serial.println(" %");
-      #endif  /* LOG_LEVEL_BUILD >= 1 */
+      #endif  /* LOG_LEVEL_BUILD >= 2 */
 
       #ifdef CFG_PRINT_TEMPERATURE_QUEUE
       for (int16_t i = 0; i < CFG_TEMP_SENSOR_FILTER_QUEUE_SIZE; i++) {
