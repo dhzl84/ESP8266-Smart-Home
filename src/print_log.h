@@ -92,25 +92,29 @@ void logHtmlAppend(char* row, size_t* rowLen, char c);  // NOLINT: out parameter
 /*===================================================================================================================*/
 /* print level                                                                                                   */
 /*===================================================================================================================*/
-/* Every print site carries the level of text it emits. The tee below drops a line's bytes - for the capture and
-   for the console alike - while its level is above the runtime level, so a line the level silences never exists
-   as text anywhere, and no line is reformatted or re-evaluated.
+/* The print levels, named by what they mean rather than by a bare number. Every print site carries the level of
+   text it emits; the tee below drops a line's bytes - for the capture and for the console alike - while its level
+   is above the runtime level, so a line the level silences never exists as text anywhere, and no line is
+   reformatted or re-evaluated.
 
-   level 0  failures, state changes, restart triggers: compiled into every build, always captured
-   level 1  the running values (temperature, addresses, counters): compiled when LOG_LEVEL_BUILD >= 1, shown
-            while the runtime level is 1
-   level 2  the per-field dumps and the boot table: compiled only when LOG_LEVEL_BUILD >= 2, which is what the
-            '#ifdef CFG_DEBUG' guards around those sites already are in a debug build, shown while the runtime
-            level is 2; debug builds default the runtime level to LOG_LEVEL_BUILD, so their serial console and
-            page keep today's output, a release build never carries these lines
+   level ERROR   a malfunction, or the fallback to default values because the real data is missing: the device
+                 cannot do what it is supposed to until this is fixed. Compiled into every build, always captured.
+   level WARNING an issue that should be solved (a buffer too small, malformed input, a state worth acting on):
+                 the device keeps working, but a developer should look at it.
+   level INFO    everything else: the running values, the boot table, the per-field dumps - the routine telemetry.
 
-   Wrap the level 2 sites in '#if LOG_LEVEL_BUILD >= 2' (or keep their existing '#ifdef CFG_DEBUG') and start
-   their line with logSetLevel(2); the levels 0 and 1 need nothing (a line defaults to level 1 after the first
-   line feed). */
+   The three levels map onto the build/toolchain gates like this:
+     INFO    compiled when LOG_LEVEL_BUILD >= 2 (the field dumps and the boot table, usually debug-only)
+     WARNING compiled when LOG_LEVEL_BUILD >= 1 (a warning is always compiled as soon as any telemetry is)
+     ERROR   compiled into every build (it is the minimum the device can say about itself)
+   A site above level 1 emits one line; after the line feed the next line defaults back to INFO. */
+#define LOG_ERROR   0
+#define LOG_WARNING 1
+#define LOG_INFO    2
 
 /* the runtime level the tee compares against; one byte of RAM, settable from the web page (log_level command) */
-extern uint8_t logRuntimeLevel;      /* defined in print_log.cpp; 0 = failures only, 1 = running values too */
-void logSetLevel(uint8_t level);     /* the level of the line printed next; resets to 1 after a line feed */
+extern uint8_t logRuntimeLevel;      /* defined in print_log.cpp; ERROR = malfunctions only, INFO = everything */
+void logSetLevel(uint8_t level);     /* the level of the line printed next; resets to INFO after a line feed */
 /*===================================================================================================================*/
 /* console tee                                                                                                   */
 /*===================================================================================================================*/
@@ -137,7 +141,7 @@ class ConsoleTee : public Print {
     logConsoleStream().write(c);
 #endif
     if (c == '\n') {
-      lineLevel = 1;  /* the next line defaults to level 1 */
+      lineLevel = LOG_INFO;  /* the next line defaults to INFO */
     }
     return 1;
   }
@@ -151,7 +155,7 @@ class ConsoleTee : public Print {
 #endif
     for (size_t i = 0; i < size; i++) {
       if (buffer[i] == '\n') {
-        lineLevel = 1;
+        lineLevel = LOG_INFO;  /* the next line defaults to INFO */
       }
     }
     return size;
@@ -173,7 +177,7 @@ class ConsoleTee : public Print {
   }
 
  private:
-  uint8_t lineLevel = 1;  /* level of the line being written; kept in the tee so no call site has to reset it */
+  uint8_t lineLevel = LOG_INFO;   /* level of the line being written; kept in the tee so no call site has to reset it */
 };
 
 /* defined in print_log.cpp, one instance for the whole program */

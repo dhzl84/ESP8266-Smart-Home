@@ -88,13 +88,13 @@ void Thermostat::loop(void) {
       if (filtered_temperature_ <= static_cast<int16_t>(target_temperature_ - thermostat_hysteresis_low_ )) {  /* check if measured temperature is lower than heating target */
         if (actual_state_ == TH_OFF) {  /* switch on heating if target temperature is higher than measured temperature */
           setActualState(TH_HEAT);
-          logSetLevel(1);   /* level 0: the relay state the room feels, in every build */
+          logSetLevel(LOG_INFO);   /* level 0: the relay state the room feels, in every build */
           Serial.println("[Thermostat] heating");
         }
       } else if (filtered_temperature_ >= static_cast<int16_t>(target_temperature_ + thermostat_hysteresis_high_)) {  /* check if measured temperature is higher than heating target */
         if (actual_state_ == TH_HEAT) {  /* switch off heating if target temperature is lower than measured temperature */
           setActualState(TH_OFF);
-          logSetLevel(1);   /* level 0: the relay state the room feels, in every build */
+          logSetLevel(LOG_INFO);   /* level 0: the relay state the room feels, in every build */
           Serial.println("[Thermostat] not heating");
         }
       } else {
