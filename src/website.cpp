@@ -258,7 +258,7 @@ void htmlStreamPage(void) {
   htmlRow4Int("display_brightness", "Range: 0 .. +255, LSB: 1 step", myConfig.display_brightness, "Brightness of OLED display");
   htmlRow4("timezone", "string", myConfig.timezone, "Timezone for NTP, pick from this list: https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv");
   htmlRow4("console_clear", "1", "none", "Clear the console output window (last window at the bottom of the page)");
-  htmlRow4("log_level", "0..2", "none", "Console window verbosity: 0 failures and state, 1 the running values, 2 the field dumps");
+  htmlRow4Int("log_level", "0..2", logRuntimeLevel, "Console window verbosity: 0 failures and state, 1 the running values, 2 the field dumps");
   htmlSendText(htmlTableClose);
   /* Restart Device */
   htmlSendText("<p><b>Restart Device</b></p>");

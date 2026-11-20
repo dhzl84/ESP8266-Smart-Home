@@ -131,10 +131,8 @@ bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor)
       *factor = factorPart.toInt();
     }
   } else {
-    #ifdef CFG_DEBUG
-    logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
+    logSetLevel(1);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("Malformed sensor calibration string >> calibration update denied");
-    #endif
   }
 
   #ifdef CFG_DEBUG
@@ -218,10 +216,8 @@ bool splitHtmlCommand(String sInput, String *key, String *value) {
     *key = (sInput.substring(0, pos));
     *value = (sInput.substring(pos+1));
   } else {
-    #ifdef CFG_DEBUG
-    logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
+    logSetLevel(1);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("Malformed HTML Command string");
-    #endif
   }
   return ret;
 }

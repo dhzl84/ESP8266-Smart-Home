@@ -75,7 +75,7 @@ void mqttHelper::buildTopics(void) {
 int mqttHelper::checkPayload(char* buf, size_t size, int written, const char* what) {
   if ((written < 0) || (static_cast<size_t>(written) >= size)) {
     #ifdef CFG_DEBUG
-    logSetLevel(2);   /* level 2: the dumps, hidden at a runtime level below 2 */
+    logSetLevel(0);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.print(what);
     Serial.print(" JSON does not fit into buffer, needed bytes: ");
     Serial.println(written + 1);
