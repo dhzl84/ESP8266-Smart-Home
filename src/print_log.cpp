@@ -2,6 +2,8 @@
 /* includes                                                                                                    */
 /*===================================================================================================================*/
 #include <string.h>
+#include <stdio.h>
+#include <time.h>
 #include "print_log.h"
 
 /*===================================================================================================================*/
@@ -114,6 +116,31 @@ void logHtmlAppend(char* row, size_t* rowLen, char c) {
 /* the console tee: one instance, every translation unit that includes print_log.h prints through it             */
 /*===================================================================================================================*/
 ConsoleTee consoleTee;
+
+/* the [hh:mm:ss] prefix every console line starts with. Written straight into the capture and the console,
+   never through the tee itself, so the prefix cannot trigger another prefix. Before NTP has synced the clock
+   (epoch below 2020-01-01) the uptime since reset stands in, so boot lines carry a time base as well. */
+void ConsoleTee::emitTimestamp(void) {
+  char prefix[16];
+  int len;
+  const time_t now = time(nullptr);
+  if (now >= 1577836800) {  /* 2020-01-01 UTC: a plausible NTP time, show the local wall clock */
+    tm local;
+    localtime_r(&now, &local);
+    len = snprintf(prefix, sizeof(prefix), "[%02d:%02d:%02d] ",
+                   local.tm_hour, local.tm_min, local.tm_sec);
+  } else {  /* no time yet: hours wrap at 100 so the prefix keeps its fixed width */
+    const uint32_t up = static_cast<uint32_t>(millis() / 1000UL);
+    len = snprintf(prefix, sizeof(prefix), "[%02u:%02u:%02u] ",
+                   static_cast<unsigned int>((up / 3600U) % 100U),
+                   static_cast<unsigned int>((up / 60U) % 60U),
+                   static_cast<unsigned int>(up % 60U));
+  }
+  if (len <= 0) {
+    return;
+  }
+  flushSegment(reinterpret_cast<const uint8_t*>(prefix), static_cast<size_t>(len));
+}
 
 /*===================================================================================================================*/
 /* print level                                                                                                   */

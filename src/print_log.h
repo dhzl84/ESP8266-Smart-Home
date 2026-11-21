@@ -20,7 +20,11 @@
    Redirect: the #define at the bottom of this header renames the identifier Serial to consoleTee for the code that
    follows it, so a project translation unit that includes this header AFTER all of its library headers captures only
    its own prints; library inline code that is compiled before the redirect still writes to the real console.
-   Include this header last, and never spell the bare identifier Serial after it. */
+   Include this header last, and never spell the bare identifier Serial after it.
+
+   Timestamp: the tee starts every line with a [hh:mm:ss] prefix, written straight into the capture and the console
+   so it cannot recurse through the tee. It is the NTP local time once the clock is synced; before that (boot, no
+   network) it is the uptime since reset, so early lines still carry a usable time base. */
 
 /* tunables, override from platformio.ini build flags (-DLOG_RING_BYTES=8192, -DLOG_MAX_LINES=100) */
 #ifndef LOG_RING_BYTES
@@ -136,12 +140,14 @@ class ConsoleTee : public Print {
     if (lineLevel > logRuntimeLevel) {
       return 1;  /* a level the runtime silenced: no bytes exist, not in the capture and not on the console */
     }
-    logCaptureByte(c);
-#if LOG_TO_CONSOLE
-    logConsoleStream().write(c);
-#endif
+    if (lineStart) {
+      emitTimestamp();
+      lineStart = false;
+    }
+    flushSegment(&c, 1);
     if (c == '\n') {
       lineLevel = LOG_INFO;  /* the next line defaults to INFO */
+      lineStart = true;
     }
     return 1;
   }
@@ -149,14 +155,22 @@ class ConsoleTee : public Print {
     if (lineLevel > logRuntimeLevel) {
       return size;
     }
-    logCaptureBytes(buffer, size);
-#if LOG_TO_CONSOLE
-    logConsoleStream().write(buffer, size);
-#endif
+    /* walk the chunk line by line so a multi-line write gets a prefix on each of its lines */
+    size_t segment = 0;
     for (size_t i = 0; i < size; i++) {
-      if (buffer[i] == '\n') {
-        lineLevel = LOG_INFO;  /* the next line defaults to INFO */
+      if (lineStart) {
+        emitTimestamp();
+        lineStart = false;
       }
+      if (buffer[i] == '\n') {
+        flushSegment(buffer + segment, i - segment + 1);
+        lineLevel = LOG_INFO;  /* the next line defaults to INFO */
+        lineStart = true;
+        segment = i + 1;
+      }
+    }
+    if (segment < size) {
+      flushSegment(buffer + segment, size - segment);
     }
     return size;
   }
@@ -177,7 +191,18 @@ class ConsoleTee : public Print {
   }
 
  private:
+  /* hand a run of bytes to the capture and the console without going through the tee again */
+  void flushSegment(const uint8_t* buffer, size_t size) {  // NOLINT: array parameter
+    logCaptureBytes(buffer, size);
+#if LOG_TO_CONSOLE
+    logConsoleStream().write(buffer, size);
+#endif
+  }
+  /* the [hh:mm:ss] line prefix, implemented in print_log.cpp; bypasses the tee so it cannot recurse */
+  void emitTimestamp(void);
+
   uint8_t lineLevel = LOG_INFO;   /* level of the line being written; kept in the tee so no call site has to reset it */
+  bool lineStart = true;          /* the next byte starts a line and gets the timestamp prefix */
 };
 
 /* defined in print_log.cpp, one instance for the whole program */
