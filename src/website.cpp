@@ -314,7 +314,7 @@ static uint16_t thermostatDialAngle(void) {
    sensor error flag stays set while the reads fail. */
 static void htmlWindowDashboard(void) {
   char valueBuf[16];
-  char angleBuf[8];
+  char angleBuf[12];  /* up to "65535deg" + NUL: gcc cannot see the 0..270 clamp inside thermostatDialAngle() */
   const bool sensorError      = myThermostat.getSensorError();
   const bool temperatureReady = (sensorError == false) && (myThermostat.getFilteredTemperature() != THERMOSTAT_SENSOR_INIT_VALUE);
   const bool humidityReady    = (sensorError == false) && (myThermostat.getFilteredHumidity() != THERMOSTAT_SENSOR_INIT_VALUE);
