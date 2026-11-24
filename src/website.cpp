@@ -243,8 +243,30 @@ static void htmlSendChunk(const char* buf, size_t len) {
   htmlPageBytes += static_cast<uint16_t>(len);
 }
 
+/* Longest text the page hands to htmlSendText as a bare pointer (config name, a String's buffer, a
+   conditional literal). Everything bigger is passed as an array, which keeps its own extent. */
+static const size_t HTML_SEND_MAX = 512;
+
+/* Measure a text inside a caller-supplied bound: the scan stops at the first '\0' or at maxLen, so a
+   buffer that is not '\0'-terminated is never read past its end (CWE-126). */
+static size_t htmlTextLength(const char* text, size_t maxLen) {
+  size_t len = 0;
+  while ((len < maxLen) && (text[len] != '\0')) {
+    len++;
+  }
+  return len;
+}
+
+/* An array argument arrives with its extent, so the bound is never guessed: this covers the page literals,
+   the PROGMEM copies of them and the stack buffers that hold snprintf output. */
+template <size_t N>
+static void htmlSendText(const char (&text)[N]) {
+  htmlSendChunk(text, htmlTextLength(text, N));
+}
+
+/* A pointer argument has no extent here, so it is measured against the page's own ceiling. */
 static void htmlSendText(const char* text) {
-  htmlSendChunk(text, strlen(text));
+  htmlSendChunk(text, htmlTextLength(text, HTML_SEND_MAX));
 }
 
 static void htmlRowAppend(int rowLen, const char* key, const char* row, size_t rowSize) {
@@ -433,15 +455,17 @@ static void htmlWindowConsole(void) {
   LogWindow window;
   logWindowSnapshot(&window, LOG_MAX_LINES);
 
+  // "%u" with an explicit cast: the "%" PRIu32 concatenation reads as a runtime format string to
+  // static analysers (CWE-134), and unsigned int is 32 bit on both boards
   char numBuf[24];
 
   htmlSendText("<section class='card'><div class='row' style='justify-content:space-between'>");
   htmlSendText("<div class='label'>Console output</div><div class='sub' style='margin:0'>");
-  snprintf(numBuf, sizeof(numBuf), "%" PRIu32, window.linesShown);
+  snprintf(numBuf, sizeof(numBuf), "%u", static_cast<unsigned int>(window.linesShown));
   htmlSendText("<span id='v-lines'>");
   htmlSendText(numBuf);
   htmlSendText("</span> / <span id='v-lines-total'>");
-  snprintf(numBuf, sizeof(numBuf), "%" PRIu32, window.linesTotal);
+  snprintf(numBuf, sizeof(numBuf), "%u", static_cast<unsigned int>(window.linesTotal));
   htmlSendText(numBuf);
   htmlSendText("</span> lines");
   if ((window.start < window.end) && (logLineStart(window.start) == false)) {

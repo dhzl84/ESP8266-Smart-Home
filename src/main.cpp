@@ -802,7 +802,7 @@ bool display_flushed = false;
 /* FNV-1a hash of all display-relevant content; used to skip redundant OLED flushes */
 uint32_t displayContentHash(void) {
   char buf[64];
-  snprintf(buf, sizeof(buf), "%d%d%d%d%d%d%d%d%d%d%d%s",
+  const int len = snprintf(buf, sizeof(buf), "%d%d%d%d%d%d%d%d%d%d%d%s",
     static_cast<int>(systemRestartRequest),
     static_cast<int>(OTA_UPDATE),
     static_cast<int>(update_firmware),
@@ -815,8 +815,14 @@ uint32_t displayContentHash(void) {
     static_cast<int>(myThermostat.getThermostatMode()),
     static_cast<int>(myThermostat.getTargetTemperature()),
     time_buffer);
+  /* snprintf returns how many bytes it wanted to write: hashing exactly that many (clamped to the buffer)
+     needs no strlen over the result, which could over-read a truncated buffer (CWE-126) */
+  size_t used = (len > 0) ? static_cast<size_t>(len) : 0;
+  if (used >= sizeof(buf)) {
+    used = sizeof(buf) - 1;
+  }
   uint32_t hash = 2166136261u;
-  for (size_t i = 0; i < strlen(buf); i++) {
+  for (size_t i = 0; i < used; i++) {
     hash ^= static_cast<uint32_t>(buf[i]);
     hash *= 16777619u;
   }
