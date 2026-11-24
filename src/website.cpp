@@ -75,11 +75,22 @@ static const char htmlStyleBlock[] =
     ".pill.bad{background:var(--err-soft);color:var(--err)}\n"
     ".pill.heat{background:var(--heat-soft);color:var(--heat)}\n"
     ".card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px;margin:0 0 14px;box-shadow:var(--shadow)}\n"
-    ".hero{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:24px}\n"
+    ".thermo{padding:22px 20px 20px;text-align:center}\n"
+    ".dial-wrap{position:relative;width:250px;height:250px;margin:12px auto 4px;display:flex;flex-direction:column;align-items:center;justify-content:center}\n"
+    ".dial{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 225deg,var(--heat) 0deg var(--p),var(--fill) var(--p) 270deg,rgba(0,0,0,0) 270deg);-webkit-mask:radial-gradient(closest-side,rgba(0,0,0,0) calc(100% - 15px),#000 calc(100% - 14px));mask:radial-gradient(closest-side,rgba(0,0,0,0) calc(100% - 15px),#000 calc(100% - 14px))}\n"
+    ".dial.off{background:conic-gradient(from 225deg,var(--muted) 0deg var(--p),var(--fill) var(--p) 270deg,rgba(0,0,0,0) 270deg)}\n"
+    ".setpoint{font-size:62px;font-weight:600;line-height:1;letter-spacing:-.035em;font-variant-numeric:tabular-nums}\n"
+    ".setpoint .unit{font-size:20px;font-weight:500;letter-spacing:0;color:var(--muted);margin-left:6px}\n"
+    ".measured{display:flex;align-items:baseline;gap:7px;margin-top:10px;font-size:15px;color:var(--muted)}\n"
+    ".measured .cap{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}\n"
+    ".thermo .row{justify-content:center;margin-top:18px}\n"
+    ".segmented{display:flex;gap:8px;margin:16px auto 0;max-width:260px}\n"
+    ".segmented button{flex:1;padding:9px 0;border:1px solid var(--line);border-radius:12px;background:rgba(0,0,0,0);color:var(--muted);font-weight:600;font-size:14px}\n"
+    ".segmented button.active{background:var(--heat-soft);border-color:rgba(0,0,0,0);color:var(--heat)}\n"
+    ".segmented button.active.off{background:var(--fill);color:var(--text)}\n"
     ".label{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}\n"
     ".value{margin-top:4px;font-size:64px;font-weight:600;line-height:1.05;letter-spacing:-.035em;font-variant-numeric:tabular-nums}\n"
     ".unit{margin-left:5px;font-size:24px;font-weight:500;letter-spacing:0;color:var(--muted)}\n"
-    ".hero-meta{display:flex;flex-direction:column;align-items:flex-end;gap:8px}\n"
     ".grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin:0 0 14px}\n"
     ".grid .card{margin:0;padding:18px}\n"
     ".stat .value{font-size:30px;letter-spacing:-.02em}\n"
@@ -117,11 +128,11 @@ static const char htmlStyleBlock[] =
     "input[type=submit]:hover,button:hover{filter:brightness(1.06)}\n"
     "button.plain{background:var(--fill);color:var(--text);border:1px solid var(--line)}\n"
     ".stat .row{margin-top:14px}\n"
-    "button.round{width:40px;height:40px;padding:0;border-radius:50%;background:var(--fill);color:var(--text);font-size:20px;font-weight:500;line-height:1}\n"
+    "button.round{width:46px;height:46px;padding:0;border:1px solid var(--line);border-radius:50%;background:var(--fill);color:var(--text);font-size:22px;font-weight:500;line-height:1}\n"
     "button.wide{width:100%}\n"
     "pre.console{margin:12px 0 0;padding:14px;border-radius:14px;background:#0f1113;color:#b8e48a;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;height:30em;overflow:auto;white-space:pre-wrap;word-break:break-all}\n"
     "footer{margin-top:24px;text-align:center;font-size:12px;color:var(--muted)}\n"
-    "@media(max-width:520px){.wrap{padding:16px 12px 40px}.card{padding:16px}.hero{padding:20px 16px}.value{font-size:52px}.hero-meta{align-items:flex-start}.pills{justify-content:flex-start}.field .row{flex-direction:column;align-items:stretch}}\n"
+    "@media(max-width:520px){.wrap{padding:16px 12px 40px}.card{padding:16px}.dial-wrap{width:210px;height:210px}.setpoint{font-size:52px}.pills{justify-content:flex-start}.field .row{flex-direction:column;align-items:stretch}}\n"
     "</style>\n";
 
 
@@ -203,12 +214,14 @@ static void htmlPill(const char* text, const char* state) {
 }
 
 /* ---- dashboard window, first window of the page ----
-   The live sensor and thermostat values: current temperature as the hero number, humidity, target temperature and
-   heating state as cards below it. A value that the sensor could not deliver yet is a dash instead of a wrong
-   number: the thermostat keeps THERMOSTAT_SENSOR_INIT_VALUE until the first successful read, and the sensor
-   error flag stays set while the reads fail. */
+   The live sensor and thermostat values: one thermostat card with the mode, the target temperature as the big
+   number inside a dial ring, the measured temperature below it, the -/+ stepper and the Heat/Off switch, followed
+   by the humidity and heating state cards. A value that the sensor could not deliver yet is a dash instead of a
+   wrong number: the thermostat keeps THERMOSTAT_SENSOR_INIT_VALUE until the first successful read, and the
+   sensor error flag stays set while the reads fail. */
 static void htmlWindowDashboard(void) {
   char valueBuf[16];
+  char angleBuf[8];
   const bool sensorError      = myThermostat.getSensorError();
   const bool temperatureReady = (sensorError == false) && (myThermostat.getFilteredTemperature() != THERMOSTAT_SENSOR_INIT_VALUE);
   const bool humidityReady    = (sensorError == false) && (myThermostat.getFilteredHumidity() != THERMOSTAT_SENSOR_INIT_VALUE);
@@ -218,27 +231,63 @@ static void htmlWindowDashboard(void) {
   const char* stateText  = heating ? "Heating" : (thermostatHeat ? "Idle" : "Off");
   const char* stateClass = heating ? "heat" : (thermostatHeat ? "ok" : "off");
 
-  /* HERO: current temperature */
-  htmlSendText("<section class='card hero'><div><div class='label'>Current temperature</div><div class='value'>");
+  /* where the setpoint sits on the dial: MINIMUM..MAXIMUM_TARGET_TEMP is the 270 degree arc of the ring,
+     drawn with a conic-gradient whose stop is the angle in --p */
+  int16_t angle = static_cast<int16_t>((static_cast<int16_t>(myThermostat.getTargetTemperature()) - static_cast<int16_t>(MINIMUM_TARGET_TEMP)) * 270 /
+                                       (static_cast<int16_t>(MAXIMUM_TARGET_TEMP) - static_cast<int16_t>(MINIMUM_TARGET_TEMP)));
+  if (angle < 0) {
+    angle = 0;
+  } else if (angle > 270) {
+    angle = 270;
+  }
+  snprintf(angleBuf, sizeof(angleBuf), "%ddeg", angle);
+
+  /* THERMOSTAT: mode, target and measured temperature, stepper and mode switch in one card */
+  htmlSendText("<section class='card thermo'><div class='label'>Mode: ");
+  htmlSendText(thermostatHeat ? "Heat" : "Off");
+  htmlSendText("</div>");
+
+  htmlSendText("<div class='dial-wrap'><div class='dial");
+  if (thermostatHeat == false) {
+    htmlSendText(" off");
+  }
+  htmlSendText("' style='--p:");
+  htmlSendText(angleBuf);
+  htmlSendText("'></div><div class='setpoint'>");
+  formatScaled(valueBuf, sizeof(valueBuf), myThermostat.getTargetTemperature(), 1);
+  htmlSendText(valueBuf);
+  htmlSendText("<span class='unit'>&deg;C</span></div><div class='measured'><span class='cap'>Current</span>");
   if (temperatureReady) {
     formatScaled(valueBuf, sizeof(valueBuf), myThermostat.getFilteredTemperature(), 1);
     htmlSendText(valueBuf);
-    htmlSendText("<span class='unit'>&deg;C</span>");
+    htmlSendText(" &deg;C");
   } else {
     htmlSendText("&mdash;");
   }
-  htmlSendText("</div></div><div class='hero-meta'>");
-  htmlPill(thermostatHeat ? "Heat" : "Off", thermostatHeat ? "heat" : "muted");
-  if (sensorError) {
-    htmlPill("Sensor error", "bad");
-  } else if (temperatureReady == false) {
-    htmlPill("Sensor starting", "muted");
-  } else {
-    htmlPill("Sensor ok", "ok");
-  }
-  htmlSendText("</div></section>\n");
+  htmlSendText("</div></div>");
 
-  /* CARD GRID: humidity, target temperature, heating state */
+  htmlSendText(htmlThermostatStepForm);  /* - / + buttons, 0.5 °C per press, POST TargetStep */
+
+  htmlSendText("<form method='POST' autocomplete='off' class='segmented'>");
+  if (thermostatHeat) {
+    htmlSendText("<button type='submit' name='ThermostatMode' value='1' class='active heat'>Heat</button>");
+    htmlSendText("<button type='submit' name='ThermostatMode' value='0'>Off</button>");
+  } else {
+    htmlSendText("<button type='submit' name='ThermostatMode' value='1'>Heat</button>");
+    htmlSendText("<button type='submit' name='ThermostatMode' value='0' class='active off'>Off</button>");
+  }
+  htmlSendText("</form>");
+
+  htmlSendText("<div class='sub'>Hysteresis &plusmn;");
+  formatScaled(valueBuf, sizeof(valueBuf), myThermostat.getThermostatHysteresis(), 1);
+  htmlSendText(valueBuf);
+  htmlSendText(" &deg;C</div>");
+  if (sensorError) {
+    htmlSendText("<div class='sub'><span class='pill bad'>Sensor error</span></div>");
+  }
+  htmlSendText("</section>\n");
+
+  /* CARD GRID: humidity and heating state */
   htmlSendText("<div class='grid'>");
 
   htmlSendText("<div class='card stat'><div class='label'>Current humidity</div><div class='value'>");
@@ -253,31 +302,14 @@ static void htmlWindowDashboard(void) {
   htmlSendText(myConfig.sensor_type == cDHT22 ? "DHT22 sensor" : "BME280 sensor");
   htmlSendText("</div></div>");
 
-  /* target temperature: the value plus a stepper, 0.5 °C per press, POST TargetStep */
-  htmlSendText("<div class='card stat'><div class='label'>Target temperature</div><div class='value'>");
-  formatScaled(valueBuf, sizeof(valueBuf), myThermostat.getTargetTemperature(), 1);
-  htmlSendText(valueBuf);
-  htmlSendText("<span class='unit'>&deg;C</span></div><div class='sub'>Hysteresis &plusmn;");
-  formatScaled(valueBuf, sizeof(valueBuf), myThermostat.getThermostatHysteresis(), 1);
-  htmlSendText(valueBuf);
-  htmlSendText(" &deg;C</div>");
-  htmlSendText(htmlThermostatStepForm);
-  htmlSendText("</div>");
-
-  /* heating state: the state plus the heat/off switch, POST ThermostatMode */
+  /* heating state: the relay, not the mode - the mode switch lives in the thermostat card above */
   htmlSendText("<div class='card stat'><div class='label'>Heating state</div><div class='state'><span class='dot ");
   htmlSendText(stateClass);
   htmlSendText("'></span><span>");
   htmlSendText(stateText);
   htmlSendText("</span></div><div class='sub'>");
   htmlSendText(heating ? "Relay on" : (thermostatHeat ? "Relay off" : "Thermostat off"));
-  htmlSendText("</div>");
-  if (thermostatHeat) {
-    htmlSendText("<form method='POST' autocomplete='off' class='row'><button type='submit' name='ThermostatMode' value='0' class='plain wide'>Turn off</button></form>");
-  } else {
-    htmlSendText("<form method='POST' autocomplete='off' class='row'><button type='submit' name='ThermostatMode' value='1' class='wide'>Turn on</button></form>");
-  }
-  htmlSendText("</div>");
+  htmlSendText("</div></div>");
 
   htmlSendText("</div>\n");
 }
