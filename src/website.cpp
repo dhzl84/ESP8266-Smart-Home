@@ -45,12 +45,12 @@ static const char htmlTableOpen[] = "<table>";
 static const char htmlTableClose[] = "</table>";
 static const char htmlCommandsTableOpen[] = "<div class='tablewrap'><table class='cmd'>";
 static const char htmlCommandsTableClose[] = "</table></div>";
-static const char htmlFormOpen[] = "<form method='POST' autocomplete='off'>";
+static const char htmlFormOpen[] = "<form method='POST' action='/' autocomplete='off'>";
 static const char htmlFormClose[] = "</form>";
 static const char htmlRestartButton[] = "<button class='plain' onclick=\"window.location.href='/restart'\">Restart</button>";
 static const char htmlRestartWaitingButton[] = "<button class='plain' onclick=\"window.location.href='/'\">Restarting, reload site</button>";
 static const char htmlThermostatStepForm[] =
-    "<form method='POST' autocomplete='off' class='row'>"
+    "<form method='POST' action='/' autocomplete='off' class='row'>"
     "<button type='submit' name='TargetStep' value='-5' class='round' aria-label='Lower target temperature'>&minus;</button>"
     "<button type='submit' name='TargetStep' value='5' class='round' aria-label='Raise target temperature'>+</button>"
     "</form>";
@@ -268,7 +268,7 @@ static void htmlWindowDashboard(void) {
 
   htmlSendText(htmlThermostatStepForm);  /* - / + buttons, 0.5 °C per press, POST TargetStep */
 
-  htmlSendText("<form method='POST' autocomplete='off' class='segmented'>");
+  htmlSendText("<form method='POST' action='/' autocomplete='off' class='segmented'>");
   if (thermostatHeat) {
     htmlSendText("<button type='submit' name='ThermostatMode' value='1' class='active heat'>Heat</button>");
     htmlSendText("<button type='submit' name='ThermostatMode' value='0'>Off</button>");
@@ -284,6 +284,8 @@ static void htmlWindowDashboard(void) {
   htmlSendText(" &deg;C</div>");
   if (sensorError) {
     htmlSendText("<div class='sub'><span class='pill bad'>Sensor error</span></div>");
+  } else if (temperatureReady == false) {
+    htmlSendText("<div class='sub'><span class='pill muted'>Sensor starting</span></div>");
   }
   htmlSendText("</section>\n");
 

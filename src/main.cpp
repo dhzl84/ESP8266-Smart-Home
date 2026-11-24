@@ -1227,9 +1227,11 @@ static void applyRuntimeLogLevel(int16_t requested) {
 }
 
 void handleWebServerClient(void) {
-  /* Evaluate Received Arguments first: the page streamed at the end of this function then already shows what
-     the POST changed, so a press on a control (target temperature, thermostat mode) is visible in the same
-     response instead of only after the next reload */
+  /* Evaluate Received Arguments first, then answer a POST with a redirect to the page instead of the page
+     itself: a reload of the result can not repeat the change (a resubmitted TargetStep would step the
+     setpoint a second time). The GET that follows renders the page from the state the POST left behind. */
+  const bool isPost = (webServer.method() == HTTP_POST);
+
   if (webServer.args() > 0) {  /* Arguments were received */
     for ( uint8_t i = 0; i < webServer.args(); i++ ) {
       #ifdef CFG_DEBUG
@@ -1510,12 +1512,12 @@ void handleWebServerClient(void) {
           #endif
         }
       }
-      if (webServer.argName(i) == "LogLevel") {  /* runtime console verbosity, nothing is persisted */
+      if (isPost && webServer.argName(i) == "LogLevel") {  /* runtime console verbosity, nothing is persisted */
         if (static_cast<int16_t>(webServer.arg(i).toInt()) != static_cast<int16_t>(logRuntimeLevel)) {
           applyRuntimeLogLevel(static_cast<int16_t>(webServer.arg(i).toInt()));
         }
       }
-      if (webServer.argName(i) == "TargetStep") {  /* +/- buttons of the target temperature card, step in 0.1 °C */
+      if (isPost && webServer.argName(i) == "TargetStep") {  /* +/- buttons of the target temperature card, step in 0.1 °C */
         const int16_t step = static_cast<int16_t>(webServer.arg(i).toInt());
         if ((step >= -50) && (step <= 50) && (step != 0)) {
           /* setTargetTemperature() clamps to MINIMUM_TARGET_TEMP / MAXIMUM_TARGET_TEMP and flags new_data_,
@@ -1523,13 +1525,20 @@ void handleWebServerClient(void) {
           myThermostat.setTargetTemperature(static_cast<int16_t>(myThermostat.getTargetTemperature()) + step);
         }
       }
-      if (webServer.argName(i) == "ThermostatMode") {  /* heat / off switch of the heating state card */
+      if (isPost && webServer.argName(i) == "ThermostatMode") {  /* heat / off switch of the heating state card */
         const String modeArg = webServer.arg(i);
         if ((modeArg == "0") || (modeArg == "1")) {  /* an empty or foreign value must not switch the heating */
           myThermostat.setThermostatMode(modeArg == "1");
         }
       }
     }
+  }
+
+  if (isPost) {
+    /* a POST only changes state: answer with a redirect, so a reload of the result repeats nothing */
+    webServer.sendHeader("Location", "/", true);
+    webServer.send(303, "text/plain", "");
+    return;
   }
 
   htmlStreamPage();  /* page is streamed in chunks, no page String is built */
