@@ -26,12 +26,9 @@
    so it cannot recurse through the tee. It is the NTP local time once the clock is synced; before that (boot, no
    network) it is the uptime since reset, so early lines still carry a usable time base. */
 
-/* tunables, override from platformio.ini build flags (-DLOG_RING_BYTES=8192, -DLOG_MAX_LINES=100) */
+/* tunables, override from platformio.ini build flags (-DLOG_RING_BYTES=8192) */
 #ifndef LOG_RING_BYTES
-  #define LOG_RING_BYTES 6144  /* bytes of console text kept in RAM; ~30 bytes per line covers LOG_MAX_LINES lines */
-#endif
-#ifndef LOG_MAX_LINES
-  #define LOG_MAX_LINES 200    /* newest lines the web window replays */
+  #define LOG_RING_BYTES 4096  /* bytes of console text kept in RAM; the ring is all the window can show */
 #endif
 /* where the captured text goes besides the web page: the console/UART is written only when this is set, and
    the default follows the build type. Debug builds see the same text on the serial console; release builds
@@ -59,9 +56,6 @@
 #if (LOG_RING_BYTES < 256) || (LOG_RING_BYTES > 65535)
   #error "LOG_RING_BYTES must be between 256 and 65535 bytes"
 #endif
-#if (LOG_MAX_LINES < 1) || (LOG_MAX_LINES > 512)
-  #error "LOG_MAX_LINES must be between 1 and 512 lines"
-#endif
 
 #include <stddef.h>
 #include <stdint.h>
@@ -81,14 +75,13 @@ bool logLineStart(uint32_t index);                         /* is the byte in fro
 
 struct LogWindow {
   uint32_t linesTotal;  /* complete (line feed terminated) lines in the ring */
-  uint32_t linesShown;  /* complete lines the window shows, LOG_MAX_LINES at the latest */
   uint32_t start;       /* index of the first byte the window shows */
   uint32_t end;         /* index one past the last byte the window shows */
 };
 
-/* snapshot of the newest LOG_MAX_LINES lines; taken before the window is streamed so that bytes written while the
-   page is sent cannot change what has already been shown */
-void logWindowSnapshot(LogWindow* window, uint16_t maxLines);  // NOLINT: out parameter, cannot be a reference
+/* snapshot of every complete line the ring still holds; taken before the window is streamed so that bytes
+   written while the page is sent cannot change what has already been shown */
+void logWindowSnapshot(LogWindow* window);  // NOLINT: out parameter, cannot be a reference
 
 /* append one console byte to an HTML text run as it is shown in the window: carriage returns are dropped, the
    three markup significant bytes become their entities. The caller keeps six spare bytes in the row. */

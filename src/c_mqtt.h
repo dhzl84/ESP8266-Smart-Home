@@ -1,10 +1,12 @@
 #ifndef C_MQTT_H_
 #define C_MQTT_H_
 
-/* buffer for the Home Assistant discovery payloads; the biggest one is the climate payload:
-   measured 1171 B for a short device name, 1345 B for the maximum name length of 63 chars
-   (name appears 3 times, topics and dev block expand too) -> 1536 keeps the worst case safe */
-#define cMQTT_PAYLOAD_SIZE 1536
+/* buffer for the Home Assistant discovery payloads. The climate document is the biggest one: its format is
+   686 bytes of fixed text plus the base topic (which carries the 6..16 character chip id), the device name
+   three times and the firmware string, i.e. 1011 B for a 63 character name and a 6 character chip id on the
+   ESP8266 and 1041 B for a 16 character chip id on the ESP32. 1152 leaves ~110 B headroom, and checkPayload()
+   still refuses to publish a document that does not fit instead of sending invalid JSON. */
+#define cMQTT_PAYLOAD_SIZE 1152
 
 #include "Arduino.h"
 

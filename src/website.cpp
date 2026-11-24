@@ -97,7 +97,6 @@ static const char htmlLiveScript[] PROGMEM =
     "if(dot){dot.className='dot '+(s.relay?'heat':(heat?'ok':'off'));}\n"
     "text('v-state',s.relay?'Heating':(heat?'Idle':'Off'));\n"
     "text('v-relay',s.relay?'Relay on':(heat?'Relay off':'Thermostat off'));\n"
-    "text('v-lines',s.shown);\n"
     "text('v-lines-total',s.log);\n"
     "pullConsole(s.log);\n"
     "var sb=id('v-sensor-bad'),sw=id('v-sensor-wait'),box=id('v-sensor');\n"
@@ -243,6 +242,16 @@ static void htmlSendChunk(const char* buf, size_t len) {
   htmlPageBytes += static_cast<uint16_t>(len);
 }
 
+/* A page fragment that must not cost DRAM: the literal gets its own flash section (the core's PROGMEM attribute,
+   unique per line) and its length is known right here, so nothing is measured and no ceiling applies. This is the
+   shape for every fragment that is only ever sent; text that is formatted into (snprintf, htmlRow2, htmlPill)
+   has to stay in RAM. */
+#define HTML_SEND_FLASH(fragment)                                                              \
+  do {                                                                                         \
+    static const char htmlFlashFragment[] PROGMEM __attribute__((aligned(4))) = (fragment);     \
+    htmlSendChunk(htmlFlashFragment, sizeof(htmlFlashFragment) - 1);                            \
+  } while (0)
+
 /* Longest text the page hands to htmlSendTextPtr as a bare pointer (a String's buffer, a conditional
    literal). Arrays - the page literals, their PROGMEM copies and the stack buffers - carry their own
    extent in the template overload below, so they are never measured against this ceiling. */
@@ -365,93 +374,90 @@ static void htmlWindowDashboard(void) {
 
   /* THERMOSTAT: mode, target and measured temperature, stepper and mode switch in one card. The ids are the
      handles of the live update (htmlLiveScript): the tab patches these nodes instead of reloading the page. */
-  htmlSendText("<section class='card thermo'><div class='label'>Mode: <span id='v-mode'>");
+  HTML_SEND_FLASH("<section class='card thermo'><div class='label'>Mode: <span id='v-mode'>");
   htmlSendTextPtr(thermostatHeat ? "Heat" : "Off");
-  htmlSendText("</span></div>");
+  HTML_SEND_FLASH("</span></div>");
 
-  htmlSendText("<div class='dial-wrap'><div id='v-dial' class='dial");
+  HTML_SEND_FLASH("<div class='dial-wrap'><div id='v-dial' class='dial");
   if (thermostatHeat == false) {
-    htmlSendText(" off");
+    HTML_SEND_FLASH(" off");
   }
-  htmlSendText("' style='--p:");
+  HTML_SEND_FLASH("' style='--p:");
   htmlSendText(angleBuf);
-  htmlSendText("'></div><div class='setpoint'><span id='v-target'>");
+  HTML_SEND_FLASH("'></div><div class='setpoint'><span id='v-target'>");
   formatScaled(valueBuf, sizeof(valueBuf), myThermostat.getTargetTemperature(), 1);
   htmlSendText(valueBuf);
-  htmlSendText("</span><span class='unit'>&deg;C</span></div><div class='measured'><span class='cap'>Current</span><span id='v-current'>");
+  HTML_SEND_FLASH("</span><span class='unit'>&deg;C</span></div><div class='measured'><span class='cap'>Current</span><span id='v-current'>");
   if (temperatureReady) {
     formatScaled(valueBuf, sizeof(valueBuf), myThermostat.getFilteredTemperature(), 1);
     htmlSendText(valueBuf);
   } else {
-    htmlSendText("&mdash;");
+    HTML_SEND_FLASH("&mdash;");
   }
-  htmlSendText("</span> &deg;C</div></div>");
+  HTML_SEND_FLASH("</span> &deg;C</div></div>");
 
   htmlSendText(htmlThermostatStepForm);  /* - / + buttons, 0.5 °C per press, POST TargetStep */
 
-  htmlSendText("<form method='POST' action='/' autocomplete='off' class='segmented live'>");
+  HTML_SEND_FLASH("<form method='POST' action='/' autocomplete='off' class='segmented live'>");
   if (thermostatHeat) {
-    htmlSendText("<button type='submit' name='ThermostatMode' value='1' id='b-heat' class='active heat'>Heat</button>");
-    htmlSendText("<button type='submit' name='ThermostatMode' value='0' id='b-off'>Off</button>");
+    HTML_SEND_FLASH("<button type='submit' name='ThermostatMode' value='1' id='b-heat' class='active heat'>Heat</button>");
+    HTML_SEND_FLASH("<button type='submit' name='ThermostatMode' value='0' id='b-off'>Off</button>");
   } else {
-    htmlSendText("<button type='submit' name='ThermostatMode' value='1' id='b-heat'>Heat</button>");
-    htmlSendText("<button type='submit' name='ThermostatMode' value='0' id='b-off' class='active off'>Off</button>");
+    HTML_SEND_FLASH("<button type='submit' name='ThermostatMode' value='1' id='b-heat'>Heat</button>");
+    HTML_SEND_FLASH("<button type='submit' name='ThermostatMode' value='0' id='b-off' class='active off'>Off</button>");
   }
-  htmlSendText("</form>");
+  HTML_SEND_FLASH("</form>");
 
-  htmlSendText("<div class='sub'>Hysteresis &plusmn;");
+  HTML_SEND_FLASH("<div class='sub'>Hysteresis &plusmn;");
   formatScaled(valueBuf, sizeof(valueBuf), myThermostat.getThermostatHysteresis(), 1);
   htmlSendText(valueBuf);
-  htmlSendText(" &deg;C</div>");
+  HTML_SEND_FLASH(" &deg;C</div>");
 
   /* the sensor state is one of two pills, both in the page so the live update only flips their display */
-  htmlSendText("<div class='sub' id='v-sensor' style='display:");
+  HTML_SEND_FLASH("<div class='sub' id='v-sensor' style='display:");
   htmlSendTextPtr((sensorError || (temperatureReady == false)) ? "block" : "none");
-  htmlSendText("'><span class='pill bad' id='v-sensor-bad' style='display:");
+  HTML_SEND_FLASH("'><span class='pill bad' id='v-sensor-bad' style='display:");
   htmlSendTextPtr(sensorError ? "inline-block" : "none");
-  htmlSendText("'>Sensor error</span><span class='pill muted' id='v-sensor-wait' style='display:");
+  HTML_SEND_FLASH("'>Sensor error</span><span class='pill muted' id='v-sensor-wait' style='display:");
   htmlSendTextPtr(((sensorError == false) && (temperatureReady == false)) ? "inline-block" : "none");
-  htmlSendText("'>Sensor starting</span></div>");
-  htmlSendText("</section>\n");
+  HTML_SEND_FLASH("'>Sensor starting</span></div>");
+  HTML_SEND_FLASH("</section>\n");
 
   /* CARD GRID: humidity and heating state */
-  htmlSendText("<div class='grid'>");
+  HTML_SEND_FLASH("<div class='grid'>");
 
-  htmlSendText("<div class='card stat'><div class='label'>Current humidity</div><div class='value'><span id='v-humidity'>");
+  HTML_SEND_FLASH("<div class='card stat'><div class='label'>Current humidity</div><div class='value'><span id='v-humidity'>");
   if (humidityReady) {
     formatScaled(valueBuf, sizeof(valueBuf), myThermostat.getFilteredHumidity(), 1);
     htmlSendText(valueBuf);
   } else {
-    htmlSendText("&mdash;");
+    HTML_SEND_FLASH("&mdash;");
   }
-  htmlSendText("</span><span class='unit'>%</span></div><div class='sub'>");
+  HTML_SEND_FLASH("</span><span class='unit'>%</span></div><div class='sub'>");
   htmlSendTextPtr(myConfig.sensor_type == cDHT22 ? "DHT22 sensor" : "BME280 sensor");
-  htmlSendText("</div></div>");
+  HTML_SEND_FLASH("</div></div>");
 
   /* heating state: the relay, not the mode - the mode switch lives in the thermostat card above */
-  htmlSendText("<div class='card stat'><div class='label'>Heating state</div><div class='state'><span class='dot ");
+  HTML_SEND_FLASH("<div class='card stat'><div class='label'>Heating state</div><div class='state'><span class='dot ");
   htmlSendTextPtr(stateClass);
-  htmlSendText("' id='v-dot'></span><span id='v-state'>");
+  HTML_SEND_FLASH("' id='v-dot'></span><span id='v-state'>");
   htmlSendTextPtr(stateText);
-  htmlSendText("</span></div><div class='sub'><span id='v-relay'>");
+  HTML_SEND_FLASH("</span></div><div class='sub'><span id='v-relay'>");
   htmlSendTextPtr(heating ? "Relay on" : (thermostatHeat ? "Relay off" : "Thermostat off"));
-  htmlSendText("</span></div></div>");
+  HTML_SEND_FLASH("</span></div></div>");
 
-  htmlSendText("</div>\n");
+  HTML_SEND_FLASH("</div>\n");
 }
 
 /* ---- console output window, the card above the restart section ----
    The bytes the program captured from its Serial.print / println / printf calls (print_log.h) are replayed as
-   text, escaped for HTML, in the order the software sent them: at most LOG_MAX_LINES of the newest lines, older
-   lines dropped, a line the ring buffer cut in the middle marked. The page works on a snapshot taken before the
-   window is streamed, so bytes printed while the response is still being sent cannot change what was already sent.
+   text, escaped for HTML, in the order the software sent them: every complete line the ring buffer still holds,
+   a line the ring cut in the middle marked. The page works on a snapshot taken before the window is streamed, so
+   bytes printed while the response is still being sent cannot change what was already sent.
    The capture is not wrapped in CFG_DEBUG: release builds print less, but what they print is shown as well. */
 /* the console text itself, escaped for HTML and ready for the <pre>: the page streams it into the window and
    the live update fetches the same bytes into the open <pre>, so both show one implementation. */
 static void htmlConsoleBody(const LogWindow* window) {
-  if (window->linesTotal > window->linesShown) {
-    htmlSendText("&hellip; older lines dropped\n");
-  }
   char row[128];  /* text run, flushed to the client whenever it is full */
   size_t rowLen = 0;
   for (uint32_t i = window->start; i < window->end; i++) {
@@ -468,29 +474,26 @@ static void htmlConsoleBody(const LogWindow* window) {
 
 static void htmlWindowConsole(void) {
   LogWindow window;
-  logWindowSnapshot(&window, LOG_MAX_LINES);
+  logWindowSnapshot(&window);
 
   // "%u" with an explicit cast: the "%" PRIu32 concatenation reads as a runtime format string to
   // static analysers (CWE-134), and unsigned int is 32 bit on both boards
   char numBuf[24];
 
-  htmlSendText("<section class='card'><div class='row' style='justify-content:space-between'>");
-  htmlSendText("<div class='label'>Console output</div><div class='sub' style='margin:0'>");
-  snprintf(numBuf, sizeof(numBuf), "%u", static_cast<unsigned int>(window.linesShown));
-  htmlSendText("<span id='v-lines'>");
-  htmlSendText(numBuf);
-  htmlSendText("</span> / <span id='v-lines-total'>");
+  HTML_SEND_FLASH("<section class='card'><div class='row' style='justify-content:space-between'>");
+  HTML_SEND_FLASH("<div class='label'>Console output</div><div class='sub' style='margin:0'>");
   snprintf(numBuf, sizeof(numBuf), "%u", static_cast<unsigned int>(window.linesTotal));
+  HTML_SEND_FLASH("<span id='v-lines-total'>");
   htmlSendText(numBuf);
-  htmlSendText("</span> lines");
+  HTML_SEND_FLASH("</span> lines");
   if ((window.start < window.end) && (logLineStart(window.start) == false)) {
-    htmlSendText(", first line cut off by the capture buffer");
+    HTML_SEND_FLASH(", first line cut off by the capture buffer");
   }
-  htmlSendText("</div></div>");
+  HTML_SEND_FLASH("</div></div>");
 
-  htmlSendText("<pre class='console' id='v-console'>");
+  HTML_SEND_FLASH("<pre class='console' id='v-console'>");
   htmlConsoleBody(&window);
-  htmlSendText("</pre></section>\n");
+  HTML_SEND_FLASH("</pre></section>\n");
 }
 
 void htmlStreamPage(void) {
@@ -516,29 +519,29 @@ void htmlStreamPage(void) {
   htmlSendText(htmlHeadDoctype);
   /* HEAD */
   htmlSendText(htmlHeadMeta);
-  htmlSendText("<title> ");
+  HTML_SEND_FLASH("<title> ");
   htmlSendText(myConfig.name);
-  htmlSendText("</title>\n");
+  HTML_SEND_FLASH("</title>\n");
   htmlSendText(htmlStyleBlock);
   htmlSendText(htmlHeadClose);
   /* BODY */
   htmlSendText(htmlBodyOpen);
 
   /* header: device name, firmware and the connection pills */
-  htmlSendText("<header class='top'><div class='brand'>");
+  HTML_SEND_FLASH("<header class='top'><div class='brand'>");
   htmlSendText(myConfig.name);
-  htmlSendText("<small>Thermostat &middot; FW ");
+  HTML_SEND_FLASH("<small>Thermostat &middot; FW ");
   htmlSendText(VERSION);
-  htmlSendText("</small></div><div class='pills'>");
+  HTML_SEND_FLASH("</small></div><div class='pills'>");
   htmlPill(WiFi.status() == WL_CONNECTED ? "Wi-Fi" : "Wi-Fi off", WiFi.status() == WL_CONNECTED ? "ok" : "bad");
   htmlPill(myMqttClient.connected() ? "MQTT" : "MQTT off", myMqttClient.connected() ? "ok" : "bad");
-  htmlSendText("</div></header>\n");
+  HTML_SEND_FLASH("</div></header>\n");
 
   /* sensor and thermostat values */
   htmlWindowDashboard();
 
   /* SYSTEM INFORMATION */
-  htmlSendText("<details class='card'><summary>System information</summary>");
+  HTML_SEND_FLASH("<details class='card'><summary>System information</summary>");
   htmlSendText(htmlTableOpen);
   /*= KEY ======================================||= VALUE ================================*/
   htmlRow2("Name", myConfig.name);
@@ -576,42 +579,42 @@ void htmlStreamPage(void) {
   htmlRow2U32("Looptime min [&micro;s]", MyLooptime.get_time_duration_min());
   htmlRow2U32("Looptime max [&micro;s]", MyLooptime.get_time_duration_max());
   htmlSendText(htmlTableClose);
-  htmlSendText("</details>\n");
+  HTML_SEND_FLASH("</details>\n");
 
   /* CONFIGURATION: input method and sensor, one POST form each */
-  htmlSendText("<section class='card'><div class='label'>Configuration</div><div class='formgrid'>");
+  HTML_SEND_FLASH("<section class='card'><div class='label'>Configuration</div><div class='formgrid'>");
 
   htmlSendText(htmlFormOpen);
-  htmlSendText("<div class='field'><label for='input_method'>Input method</label><div class='row'><select name='InputMethod' id='input_method'>");
+  HTML_SEND_FLASH("<div class='field'><label for='input_method'>Input method</label><div class='row'><select name='InputMethod' id='input_method'>");
   if (myConfig.input_method == cPUSH_BUTTONS) {
-    htmlSendText("<option value='0'>Rotary Encoder </option> <option value='1' selected> Push Buttons </option>");
+    HTML_SEND_FLASH("<option value='0'>Rotary Encoder </option> <option value='1' selected> Push Buttons </option>");
   } else {
-    htmlSendText("<option value='0' selected> Rotary Encoder </option> <option value='1'> Push Buttons </option>");
+    HTML_SEND_FLASH("<option value='0' selected> Rotary Encoder </option> <option value='1'> Push Buttons </option>");
   }
-  htmlSendText("</select><input type='submit' value='Apply'></div></div>");
+  HTML_SEND_FLASH("</select><input type='submit' value='Apply'></div></div>");
   htmlSendText(htmlFormClose);
 
   htmlSendText(htmlFormOpen);
-  htmlSendText("<div class='field'><label for='sensor'>Sensor</label><div class='row'><select name='Sensor' id='sensor'>");
+  HTML_SEND_FLASH("<div class='field'><label for='sensor'>Sensor</label><div class='row'><select name='Sensor' id='sensor'>");
   if (myConfig.sensor_type == cDHT22) {  /* select currently configured input method */
-    htmlSendText("<option value='0' selected >DHT22 </option> <option value='1'> BME280 </option>");
+    HTML_SEND_FLASH("<option value='0' selected >DHT22 </option> <option value='1'> BME280 </option>");
   } else {
-    htmlSendText("<option value='0'>DHT22 </option> <option value='1' selected > BME280 </option>");
+    HTML_SEND_FLASH("<option value='0'>DHT22 </option> <option value='1' selected > BME280 </option>");
   }
-  htmlSendText("</select><input type='submit' value='Apply'></div></div>");
+  HTML_SEND_FLASH("</select><input type='submit' value='Apply'></div></div>");
   htmlSendText(htmlFormClose);
 
-  htmlSendText("</div></section>\n");
+  HTML_SEND_FLASH("</div></section>\n");
 
   /* COMMAND LINE */
-  htmlSendText("<section class='card'><div class='label'>Command line</div>");
+  HTML_SEND_FLASH("<section class='card'><div class='label'>Command line</div>");
   htmlSendText(htmlFormOpen);
-  htmlSendText("<div class='row' style='margin-top:12px'><input type='text' name='cmd' placeholder='key:value' aria-label='Command'><input type='submit' value='Send'></div>");
+  HTML_SEND_FLASH("<div class='row' style='margin-top:12px'><input type='text' name='cmd' placeholder='key:value' aria-label='Command'><input type='submit' value='Send'></div>");
   htmlSendText(htmlFormClose);
-  htmlSendText("</section>\n");
+  HTML_SEND_FLASH("</section>\n");
 
   /* COMMANDS TABLE */
-  htmlSendText("<details class='card'><summary>Commands</summary>");
+  HTML_SEND_FLASH("<details class='card'><summary>Commands</summary>");
   htmlSendText(htmlCommandsTableOpen);
   htmlRow4("<b>Key</b>", "<b>Value</b>", "<b>Current Value</b>", "<b>Description</b>");
   htmlRow4("discover", "0 | 1", "none", "MQTT on demand device discovery: 1 = discover; 0 = remove");
@@ -634,41 +637,41 @@ void htmlStreamPage(void) {
   htmlRow4("console_clear", "1", "none", "Clear the console output window (last window at the bottom of the page)");
   htmlRow4Int("log_level", "0..2", logRuntimeLevel, "Console window verbosity: 0 errors, 1 warnings, 2 info");
   htmlSendText(htmlCommandsTableClose);
-  htmlSendText("</details>\n");
+  HTML_SEND_FLASH("</details>\n");
 
   /* CONSOLE LOG LEVEL: the runtime verbosity of the window right below, and the button that empties it. The
      level is not persisted: the next boot starts at LOG_WARNING again. Info only exists where the image
      compiled it in, so a release build does not offer it. The form is 'live', so neither press reloads the
      page: the tab posts, then polls and repaints the console window. */
-  htmlSendText("<section class='card'><div class='label'>Console log level</div>");
-  htmlSendText("<form method='POST' action='/' autocomplete='off' class='live'>");
-  htmlSendText("<div class='field'><div class='row'><select name='LogLevel' aria-label='Console log level'>");
+  HTML_SEND_FLASH("<section class='card'><div class='label'>Console log level</div>");
+  HTML_SEND_FLASH("<form method='POST' action='/' autocomplete='off' class='live'>");
+  HTML_SEND_FLASH("<div class='field'><div class='row'><select name='LogLevel' aria-label='Console log level'>");
   htmlSendTextPtr(logRuntimeLevel == LOG_ERROR ? "<option value='0' selected>Errors</option>" : "<option value='0'>Errors</option>");
   htmlSendTextPtr(logRuntimeLevel == LOG_WARNING ? "<option value='1' selected>Warnings</option>" : "<option value='1'>Warnings</option>");
   #if LOG_LEVEL_BUILD >= 2
   htmlSendTextPtr(logRuntimeLevel == LOG_INFO ? "<option value='2' selected>Info</option>" : "<option value='2'>Info</option>");
   #endif
-  htmlSendText("</select><input type='submit' value='Set Log Level'>");
-  htmlSendText("<button type='submit' name='cmd' value='console_clear:1' class='plain'>Clear Log</button></div></div>");
+  HTML_SEND_FLASH("</select><input type='submit' value='Set Log Level'>");
+  HTML_SEND_FLASH("<button type='submit' name='cmd' value='console_clear:1' class='plain'>Clear Log</button></div></div>");
   #if LOG_LEVEL_BUILD < 2
-  htmlSendText("<div class='sub'>Info is compiled into debug builds only.</div>");
+  HTML_SEND_FLASH("<div class='sub'>Info is compiled into debug builds only.</div>");
   #endif
   htmlSendText(htmlFormClose);
-  htmlSendText("</section>\n");
+  HTML_SEND_FLASH("</section>\n");
 
   htmlWindowConsole();  /* the captured console output, see htmlWindowConsole() above */
 
   /* RESTART DEVICE */
-  htmlSendText("<section class='card'><div class='row' style='justify-content:space-between'><div><div class='label'>Restart device</div><div class='sub'>Reboots the controller and reloads this page.</div></div>");
+  HTML_SEND_FLASH("<section class='card'><div class='row' style='justify-content:space-between'><div><div class='label'>Restart device</div><div class='sub'>Reboots the controller and reloads this page.</div></div>");
   if (systemRestartRequest == false) {
     htmlSendText(htmlRestartButton);
   } else {
     htmlSendText(htmlRestartWaitingButton);
   }
-  htmlSendText("</div></section>\n");
+  HTML_SEND_FLASH("</div></section>\n");
 
   htmlSendText(htmlLiveScript);
-  htmlSendText("<footer>ESP8266 Smart Home</footer>\n");
+  HTML_SEND_FLASH("<footer>ESP8266 Smart Home</footer>\n");
   htmlSendText(htmlPageFooter);
 
   #if CFG_BOARD_ESP32
@@ -718,11 +721,11 @@ void handleApiState(void) {
   }
 
   LogWindow logWindow;
-  logWindowSnapshot(&logWindow, LOG_MAX_LINES);
+  logWindowSnapshot(&logWindow);
 
   char payload[192];
   (void)snprintf(payload, sizeof(payload),
-                 "{\"target\":%s,\"current\":%s,\"humidity\":%s,\"heat\":%d,\"relay\":%d,\"sensor\":%d,\"angle\":%u,\"log\":%" PRIu32 ",\"shown\":%" PRIu32 "}",
+                 "{\"target\":%s,\"current\":%s,\"humidity\":%s,\"heat\":%d,\"relay\":%d,\"sensor\":%d,\"angle\":%u,\"log\":%" PRIu32 "}",
                  targetBuf,
                  currentBuf,
                  humidityBuf,
@@ -730,8 +733,7 @@ void handleApiState(void) {
                  myThermostat.getActualState() ? 1 : 0,
                  sensorError ? 1 : 0,
                  thermostatDialAngle(),
-                 logWindow.linesTotal,
-                 logWindow.linesShown);
+                 logWindow.linesTotal);
 
   webServer.sendHeader("Cache-Control", "no-store");
   webServer.send(200, "application/json", payload);
@@ -740,7 +742,7 @@ void handleApiState(void) {
    the line counter in /api/state moved, so the window follows the device without reloading the page. */
 void handleConsoleFragment(void) {
   LogWindow window;
-  logWindowSnapshot(&window, LOG_MAX_LINES);
+  logWindowSnapshot(&window);
 
   htmlPageBytes = 0;
   #if CFG_BOARD_ESP32

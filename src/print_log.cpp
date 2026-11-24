@@ -57,7 +57,7 @@ bool logLineStart(uint32_t index) {
   return logByteAt(index - 1) == '\n';
 }
 
-void logWindowSnapshot(LogWindow* window, uint16_t maxLines) {
+void logWindowSnapshot(LogWindow* window) {
   const uint32_t oldest = consoleBytesCaptured - logBytesVisible();
 
   uint32_t linesTotal = 0;
@@ -67,22 +67,10 @@ void logWindowSnapshot(LogWindow* window, uint16_t maxLines) {
     }
   }
 
+  /* the window shows every complete line the ring still holds, plus a possibly unfinished newest one */
   window->linesTotal = linesTotal;
-  window->linesShown = (linesTotal > maxLines) ? maxLines : linesTotal;
-  window->end = consoleBytesCaptured;
-
-  /* the window shows the newest linesShown complete lines plus a possibly unfinished newest one:
-     walk over the older linesTotal - linesShown line feeds and start in front of the next byte */
-  const uint32_t linesHidden = linesTotal - window->linesShown;
-  uint32_t linesSkipped = 0;
   window->start = oldest;
-  for (uint32_t i = oldest; linesSkipped < linesHidden; i++) {
-    if (logByteAt(i) != '\n') {
-      continue;
-    }
-    linesSkipped++;
-    window->start = i + 1;
-  }
+  window->end = consoleBytesCaptured;
 }
 
 void logHtmlAppend(char* row, size_t* rowLen, char c) {
