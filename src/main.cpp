@@ -1211,6 +1211,21 @@ void mqttPubState(void) {
 }
 
 
+/* Runtime verbosity of the console window: 0 = errors, 1 = warnings, 2 = info. The dropdown of the web page
+   and the log_level command both land here, so both clamp the same way: a level the image does not compile
+   stays at the highest level it can show. Nothing is persisted, the next boot starts at LOG_WARNING again. */
+static void applyRuntimeLogLevel(int16_t requested) {
+  if (requested < 0) {
+    requested = 0;
+  } else if (requested > LOG_LEVEL_BUILD) {
+    requested = LOG_LEVEL_BUILD;  /* a level the image does not compile stays at the level it can show */
+  }
+  logRuntimeLevel = static_cast<uint8_t>(requested);
+  logSetLevel(LOG_INFO);   /* level 2: the confirmation line, hidden at a runtime level below 2 */
+  Serial.print("Runtime log level set to ");
+  Serial.println(logRuntimeLevel);
+}
+
 void handleWebServerClient(void) {
   htmlStreamPage();  /* page is streamed in chunks, no page String is built */
 
@@ -1239,16 +1254,7 @@ void handleWebServerClient(void) {
           if (key == "console_clear") {  /* empty the console output window */
             logClear();
           } else if (key == "log_level") {  /* how loud the window is: 0 errors, 1 warnings, 2 info */
-            int16_t requested = value.toInt();
-            if (requested < 0) {
-              requested = 0;
-            } else if (requested > LOG_LEVEL_BUILD) {
-              requested = LOG_LEVEL_BUILD;  /* a level the image does not compile stays at the level it can show */
-            }
-            logRuntimeLevel = static_cast<uint8_t>(requested);
-            logSetLevel(LOG_INFO);
-            Serial.print("Runtime log level set to ");
-            Serial.println(logRuntimeLevel);
+            applyRuntimeLogLevel(static_cast<int16_t>(value.toInt()));
           } else if (key == "discover") {
             if ((value.toInt() & 1) == true) {
               myMqttHelper.setTriggerDiscovery(true);
@@ -1509,6 +1515,11 @@ void handleWebServerClient(void) {
           logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
           Serial.println("Configuration unchanged, do nothing");
           #endif
+        }
+      }
+      if (webServer.argName(i) == "LogLevel") {  /* runtime console verbosity, nothing is persisted */
+        if (static_cast<int16_t>(webServer.arg(i).toInt()) != static_cast<int16_t>(logRuntimeLevel)) {
+          applyRuntimeLogLevel(static_cast<int16_t>(webServer.arg(i).toInt()));
         }
       }
     }
