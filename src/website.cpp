@@ -64,6 +64,23 @@ static const char htmlLiveScript[] =
     "function id(n){return document.getElementById(n);}\n"
     "function text(n,v){var e=id(n);if(e){e.textContent=v;}}\n"
     "function fmt(v){return v===null?'\\u2014':Number(v).toFixed(1);}\n"
+    "var lastLog=-1;\n"
+    "function pullConsole(total){\n"
+    "if(total===lastLog){return;}\n"
+    "lastLog=total;\n"
+    "var x=new XMLHttpRequest();\n"
+    "x.open('GET','/api/console',true);\n"
+    "x.onreadystatechange=function(){\n"
+    "if(x.readyState!==4){return;}\n"
+    "if(x.status!==200){lastLog=-1;return;}\n"
+    "var e=id('v-console');\n"
+    "if(!e){return;}\n"
+    "var atEnd=(e.scrollHeight-e.scrollTop-e.clientHeight)<24;\n"
+    "e.innerHTML=x.responseText;\n"
+    "if(atEnd){e.scrollTop=e.scrollHeight;}\n"
+    "};\n"
+    "x.send();\n"
+    "}\n"
     "function apply(s){\n"
     "var heat=!!s.heat;\n"
     "text('v-target',fmt(s.target));\n"
@@ -80,6 +97,9 @@ static const char htmlLiveScript[] =
     "if(dot){dot.className='dot '+(s.relay?'heat':(heat?'ok':'off'));}\n"
     "text('v-state',s.relay?'Heating':(heat?'Idle':'Off'));\n"
     "text('v-relay',s.relay?'Relay on':(heat?'Relay off':'Thermostat off'));\n"
+    "text('v-lines',s.shown);\n"
+    "text('v-lines-total',s.log);\n"
+    "pullConsole(s.log);\n"
     "var sb=id('v-sensor-bad'),sw=id('v-sensor-wait'),box=id('v-sensor');\n"
     "var err=!!s.sensor,wait=(!err&&s.current===null);\n"
     "if(sb){sb.style.display=err?'inline-block':'none';}\n"
@@ -389,32 +409,15 @@ static void htmlWindowDashboard(void) {
    lines dropped, a line the ring buffer cut in the middle marked. The page works on a snapshot taken before the
    window is streamed, so bytes printed while the response is still being sent cannot change what was already sent.
    The capture is not wrapped in CFG_DEBUG: release builds print less, but what they print is shown as well. */
-static void htmlWindowConsole(void) {
-  LogWindow window;
-  logWindowSnapshot(&window, LOG_MAX_LINES);
-
-  char numBuf[24];
-
-  htmlSendText("<section class='card'><div class='row' style='justify-content:space-between'>");
-  htmlSendText("<div class='label'>Console output</div><div class='sub' style='margin:0'>");
-  snprintf(numBuf, sizeof(numBuf), "%" PRIu32, window.linesShown);
-  htmlSendText(numBuf);
-  htmlSendText(" / ");
-  snprintf(numBuf, sizeof(numBuf), "%" PRIu32, window.linesTotal);
-  htmlSendText(numBuf);
-  htmlSendText(" lines");
-  if ((window.start < window.end) && (logLineStart(window.start) == false)) {
-    htmlSendText(", first line cut off by the capture buffer");
-  }
-  htmlSendText("</div></div>");
-
-  htmlSendText("<pre class='console'>");
-  if (window.linesTotal > window.linesShown) {
+/* the console text itself, escaped for HTML and ready for the <pre>: the page streams it into the window and
+   the live update fetches the same bytes into the open <pre>, so both show one implementation. */
+static void htmlConsoleBody(const LogWindow* window) {
+  if (window->linesTotal > window->linesShown) {
     htmlSendText("&hellip; older lines dropped\n");
   }
   char row[128];  /* text run, flushed to the client whenever it is full */
   size_t rowLen = 0;
-  for (uint32_t i = window.start; i < window.end; i++) {
+  for (uint32_t i = window->start; i < window->end; i++) {
     if (rowLen + 6 >= sizeof(row)) {  /* spare room for the longest escape sequence */
       htmlSendChunk(row, rowLen);
       rowLen = 0;
@@ -424,6 +427,30 @@ static void htmlWindowConsole(void) {
   if (rowLen > 0) {
     htmlSendChunk(row, rowLen);
   }
+}
+
+static void htmlWindowConsole(void) {
+  LogWindow window;
+  logWindowSnapshot(&window, LOG_MAX_LINES);
+
+  char numBuf[24];
+
+  htmlSendText("<section class='card'><div class='row' style='justify-content:space-between'>");
+  htmlSendText("<div class='label'>Console output</div><div class='sub' style='margin:0'>");
+  snprintf(numBuf, sizeof(numBuf), "%" PRIu32, window.linesShown);
+  htmlSendText("<span id='v-lines'>");
+  htmlSendText(numBuf);
+  htmlSendText("</span> / <span id='v-lines-total'>");
+  snprintf(numBuf, sizeof(numBuf), "%" PRIu32, window.linesTotal);
+  htmlSendText(numBuf);
+  htmlSendText("</span> lines");
+  if ((window.start < window.end) && (logLineStart(window.start) == false)) {
+    htmlSendText(", first line cut off by the capture buffer");
+  }
+  htmlSendText("</div></div>");
+
+  htmlSendText("<pre class='console' id='v-console'>");
+  htmlConsoleBody(&window);
   htmlSendText("</pre></section>\n");
 }
 
@@ -590,7 +617,7 @@ void htmlStreamPage(void) {
   #if LOG_LEVEL_BUILD >= 2
   htmlSendText(logRuntimeLevel == LOG_INFO ? "<option value='2' selected>Info</option>" : "<option value='2'>Info</option>");
   #endif
-  htmlSendText("</select><input type='submit' value='Console Log Level'></div></div>");
+  htmlSendText("</select><input type='submit' value='Set Log Level'></div></div>");
   #if LOG_LEVEL_BUILD < 2
   htmlSendText("<div class='sub'>Info is compiled into debug builds only.</div>");
   #endif
@@ -648,17 +675,45 @@ void handleApiState(void) {
     strlcpy(humidityBuf, "null", sizeof(humidityBuf));
   }
 
-  char payload[128];
+  LogWindow logWindow;
+  logWindowSnapshot(&logWindow, LOG_MAX_LINES);
+
+  char payload[192];
   (void)snprintf(payload, sizeof(payload),
-                 "{\"target\":%s,\"current\":%s,\"humidity\":%s,\"heat\":%d,\"relay\":%d,\"sensor\":%d,\"angle\":%u}",
+                 "{\"target\":%s,\"current\":%s,\"humidity\":%s,\"heat\":%d,\"relay\":%d,\"sensor\":%d,\"angle\":%u,\"log\":%" PRIu32 ",\"shown\":%" PRIu32 "}",
                  targetBuf,
                  currentBuf,
                  humidityBuf,
                  myThermostat.getThermostatMode() == TH_HEAT ? 1 : 0,
                  myThermostat.getActualState() ? 1 : 0,
                  sensorError ? 1 : 0,
-                 thermostatDialAngle());
+                 thermostatDialAngle(),
+                 logWindow.linesTotal,
+                 logWindow.linesShown);
 
   webServer.sendHeader("Cache-Control", "no-store");
   webServer.send(200, "application/json", payload);
+}
+/* the console text as HTML for the live update: the tab replaces the content of the open <pre> with it whenever
+   the line counter in /api/state moved, so the window follows the device without reloading the page. */
+void handleConsoleFragment(void) {
+  LogWindow window;
+  logWindowSnapshot(&window, LOG_MAX_LINES);
+
+  htmlPageBytes = 0;
+  #if CFG_BOARD_ESP32
+  htmlPageBuffered = String();
+  #else
+  if (webServer.chunkedResponseModeStart(200, "text/html") == false) {
+    return;
+  }
+  #endif
+
+  htmlConsoleBody(&window);
+
+  #if CFG_BOARD_ESP32
+  webServer.send(200, "text/html", htmlPageBuffered);
+  #else
+  htmlSendChunk("", 0);
+  #endif
 }
