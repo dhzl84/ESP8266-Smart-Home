@@ -403,7 +403,7 @@ static void htmlWindowDashboard(void) {
   htmlSendText("</div>\n");
 }
 
-/* ---- console output window, last window at the bottom of the page ----
+/* ---- console output window, the card above the restart section ----
    The bytes the program captured from its Serial.print / println / printf calls (print_log.h) are replayed as
    text, escaped for HTML, in the order the software sent them: at most LOG_MAX_LINES of the newest lines, older
    lines dropped, a line the ring buffer cut in the middle marked. The page works on a snapshot taken before the
@@ -597,15 +597,6 @@ void htmlStreamPage(void) {
   htmlSendText(htmlCommandsTableClose);
   htmlSendText("</details>\n");
 
-  /* RESTART DEVICE */
-  htmlSendText("<section class='card'><div class='row' style='justify-content:space-between'><div><div class='label'>Restart device</div><div class='sub'>Reboots the controller and reloads this page.</div></div>");
-  if (systemRestartRequest == false) {
-    htmlSendText(htmlRestartButton);
-  } else {
-    htmlSendText(htmlRestartWaitingButton);
-  }
-  htmlSendText("</div></section>\n");
-
   /* CONSOLE LOG LEVEL: the runtime verbosity of the window right below, and the button that empties it. The
      level is not persisted: the next boot starts at LOG_WARNING again. Info only exists where the image
      compiled it in, so a release build does not offer it. The form is 'live', so neither press reloads the
@@ -626,7 +617,17 @@ void htmlStreamPage(void) {
   htmlSendText(htmlFormClose);
   htmlSendText("</section>\n");
 
-  htmlWindowConsole();  /* last window: the captured console output, see htmlWindowConsole() above */
+  htmlWindowConsole();  /* the captured console output, see htmlWindowConsole() above */
+
+  /* RESTART DEVICE */
+  htmlSendText("<section class='card'><div class='row' style='justify-content:space-between'><div><div class='label'>Restart device</div><div class='sub'>Reboots the controller and reloads this page.</div></div>");
+  if (systemRestartRequest == false) {
+    htmlSendText(htmlRestartButton);
+  } else {
+    htmlSendText(htmlRestartWaitingButton);
+  }
+  htmlSendText("</div></section>\n");
+
   htmlSendText(htmlLiveScript);
   htmlSendText("<footer>ESP8266 Smart Home</footer>\n");
   htmlSendText(htmlPageFooter);
