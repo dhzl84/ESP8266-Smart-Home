@@ -243,29 +243,44 @@ static void htmlSendChunk(const char* buf, size_t len) {
   htmlPageBytes += static_cast<uint16_t>(len);
 }
 
-/* Longest text the page hands to htmlSendText as a bare pointer (config name, a String's buffer, a
-   conditional literal). Everything bigger is passed as an array, which keeps its own extent. */
+/* Longest text the page hands to htmlSendTextPtr as a bare pointer (a String's buffer, a conditional
+   literal). Arrays - the page literals, their PROGMEM copies and the stack buffers - carry their own
+   extent in the template overload below, so they are never measured against this ceiling. */
 static const size_t HTML_SEND_MAX = 512;
+
+/* One character of a text that may live in flash: the PROGMEM page literals sit in .irom0.text, and there
+   the ESP8266 answers a byte load with exception 3 (LoadStoreErrorCause) - only 32 bit aligned word reads
+   are allowed in flash, which is what pgm_read_byte() issues. In DRAM it is a plain load. */
+static char htmlTextAt(const char* text, size_t index) {
+  #if CFG_BOARD_ESP8266
+  return static_cast<char>(pgm_read_byte(text + index));
+  #else
+  return text[index];
+  #endif  // CFG_BOARD_ESP8266
+}
 
 /* Measure a text inside a caller-supplied bound: the scan stops at the first '\0' or at maxLen, so a
    buffer that is not '\0'-terminated is never read past its end (CWE-126). */
 static size_t htmlTextLength(const char* text, size_t maxLen) {
   size_t len = 0;
-  while ((len < maxLen) && (text[len] != '\0')) {
+  while ((len < maxLen) && (htmlTextAt(text, len) != '\0')) {
     len++;
   }
   return len;
 }
 
-/* An array argument arrives with its extent, so the bound is never guessed: this covers the page literals,
-   the PROGMEM copies of them and the stack buffers that hold snprintf output. */
+/* An array argument arrives with its extent, so the length is exact and the bound is never guessed: this
+   covers the page literals, the PROGMEM copies of them and the stack buffers that hold snprintf output.
+   The overload set matters: a non-template 'const char*' wins against this template for an array argument,
+   so the pointers go through htmlSendTextPtr() - with both under one name every literal would take the
+   pointer overload, be measured against HTML_SEND_MAX and the style block and the script cut in half. */
 template <size_t N>
 static void htmlSendText(const char (&text)[N]) {
   htmlSendChunk(text, htmlTextLength(text, N));
 }
 
 /* A pointer argument has no extent here, so it is measured against the page's own ceiling. */
-static void htmlSendText(const char* text) {
+static void htmlSendTextPtr(const char* text) {
   htmlSendChunk(text, htmlTextLength(text, HTML_SEND_MAX));
 }
 
@@ -351,7 +366,7 @@ static void htmlWindowDashboard(void) {
   /* THERMOSTAT: mode, target and measured temperature, stepper and mode switch in one card. The ids are the
      handles of the live update (htmlLiveScript): the tab patches these nodes instead of reloading the page. */
   htmlSendText("<section class='card thermo'><div class='label'>Mode: <span id='v-mode'>");
-  htmlSendText(thermostatHeat ? "Heat" : "Off");
+  htmlSendTextPtr(thermostatHeat ? "Heat" : "Off");
   htmlSendText("</span></div>");
 
   htmlSendText("<div class='dial-wrap'><div id='v-dial' class='dial");
@@ -391,11 +406,11 @@ static void htmlWindowDashboard(void) {
 
   /* the sensor state is one of two pills, both in the page so the live update only flips their display */
   htmlSendText("<div class='sub' id='v-sensor' style='display:");
-  htmlSendText((sensorError || (temperatureReady == false)) ? "block" : "none");
+  htmlSendTextPtr((sensorError || (temperatureReady == false)) ? "block" : "none");
   htmlSendText("'><span class='pill bad' id='v-sensor-bad' style='display:");
-  htmlSendText(sensorError ? "inline-block" : "none");
+  htmlSendTextPtr(sensorError ? "inline-block" : "none");
   htmlSendText("'>Sensor error</span><span class='pill muted' id='v-sensor-wait' style='display:");
-  htmlSendText(((sensorError == false) && (temperatureReady == false)) ? "inline-block" : "none");
+  htmlSendTextPtr(((sensorError == false) && (temperatureReady == false)) ? "inline-block" : "none");
   htmlSendText("'>Sensor starting</span></div>");
   htmlSendText("</section>\n");
 
@@ -410,16 +425,16 @@ static void htmlWindowDashboard(void) {
     htmlSendText("&mdash;");
   }
   htmlSendText("</span><span class='unit'>%</span></div><div class='sub'>");
-  htmlSendText(myConfig.sensor_type == cDHT22 ? "DHT22 sensor" : "BME280 sensor");
+  htmlSendTextPtr(myConfig.sensor_type == cDHT22 ? "DHT22 sensor" : "BME280 sensor");
   htmlSendText("</div></div>");
 
   /* heating state: the relay, not the mode - the mode switch lives in the thermostat card above */
   htmlSendText("<div class='card stat'><div class='label'>Heating state</div><div class='state'><span class='dot ");
-  htmlSendText(stateClass);
+  htmlSendTextPtr(stateClass);
   htmlSendText("' id='v-dot'></span><span id='v-state'>");
-  htmlSendText(stateText);
+  htmlSendTextPtr(stateText);
   htmlSendText("</span></div><div class='sub'><span id='v-relay'>");
-  htmlSendText(heating ? "Relay on" : (thermostatHeat ? "Relay off" : "Thermostat off"));
+  htmlSendTextPtr(heating ? "Relay on" : (thermostatHeat ? "Relay off" : "Thermostat off"));
   htmlSendText("</span></div></div>");
 
   htmlSendText("</div>\n");
@@ -628,10 +643,10 @@ void htmlStreamPage(void) {
   htmlSendText("<section class='card'><div class='label'>Console log level</div>");
   htmlSendText("<form method='POST' action='/' autocomplete='off' class='live'>");
   htmlSendText("<div class='field'><div class='row'><select name='LogLevel' aria-label='Console log level'>");
-  htmlSendText(logRuntimeLevel == LOG_ERROR ? "<option value='0' selected>Errors</option>" : "<option value='0'>Errors</option>");
-  htmlSendText(logRuntimeLevel == LOG_WARNING ? "<option value='1' selected>Warnings</option>" : "<option value='1'>Warnings</option>");
+  htmlSendTextPtr(logRuntimeLevel == LOG_ERROR ? "<option value='0' selected>Errors</option>" : "<option value='0'>Errors</option>");
+  htmlSendTextPtr(logRuntimeLevel == LOG_WARNING ? "<option value='1' selected>Warnings</option>" : "<option value='1'>Warnings</option>");
   #if LOG_LEVEL_BUILD >= 2
-  htmlSendText(logRuntimeLevel == LOG_INFO ? "<option value='2' selected>Info</option>" : "<option value='2'>Info</option>");
+  htmlSendTextPtr(logRuntimeLevel == LOG_INFO ? "<option value='2' selected>Info</option>" : "<option value='2'>Info</option>");
   #endif
   htmlSendText("</select><input type='submit' value='Set Log Level'>");
   htmlSendText("<button type='submit' name='cmd' value='console_clear:1' class='plain'>Clear Log</button></div></div>");
