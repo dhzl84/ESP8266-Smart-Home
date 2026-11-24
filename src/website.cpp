@@ -606,18 +606,20 @@ void htmlStreamPage(void) {
   }
   htmlSendText("</div></section>\n");
 
-  /* CONSOLE LOG LEVEL: the runtime verbosity of the window right below, one POST form like the input method.
-     The level is not persisted: the next boot starts at LOG_WARNING again. Info only exists where the image
-     compiled it in, so a release build does not offer it. */
+  /* CONSOLE LOG LEVEL: the runtime verbosity of the window right below, and the button that empties it. The
+     level is not persisted: the next boot starts at LOG_WARNING again. Info only exists where the image
+     compiled it in, so a release build does not offer it. The form is 'live', so neither press reloads the
+     page: the tab posts, then polls and repaints the console window. */
   htmlSendText("<section class='card'><div class='label'>Console log level</div>");
-  htmlSendText(htmlFormOpen);
+  htmlSendText("<form method='POST' action='/' autocomplete='off' class='live'>");
   htmlSendText("<div class='field'><div class='row'><select name='LogLevel' aria-label='Console log level'>");
   htmlSendText(logRuntimeLevel == LOG_ERROR ? "<option value='0' selected>Errors</option>" : "<option value='0'>Errors</option>");
   htmlSendText(logRuntimeLevel == LOG_WARNING ? "<option value='1' selected>Warnings</option>" : "<option value='1'>Warnings</option>");
   #if LOG_LEVEL_BUILD >= 2
   htmlSendText(logRuntimeLevel == LOG_INFO ? "<option value='2' selected>Info</option>" : "<option value='2'>Info</option>");
   #endif
-  htmlSendText("</select><input type='submit' value='Set Log Level'></div></div>");
+  htmlSendText("</select><input type='submit' value='Set Log Level'>");
+  htmlSendText("<button type='submit' name='cmd' value='console_clear:1' class='plain'>Clear Log</button></div></div>");
   #if LOG_LEVEL_BUILD < 2
   htmlSendText("<div class='sub'>Info is compiled into debug builds only.</div>");
   #endif
