@@ -214,6 +214,7 @@ void setup() {
   webServer.begin();
   webServer.on("/", handleWebServerClient);
   webServer.on("/restart", handleHttpReset);
+  webServer.on("/api/state", handleApiState);   /* live update the open page polls, see website.cpp */
 
 /* button debounce */
   debounceOnOff.attach(PHYS_INPUT_3_PIN);

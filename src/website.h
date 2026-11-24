@@ -38,5 +38,6 @@ extern WebServer webServer;
 /* the page                                                                                                 */
 /*===================================================================================================================*/
 void htmlStreamPage(void);  /* stream the whole status and configuration page to the waiting web server client */
+void handleApiState(void);  /* answer the live update the page polls: the dashboard values as a small JSON object */
 
 #endif  // WEBSITE_H_

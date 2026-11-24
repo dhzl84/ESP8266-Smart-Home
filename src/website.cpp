@@ -50,10 +50,70 @@ static const char htmlFormClose[] = "</form>";
 static const char htmlRestartButton[] = "<button class='plain' onclick=\"window.location.href='/restart'\">Restart</button>";
 static const char htmlRestartWaitingButton[] = "<button class='plain' onclick=\"window.location.href='/'\">Restarting, reload site</button>";
 static const char htmlThermostatStepForm[] =
-    "<form method='POST' action='/' autocomplete='off' class='row'>"
+    "<form method='POST' action='/' autocomplete='off' class='row live'>"
     "<button type='submit' name='TargetStep' value='-5' class='round' aria-label='Lower target temperature'>&minus;</button>"
     "<button type='submit' name='TargetStep' value='5' class='round' aria-label='Raise target temperature'>+</button>"
     "</form>";
+/* the live update: the tab pulls /api/state every 5 s and patches the dashboard nodes instead of reloading
+   the page, and the +/- and Heat/Off forms post through fetch so a press neither reloads nor jumps to the top.
+   Without JavaScript (or without fetch/URLSearchParams) the plain forms work as before: POST, 303, fresh page. */
+static const char htmlLiveScript[] =
+    "<script>\n"
+    "(function(){\n"
+    "if(!window.fetch||typeof URLSearchParams==='undefined'||!document.getElementById){return;}\n"
+    "function id(n){return document.getElementById(n);}\n"
+    "function text(n,v){var e=id(n);if(e){e.textContent=v;}}\n"
+    "function fmt(v){return v===null?'\\u2014':Number(v).toFixed(1);}\n"
+    "function apply(s){\n"
+    "var heat=!!s.heat;\n"
+    "text('v-target',fmt(s.target));\n"
+    "text('v-current',fmt(s.current));\n"
+    "text('v-humidity',fmt(s.humidity));\n"
+    "text('v-mode',heat?'Heat':'Off');\n"
+    "var d=id('v-dial');\n"
+    "if(d){d.style.setProperty('--p',s.angle+'deg');d.className=heat?'dial':'dial off';}\n"
+    "var bh=id('b-heat');\n"
+    "if(bh){bh.className=heat?'active heat':'';}\n"
+    "var bo=id('b-off');\n"
+    "if(bo){bo.className=heat?'':'active off';}\n"
+    "var dot=id('v-dot');\n"
+    "if(dot){dot.className='dot '+(s.relay?'heat':(heat?'ok':'off'));}\n"
+    "text('v-state',s.relay?'Heating':(heat?'Idle':'Off'));\n"
+    "text('v-relay',s.relay?'Relay on':(heat?'Relay off':'Thermostat off'));\n"
+    "var sb=id('v-sensor-bad'),sw=id('v-sensor-wait'),box=id('v-sensor');\n"
+    "var err=!!s.sensor,wait=(!err&&s.current===null);\n"
+    "if(sb){sb.style.display=err?'inline-block':'none';}\n"
+    "if(sw){sw.style.display=wait?'inline-block':'none';}\n"
+    "if(box){box.style.display=(err||wait)?'block':'none';}\n"
+    "}\n"
+    "function refresh(){\n"
+    "var x=new XMLHttpRequest();\n"
+    "x.open('GET','/api/state',true);\n"
+    "x.onreadystatechange=function(){\n"
+    "if(x.readyState!==4||x.status!==200){return;}\n"
+    "try{apply(JSON.parse(x.responseText));}catch(e){}\n"
+    "};\n"
+    "x.send();\n"
+    "}\n"
+    "function send(f,submitter){\n"
+    "var body=new URLSearchParams();\n"
+    "for(var i=0;i<f.elements.length;i++){var el=f.elements[i];\n"
+    "if(!el.name||el.disabled||(el.type==='submit'&&el!==submitter)){continue;}\n"
+    "body.append(el.name,el.value);}\n"
+    "fetch('/',{method:'POST',body:body,redirect:'manual'}).then(function(){setTimeout(refresh,120);},function(){setTimeout(refresh,120);});\n"
+    "}\n"
+    "document.addEventListener('submit',function(ev){\n"
+    "var f=ev.target,sub=ev.submitter;\n"
+    "if(!f||!sub||typeof f.className!=='string'||(' '+f.className+' ').indexOf(' live ')<0){return;}\n"
+    "ev.preventDefault();\n"
+    "send(f,sub);\n"
+    "},true);\n"
+    "setInterval(refresh,5000);\n"
+    "document.addEventListener('visibilitychange',function(){if(!document.hidden){refresh();}});\n"
+    "refresh();\n"
+    "})();\n"
+    "</script>\n";
+
 static const char htmlPageFooter[] = "</div>\n</body>\n</html>\n";
 
 /* the whole look of the page in one literal: a light palette and a dark palette, cards, pills, forms and the
@@ -213,6 +273,19 @@ static void htmlPill(const char* text, const char* state) {
   htmlRowAppend(snprintf(row, sizeof(row), "<span class='pill %s'>%s</span>", state, text), "pill", row, sizeof(row));
 }
 
+/* where the setpoint sits on the dial: MINIMUM..MAXIMUM_TARGET_TEMP is the 270 degree arc of the ring, drawn with
+   a conic-gradient whose stop is the angle emitted as --p. The live update endpoint sends the same number. */
+static uint16_t thermostatDialAngle(void) {
+  int16_t angle = static_cast<int16_t>((static_cast<int16_t>(myThermostat.getTargetTemperature()) - static_cast<int16_t>(MINIMUM_TARGET_TEMP)) * 270 /
+                                       (static_cast<int16_t>(MAXIMUM_TARGET_TEMP) - static_cast<int16_t>(MINIMUM_TARGET_TEMP)));
+  if (angle < 0) {
+    angle = 0;
+  } else if (angle > 270) {
+    angle = 270;
+  }
+  return static_cast<uint16_t>(angle);
+}
+
 /* ---- dashboard window, first window of the page ----
    The live sensor and thermostat values: one thermostat card with the mode, the target temperature as the big
    number inside a dial ring, the measured temperature below it, the -/+ stepper and the Heat/Off switch, followed
@@ -231,50 +304,41 @@ static void htmlWindowDashboard(void) {
   const char* stateText  = heating ? "Heating" : (thermostatHeat ? "Idle" : "Off");
   const char* stateClass = heating ? "heat" : (thermostatHeat ? "ok" : "off");
 
-  /* where the setpoint sits on the dial: MINIMUM..MAXIMUM_TARGET_TEMP is the 270 degree arc of the ring,
-     drawn with a conic-gradient whose stop is the angle in --p */
-  int16_t angle = static_cast<int16_t>((static_cast<int16_t>(myThermostat.getTargetTemperature()) - static_cast<int16_t>(MINIMUM_TARGET_TEMP)) * 270 /
-                                       (static_cast<int16_t>(MAXIMUM_TARGET_TEMP) - static_cast<int16_t>(MINIMUM_TARGET_TEMP)));
-  if (angle < 0) {
-    angle = 0;
-  } else if (angle > 270) {
-    angle = 270;
-  }
-  snprintf(angleBuf, sizeof(angleBuf), "%ddeg", angle);
+  snprintf(angleBuf, sizeof(angleBuf), "%ddeg", thermostatDialAngle());
 
-  /* THERMOSTAT: mode, target and measured temperature, stepper and mode switch in one card */
-  htmlSendText("<section class='card thermo'><div class='label'>Mode: ");
+  /* THERMOSTAT: mode, target and measured temperature, stepper and mode switch in one card. The ids are the
+     handles of the live update (htmlLiveScript): the tab patches these nodes instead of reloading the page. */
+  htmlSendText("<section class='card thermo'><div class='label'>Mode: <span id='v-mode'>");
   htmlSendText(thermostatHeat ? "Heat" : "Off");
-  htmlSendText("</div>");
+  htmlSendText("</span></div>");
 
-  htmlSendText("<div class='dial-wrap'><div class='dial");
+  htmlSendText("<div class='dial-wrap'><div id='v-dial' class='dial");
   if (thermostatHeat == false) {
     htmlSendText(" off");
   }
   htmlSendText("' style='--p:");
   htmlSendText(angleBuf);
-  htmlSendText("'></div><div class='setpoint'>");
+  htmlSendText("'></div><div class='setpoint'><span id='v-target'>");
   formatScaled(valueBuf, sizeof(valueBuf), myThermostat.getTargetTemperature(), 1);
   htmlSendText(valueBuf);
-  htmlSendText("<span class='unit'>&deg;C</span></div><div class='measured'><span class='cap'>Current</span>");
+  htmlSendText("</span><span class='unit'>&deg;C</span></div><div class='measured'><span class='cap'>Current</span><span id='v-current'>");
   if (temperatureReady) {
     formatScaled(valueBuf, sizeof(valueBuf), myThermostat.getFilteredTemperature(), 1);
     htmlSendText(valueBuf);
-    htmlSendText(" &deg;C");
   } else {
     htmlSendText("&mdash;");
   }
-  htmlSendText("</div></div>");
+  htmlSendText("</span> &deg;C</div></div>");
 
   htmlSendText(htmlThermostatStepForm);  /* - / + buttons, 0.5 °C per press, POST TargetStep */
 
-  htmlSendText("<form method='POST' action='/' autocomplete='off' class='segmented'>");
+  htmlSendText("<form method='POST' action='/' autocomplete='off' class='segmented live'>");
   if (thermostatHeat) {
-    htmlSendText("<button type='submit' name='ThermostatMode' value='1' class='active heat'>Heat</button>");
-    htmlSendText("<button type='submit' name='ThermostatMode' value='0'>Off</button>");
+    htmlSendText("<button type='submit' name='ThermostatMode' value='1' id='b-heat' class='active heat'>Heat</button>");
+    htmlSendText("<button type='submit' name='ThermostatMode' value='0' id='b-off'>Off</button>");
   } else {
-    htmlSendText("<button type='submit' name='ThermostatMode' value='1'>Heat</button>");
-    htmlSendText("<button type='submit' name='ThermostatMode' value='0' class='active off'>Off</button>");
+    htmlSendText("<button type='submit' name='ThermostatMode' value='1' id='b-heat'>Heat</button>");
+    htmlSendText("<button type='submit' name='ThermostatMode' value='0' id='b-off' class='active off'>Off</button>");
   }
   htmlSendText("</form>");
 
@@ -282,36 +346,39 @@ static void htmlWindowDashboard(void) {
   formatScaled(valueBuf, sizeof(valueBuf), myThermostat.getThermostatHysteresis(), 1);
   htmlSendText(valueBuf);
   htmlSendText(" &deg;C</div>");
-  if (sensorError) {
-    htmlSendText("<div class='sub'><span class='pill bad'>Sensor error</span></div>");
-  } else if (temperatureReady == false) {
-    htmlSendText("<div class='sub'><span class='pill muted'>Sensor starting</span></div>");
-  }
+
+  /* the sensor state is one of two pills, both in the page so the live update only flips their display */
+  htmlSendText("<div class='sub' id='v-sensor' style='display:");
+  htmlSendText((sensorError || (temperatureReady == false)) ? "block" : "none");
+  htmlSendText("'><span class='pill bad' id='v-sensor-bad' style='display:");
+  htmlSendText(sensorError ? "inline-block" : "none");
+  htmlSendText("'>Sensor error</span><span class='pill muted' id='v-sensor-wait' style='display:");
+  htmlSendText(((sensorError == false) && (temperatureReady == false)) ? "inline-block" : "none");
+  htmlSendText("'>Sensor starting</span></div>");
   htmlSendText("</section>\n");
 
   /* CARD GRID: humidity and heating state */
   htmlSendText("<div class='grid'>");
 
-  htmlSendText("<div class='card stat'><div class='label'>Current humidity</div><div class='value'>");
+  htmlSendText("<div class='card stat'><div class='label'>Current humidity</div><div class='value'><span id='v-humidity'>");
   if (humidityReady) {
     formatScaled(valueBuf, sizeof(valueBuf), myThermostat.getFilteredHumidity(), 1);
     htmlSendText(valueBuf);
-    htmlSendText("<span class='unit'>%</span>");
   } else {
     htmlSendText("&mdash;");
   }
-  htmlSendText("</div><div class='sub'>");
+  htmlSendText("</span><span class='unit'>%</span></div><div class='sub'>");
   htmlSendText(myConfig.sensor_type == cDHT22 ? "DHT22 sensor" : "BME280 sensor");
   htmlSendText("</div></div>");
 
   /* heating state: the relay, not the mode - the mode switch lives in the thermostat card above */
   htmlSendText("<div class='card stat'><div class='label'>Heating state</div><div class='state'><span class='dot ");
   htmlSendText(stateClass);
-  htmlSendText("'></span><span>");
+  htmlSendText("' id='v-dot'></span><span id='v-state'>");
   htmlSendText(stateText);
-  htmlSendText("</span></div><div class='sub'>");
+  htmlSendText("</span></div><div class='sub'><span id='v-relay'>");
   htmlSendText(heating ? "Relay on" : (thermostatHeat ? "Relay off" : "Thermostat off"));
-  htmlSendText("</div></div>");
+  htmlSendText("</span></div></div>");
 
   htmlSendText("</div>\n");
 }
@@ -531,6 +598,7 @@ void htmlStreamPage(void) {
   htmlSendText("</section>\n");
 
   htmlWindowConsole();  /* last window: the captured console output, see htmlWindowConsole() above */
+  htmlSendText(htmlLiveScript);
   htmlSendText("<footer>ESP8266 Smart Home</footer>\n");
   htmlSendText(htmlPageFooter);
 
@@ -556,4 +624,41 @@ void htmlStreamPage(void) {
   Serial.println(ESP.getFreeContStack());
   #endif
   #endif  /* LOG_LEVEL_BUILD >= 2 */
+}
+
+/* JSON the live update pulls: the same numbers the cards show. A value the sensor could not deliver is null, the
+   tab renders a dash. Small on purpose - it replaces a 12 kB page reload per refresh. */
+void handleApiState(void) {
+  const bool sensorError      = myThermostat.getSensorError();
+  const bool temperatureReady = (sensorError == false) && (myThermostat.getFilteredTemperature() != THERMOSTAT_SENSOR_INIT_VALUE);
+  const bool humidityReady    = (sensorError == false) && (myThermostat.getFilteredHumidity() != THERMOSTAT_SENSOR_INIT_VALUE);
+
+  char targetBuf[10];
+  char currentBuf[10];
+  char humidityBuf[10];
+  formatScaled(targetBuf, sizeof(targetBuf), myThermostat.getTargetTemperature(), 1);
+  if (temperatureReady) {
+    formatScaled(currentBuf, sizeof(currentBuf), myThermostat.getFilteredTemperature(), 1);
+  } else {
+    strlcpy(currentBuf, "null", sizeof(currentBuf));
+  }
+  if (humidityReady) {
+    formatScaled(humidityBuf, sizeof(humidityBuf), myThermostat.getFilteredHumidity(), 1);
+  } else {
+    strlcpy(humidityBuf, "null", sizeof(humidityBuf));
+  }
+
+  char payload[128];
+  (void)snprintf(payload, sizeof(payload),
+                 "{\"target\":%s,\"current\":%s,\"humidity\":%s,\"heat\":%d,\"relay\":%d,\"sensor\":%d,\"angle\":%u}",
+                 targetBuf,
+                 currentBuf,
+                 humidityBuf,
+                 myThermostat.getThermostatMode() == TH_HEAT ? 1 : 0,
+                 myThermostat.getActualState() ? 1 : 0,
+                 sensorError ? 1 : 0,
+                 thermostatDialAngle());
+
+  webServer.sendHeader("Cache-Control", "no-store");
+  webServer.send(200, "application/json", payload);
 }
