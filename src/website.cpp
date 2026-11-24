@@ -33,23 +33,23 @@
    the page is one literal the compiler concatenates, so the style costs one chunk of the chunked response
    instead of many. The bytes the page sends do not change with the number of literals. */
 
-static const char htmlHeadDoctype[] = "<!DOCTYPE html> <html>\n";
-static const char htmlHeadMeta[] =
+static const char htmlHeadDoctype[] PROGMEM = "<!DOCTYPE html> <html>\n";
+static const char htmlHeadMeta[] PROGMEM =
     "<head><meta charset='utf-8'>\n"
     "<meta name='viewport' content='width=device-width, initial-scale=1.0, viewport-fit=cover'>\n"
     "<meta name='theme-color' content='#f2f2f7' media='(prefers-color-scheme: light)'>\n"
     "<meta name='theme-color' content='#000000' media='(prefers-color-scheme: dark)'>\n";
-static const char htmlHeadClose[] = "</head>\n";
-static const char htmlBodyOpen[] = "<body>\n<div class='wrap'>\n";
-static const char htmlTableOpen[] = "<table>";
-static const char htmlTableClose[] = "</table>";
-static const char htmlCommandsTableOpen[] = "<div class='tablewrap'><table class='cmd'>";
-static const char htmlCommandsTableClose[] = "</table></div>";
-static const char htmlFormOpen[] = "<form method='POST' action='/' autocomplete='off'>";
-static const char htmlFormClose[] = "</form>";
-static const char htmlRestartButton[] = "<button class='plain' onclick=\"window.location.href='/restart'\">Restart</button>";
-static const char htmlRestartWaitingButton[] = "<button class='plain' onclick=\"window.location.href='/'\">Restarting, reload site</button>";
-static const char htmlThermostatStepForm[] =
+static const char htmlHeadClose[] PROGMEM = "</head>\n";
+static const char htmlBodyOpen[] PROGMEM = "<body>\n<div class='wrap'>\n";
+static const char htmlTableOpen[] PROGMEM = "<table>";
+static const char htmlTableClose[] PROGMEM = "</table>";
+static const char htmlCommandsTableOpen[] PROGMEM = "<div class='tablewrap'><table class='cmd'>";
+static const char htmlCommandsTableClose[] PROGMEM = "</table></div>";
+static const char htmlFormOpen[] PROGMEM = "<form method='POST' action='/' autocomplete='off'>";
+static const char htmlFormClose[] PROGMEM = "</form>";
+static const char htmlRestartButton[] PROGMEM = "<button class='plain' onclick=\"window.location.href='/restart'\">Restart</button>";
+static const char htmlRestartWaitingButton[] PROGMEM = "<button class='plain' onclick=\"window.location.href='/'\">Restarting, reload site</button>";
+static const char htmlThermostatStepForm[] PROGMEM =
     "<form method='POST' action='/' autocomplete='off' class='row live'>"
     "<button type='submit' name='TargetStep' value='-5' class='round' aria-label='Lower target temperature'>&minus;</button>"
     "<button type='submit' name='TargetStep' value='5' class='round' aria-label='Raise target temperature'>+</button>"
@@ -57,7 +57,7 @@ static const char htmlThermostatStepForm[] =
 /* the live update: the tab pulls /api/state every 5 s and patches the dashboard nodes instead of reloading
    the page, and the +/- and Heat/Off forms post through fetch so a press neither reloads nor jumps to the top.
    Without JavaScript (or without fetch/URLSearchParams) the plain forms work as before: POST, 303, fresh page. */
-static const char htmlLiveScript[] =
+static const char htmlLiveScript[] PROGMEM =
     "<script>\n"
     "(function(){\n"
     "if(!window.fetch||typeof URLSearchParams==='undefined'||!document.getElementById){return;}\n"
@@ -134,11 +134,11 @@ static const char htmlLiveScript[] =
     "})();\n"
     "</script>\n";
 
-static const char htmlPageFooter[] = "</div>\n</body>\n</html>\n";
+static const char htmlPageFooter[] PROGMEM = "</div>\n</body>\n</html>\n";
 
 /* the whole look of the page in one literal: a light palette and a dark palette, cards, pills, forms and the
    console window. Sizes are fluid, the layout is one centred column that folds on narrow screens. */
-static const char htmlStyleBlock[] =
+static const char htmlStyleBlock[] PROGMEM =
     "<style>\n"
     ":root{color-scheme:light dark;--bg:#f2f2f7;--card:#ffffff;--text:#1d1d1f;--muted:#6e6e73;--line:rgba(0,0,0,.08);--fill:rgba(120,120,128,.12);--accent:#0071e3;--accent-soft:rgba(0,113,227,.12);--heat:#ff9500;--heat-soft:rgba(255,149,0,.15);--ok:#248a3d;--ok-soft:rgba(52,199,89,.15);--err:#d70015;--err-soft:rgba(255,59,48,.14);--shadow:0 1px 2px rgba(0,0,0,.04),0 10px 30px rgba(0,0,0,.05)}\n"
     "@media(prefers-color-scheme:dark){:root{--bg:#000000;--card:#1c1c1e;--text:#f5f5f7;--muted:#98989d;--line:rgba(255,255,255,.10);--fill:rgba(120,120,128,.24);--accent:#0a84ff;--accent-soft:rgba(10,132,255,.18);--heat:#ff9f0a;--heat-soft:rgba(255,159,10,.18);--ok:#30d158;--ok-soft:rgba(48,209,88,.18);--err:#ff453a;--err-soft:rgba(255,69,58,.18);--shadow:none}}\n"
