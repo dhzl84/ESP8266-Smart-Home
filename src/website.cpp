@@ -372,10 +372,10 @@ void htmlStreamPage(void) {
   htmlPageBuffered = String();  /* buffer the whole page, sent with webServer.send() below */
   #else
   if (webServer.chunkedResponseModeStart(200, "text/html") == false) {
-    #ifdef CFG_DEBUG
+    #if LOG_LEVEL_BUILD >= 2
     logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("Client speaks HTTP/1.0, chunked page not sent");
-    #endif /* CFG_DEBUG */
+    #endif  /* LOG_LEVEL_BUILD >= 2 */
     return;
   }
   #endif
@@ -540,7 +540,7 @@ void htmlStreamPage(void) {
   htmlSendChunk("", 0);  /* zero length chunk closes the chunked response */
   #endif
 
-  #ifdef CFG_DEBUG
+  #if LOG_LEVEL_BUILD >= 2
   logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
   /* Serial.print() keeps the deep frames small; Serial.printf() allocates a 128 byte
      local buffer inside Print::vprintf in the cont stack that runs loop() */
@@ -550,8 +550,10 @@ void htmlStreamPage(void) {
   logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
   Serial.print("  Free Heap: ");
   Serial.println(ESP.getFreeHeap());
+  #if CFG_BOARD_ESP8266
   logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
-  Serial.print("  Free ContStack at page build: ");
+  Serial.print("  Free ContStack at page build: ");   /* ESP8266 only, the ESP32 core has no cont stack */
   Serial.println(ESP.getFreeContStack());
-  #endif /* CFG_DEBUG */
+  #endif
+  #endif  /* LOG_LEVEL_BUILD >= 2 */
 }

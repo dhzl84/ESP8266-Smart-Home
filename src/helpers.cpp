@@ -139,7 +139,7 @@ bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor)
     Serial.println("Malformed sensor calibration string >> calibration update denied");
   }
 
-  #ifdef CFG_DEBUG
+  #if LOG_LEVEL_BUILD >= 2
   logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
   Serial.println("Delimiter: " + delimiter);
   logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
@@ -148,7 +148,7 @@ bool splitSensorDataString(String sensorCalib, int16_t *offset, int16_t *factor)
   Serial.println("Offset: " + String(*offset));
   logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
   Serial.println("Factor: " + String(*factor));
-  #endif
+  #endif  /* LOG_LEVEL_BUILD >= 2 */
   return ret;
 }
 
@@ -164,10 +164,10 @@ String millisFormatted(void) {
   uint16_t s = t % 60;
 
   (void) snprintf(char_buffer, sizeof(char_buffer), "%uT %02u:%02u:%02u", d, h, m, s);
-  #ifdef CFG_DEBUG
+  #if LOG_LEVEL_BUILD >= 2
   logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
   Serial.println(char_buffer);
-  #endif  // CFG_DEBUG
+  #endif  /* LOG_LEVEL_BUILD >= 2 */
 
   return String(char_buffer);
 }

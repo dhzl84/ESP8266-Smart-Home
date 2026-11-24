@@ -146,7 +146,9 @@ char time_buffer[6] = "00:00";  /* hold the current time in format "%H:%M" */
 /*===================================================================================================================*/
 void setup() {
   #ifdef CFG_DEBUG
-  Serial.begin(115200);
+  Serial.begin(115200);   /* the UART: only a debug build drives the console stream, see LOG_TO_CONSOLE */
+  #endif
+  #if LOG_LEVEL_BUILD >= 2
   logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
   Serial.println("SETUP STARTED");
   #if CFG_BOARD_ESP8266
@@ -171,7 +173,7 @@ void setup() {
   Serial.println("Free for Sketch: " + String(ESP.getFreeSketchSpace()));
   logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
   Serial.println("Free Heap: " + String(ESP.getFreeHeap()));
-  #endif /* CFG_DEBUG */
+  #endif  /* LOG_LEVEL_BUILD >= 2 */
 
   Wire.begin(SDA_PIN, SCL_PIN);   /* needed for I²C communication with display and BME280 */
   FS_INIT();                  /* read stuff from FileSystem */
@@ -179,14 +181,14 @@ void setup() {
   myConfig.binary_version_address.concat("/version");
   myConfig.binary_address.concat(myConfig.update_server_address);
   myConfig.binary_address.concat("/firmware.bin");
-  #ifdef CFG_DEBUG
+  #if LOG_LEVEL_BUILD >= 2
   logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
   Serial.print("Update binary address: ");
   Serial.println(myConfig.binary_address);
   logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
   Serial.print("Update version file address: ");
   Serial.println(myConfig.binary_version_address);
-  #endif /* CFG_DEBUG */
+  #endif  /* LOG_LEVEL_BUILD >= 2 */
 
   GPIO_CONFIG();                  /* configure GPIOs */
 
@@ -203,10 +205,10 @@ void setup() {
   NTP();           /* acquire time */
   OTA_INIT();      /* init over the air update */
   MQTT_CONNECT();  /* connect to MQTT host and build subscriptions, must be called after FS_INIT()*/
-  #ifdef CFG_DEBUG
+  #if LOG_LEVEL_BUILD >= 2
   logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
   Serial.printf("MQTT Server IP: %s\n", myConfig.mqtt_host);
-  #endif /* CFG_DEBUG */
+  #endif  /* LOG_LEVEL_BUILD >= 2 */
   MDNS.begin(myConfig.name);
   configTzTime(myConfig.timezone, NTP_SERVER_1, NTP_SERVER_2, NTP_SERVER_3);  /* init network time protocol, must be called after WIFI_CONNECT() and FS_INIT() */
   webServer.begin();
@@ -229,10 +231,10 @@ void setup() {
   }
 
   SENSOR_MAIN();  /* acquire first sensor data before staring loop() to avoid false value reporting due to current temperature, etc. being the init value until first sensor value is read */
-  #ifdef CFG_DEBUG
+  #if LOG_LEVEL_BUILD >= 2
   logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
   Serial.println("SETUP COMPLETE - ENTER LOOP");
-  #endif /* CFG_DEBUG */
+  #endif  /* LOG_LEVEL_BUILD >= 2 */
 }
 
 /*===================================================================================================================*/
@@ -244,52 +246,52 @@ void FS_INIT(void) {  // initializes the FileSystem when first used and loads th
 
   if (!FileSystem.exists(F("/formatted"))) {
     /* This code is only run once to format the FileSystem before first usage */
-    #ifdef CFG_DEBUG
+    #if LOG_LEVEL_BUILD >= 2
     logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("Formatting FileSystem, this takes some time");
-    #endif
+    #endif  /* LOG_LEVEL_BUILD >= 2 */
     FileSystem.format();
-    #ifdef CFG_DEBUG
+    #if LOG_LEVEL_BUILD >= 2
     logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("Formatting FileSystem finished");
     logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("Open file '/formatted' in write mode");
-    #endif
+    #endif  /* LOG_LEVEL_BUILD >= 2 */
     File f = FileSystem.open("/formatted", "w");
     yield();  // yield after LittleFS open() to let UART ISR complete (prevents Level-1 interrupt corruption)
     if (!f) {
-      #ifdef CFG_DEBUG
+      #if LOG_LEVEL_BUILD >= 2
       logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
       Serial.println("file open failed");
-      #endif
+      #endif  /* LOG_LEVEL_BUILD >= 2 */
     } else {
       f.close();
       delay(5000);
       yield();  // yield after close()
       if (!FileSystem.exists(F("/formatted"))) {
-        #ifdef CFG_DEBUG
+        #if LOG_LEVEL_BUILD >= 2
         logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
         Serial.println("That didn't work!");
-        #endif
+        #endif  /* LOG_LEVEL_BUILD >= 2 */
       } else {
-        #ifdef CFG_DEBUG
+        #if LOG_LEVEL_BUILD >= 2
         logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
         Serial.println("Cool, working!");
-        #endif
+        #endif  /* LOG_LEVEL_BUILD >= 2 */
       }
     }
   } else {
-    #ifdef CFG_DEBUG
+    #if LOG_LEVEL_BUILD >= 2
     logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("Found '/formatted' >> FileSystem ready to use");
-    #endif
+    #endif  /* LOG_LEVEL_BUILD >= 2 */
   }
-  #ifdef CFG_DEBUG
+  #if LOG_LEVEL_BUILD >= 2
   logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
   Serial.println("Check if I remember who I am ... ");
-  #endif
+  #endif  /* LOG_LEVEL_BUILD >= 2 */
 
-  #ifdef CFG_DEBUG
+  #if LOG_LEVEL_BUILD >= 2
   #if CFG_BOARD_ESP8266
   Dir dir = FileSystem.openDir("/");
   while (dir.next()) {
@@ -305,14 +307,14 @@ void FS_INIT(void) {  // initializes the FileSystem when first used and loads th
   listDir(FileSystem, "/", 0);
   #else
   #endif
-  #endif  /* CFG_DEBUG */
+  #endif  /* LOG_LEVEL_BUILD >= 2 */
 
   loadConfiguration(myConfig);  // load config
 
-  #ifdef CFG_DEBUG
+  #if LOG_LEVEL_BUILD >= 2
   logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
   Serial.println("My name is: " + String(myConfig.name));
-  #endif
+  #endif  /* LOG_LEVEL_BUILD >= 2 */
 }
 
 void GPIO_CONFIG(void) {  /* initialize encoder / push button pins */
@@ -323,10 +325,10 @@ void GPIO_CONFIG(void) {  /* initialize encoder / push button pins */
 }
 
 void DISPLAY_INIT(void) {
-  #ifdef CFG_DEBUG
+  #if LOG_LEVEL_BUILD >= 2
   logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
   Serial.println("Initialize display");
-  #endif
+  #endif  /* LOG_LEVEL_BUILD >= 2 */
   myDisplay.init();
   myDisplay.flipScreenVertically();
   myDisplay.setBrightness(myConfig.display_brightness);
@@ -343,10 +345,10 @@ void DISPLAY_INIT(void) {
 }
 
 void WIFI_CONNECT(void) {
-  #ifdef CFG_DEBUG
+  #if LOG_LEVEL_BUILD >= 2
   logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
   Serial.println("Initialize WiFi ");
-  #endif
+  #endif  /* LOG_LEVEL_BUILD >= 2 */
   wifiConnected = false;
   WiFi.mode(WIFI_STA);
   #if CFG_BOARD_ESP8266
@@ -360,7 +362,7 @@ void WIFI_CONNECT(void) {
   #endif
   WiFi.begin(myConfig.ssid, myConfig.wifi_password);
 
-  #ifdef CFG_DEBUG
+  #if LOG_LEVEL_BUILD >= 2
   logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
   /* Serial.print with String concat allocates/copies while lwIP is still reconfiguring
      the WiFi port: the Level-1 UART TX ISR preempts those heap ops and corrupts the
@@ -386,7 +388,7 @@ void WIFI_CONNECT(void) {
   logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
   Serial.print("DNS IP: ");
   Serial.println(ipBuf);
-  #endif
+  #endif  /* LOG_LEVEL_BUILD >= 2 */
 }
 
 void OTA_INIT(void) {
@@ -396,26 +398,26 @@ void OTA_INIT(void) {
     myMqttClient.disconnect();
     OTA_UPDATE = TH_OTA_ACTIVE;
     DISPLAY_MAIN();
-    #ifdef CFG_DEBUG
+    #if LOG_LEVEL_BUILD >= 2
     logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("Start OTA");
-    #endif
+    #endif  /* LOG_LEVEL_BUILD >= 2 */
   });
 
   ArduinoOTA.onEnd([]() {
     OTA_UPDATE = TH_OTA_FINISHED;
     DISPLAY_MAIN();
-    #ifdef CFG_DEBUG
+    #if LOG_LEVEL_BUILD >= 2
     logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("\nEnd OTA");
-    #endif
+    #endif  /* LOG_LEVEL_BUILD >= 2 */
   });
 
   ArduinoOTA.onProgress([](uint16_t progress, uint16_t total) {
-    #ifdef CFG_DEBUG
+    #if LOG_LEVEL_BUILD >= 2
     logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-    #endif
+    #endif  /* LOG_LEVEL_BUILD >= 2 */
   });
 
   ArduinoOTA.onError([](ota_error_t error) {
@@ -689,7 +691,7 @@ void SENSOR_INIT() {
       Serial.println("Could not find a valid BME sensor!");
     } else {
       myBME280.setSettings(settings);
-      #ifdef CFG_DEBUG
+      #if LOG_LEVEL_BUILD >= 2
       // ChipModel_UNKNOWN = 0
       // ChipModel_BMP280 = 0x58
       // ChipModel_BME280 = 0x60
@@ -706,14 +708,14 @@ void SENSOR_INIT() {
         logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
         Serial.println("Sensor Chip Model: unknown");
       }
-      #endif
+      #endif  /* LOG_LEVEL_BUILD >= 2 */
     }
   } else if (myConfig.sensor_type == cDHT22) {
       myDHT22.setup(DHT_PIN, DHTesp::DHT22); /* init DHT sensor */
-      #ifdef CFG_DEBUG
+      #if LOG_LEVEL_BUILD >= 2
       logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
       Serial.println("DHT22 init: " + String(myDHT22.getStatusString()));
-      #endif
+      #endif  /* LOG_LEVEL_BUILD >= 2 */
   } else {
       logSetLevel(LOG_ERROR);   /* level 0: a configured sensor the device cannot read, in every build */
       Serial.println("Sensor misconfiguration!");
@@ -970,33 +972,33 @@ void HANDLE_HTTP_UPDATE(WiFiClient &myWiFiClient) {
     update_firmware = false;
     t_httpUpdate_return ret = myHttpUpdate.update(myWiFiClient, myConfig.binary_address, FW);
 
-    #ifdef CFG_DEBUG
+    #if LOG_LEVEL_BUILD >= 2
     logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("Remote update started");
     logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("Firmware Address: " + myConfig.binary_address);
-    #endif
+    #endif  /* LOG_LEVEL_BUILD >= 2 */
 
     switch (ret) {
     case HTTP_UPDATE_FAILED:
-      #ifdef CFG_DEBUG
+      #if LOG_LEVEL_BUILD >= 2
       logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
       Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s \n", myHttpUpdate.getLastError(), myHttpUpdate.getLastErrorString().c_str());
-      #endif
+      #endif  /* LOG_LEVEL_BUILD >= 2 */
       break;
 
     case HTTP_UPDATE_NO_UPDATES:
-      #ifdef CFG_DEBUG
+      #if LOG_LEVEL_BUILD >= 2
       logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
       Serial.println("HTTP_UPDATE_NO_UPDATES");
-      #endif
+      #endif  /* LOG_LEVEL_BUILD >= 2 */
       break;
 
     case HTTP_UPDATE_OK:
-      #ifdef CFG_DEBUG
+      #if LOG_LEVEL_BUILD >= 2
       logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
       Serial.println("HTTP_UPDATE_OK");
-      #endif
+      #endif  /* LOG_LEVEL_BUILD >= 2 */
       break;
     }
   }
@@ -1010,10 +1012,10 @@ void FS_MAIN(void) {
       requestSaveToSpiffsWithRestart = false;
       requestSaveToSpiffs = false;  /* reset non reset request as well */
       systemRestartRequest = true;
-      #ifdef CFG_DEBUG
+      #if LOG_LEVEL_BUILD >= 2
       logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
       Serial.println("Restart requested by file system handler");
-      #endif
+      #endif  /* LOG_LEVEL_BUILD >= 2 */
       } else {
       /* write failed, retry next loop */
     }
@@ -1035,11 +1037,11 @@ void FS_MAIN(void) {
     myConfig.thermostat_mode   = myThermostat.getThermostatMode();
     myThermostat.resetNewCalib();
     FS_WRITTEN = false;
-    #ifdef CFG_DEBUG
+    #if LOG_LEVEL_BUILD >= 2
     char cstr[16];
     logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.printf("FileSystem to be stored after debounce time: %s\n", itoa(FS_WRITE_DEBOUNCE, cstr, 10));
-    #endif /* CFG_DEBUG */
+    #endif  /* LOG_LEVEL_BUILD >= 2 */
   } else {
     /* no spiffs data changed this loop */
   }
@@ -1052,10 +1054,10 @@ void FS_MAIN(void) {
         FS_WRITTEN = true;
       } else {
         /* FileSystem not written, retry next loop */
-        #ifdef CFG_DEBUG
+        #if LOG_LEVEL_BUILD >= 2
         logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
         Serial.println("FileSystem write failed");
-        #endif /* CFG_DEBUG */
+        #endif  /* LOG_LEVEL_BUILD >= 2 */
       }
     } else {
       /* debounce FileSystem write */
@@ -1098,10 +1100,10 @@ static void homeAssistantPublishDiscovery(const String& topic, const char* paylo
   if (payloadLen > 0) {
     myMqttClient.publish(topic.c_str(), payload, payloadLen, true, MQTT_QOS);
   } else {
-    #ifdef CFG_DEBUG
+    #if LOG_LEVEL_BUILD >= 2
     logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("Discovery payload not published: " + topic);
-    #endif
+    #endif  /* LOG_LEVEL_BUILD >= 2 */
   }
 }
 
@@ -1234,18 +1236,18 @@ void handleWebServerClient(void) {
 
   if (webServer.args() > 0) {  /* Arguments were received */
     for ( uint8_t i = 0; i < webServer.args(); i++ ) {
-      #ifdef CFG_DEBUG
+      #if LOG_LEVEL_BUILD >= 2
       logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
       Serial.println("HTTP arg(" + String(i) + "): " + webServer.argName(i) + " = " + webServer.arg(i));  /* Display each argument */
-      #endif /* CFG_DEBUG */
+      #endif  /* LOG_LEVEL_BUILD >= 2 */
       if (webServer.argName(i) == "cmd") {  /* check for cmd */
         String key = "";
         String value = "";
         if (splitHtmlCommand(webServer.arg(i), &key, &value)) {
-          #ifdef CFG_DEBUG
+          #if LOG_LEVEL_BUILD >= 2
           logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
           Serial.println(key + " : " + value);
-          #endif /* CFG_DEBUG */
+          #endif  /* LOG_LEVEL_BUILD >= 2 */
           if (key == "console_clear") {  /* empty the console output window */
             logClear();
           } else if (key == "log_level") {  /* how loud the window is: 0 errors, 1 warnings, 2 info */
@@ -1269,36 +1271,36 @@ void handleWebServerClient(void) {
               /* new name will create new entities in HA if discovery is enabled so do a restart then */
               if (myConfig.discovery_enabled == true) {
                 requestSaveToSpiffsWithRestart = true;
-                #ifdef CFG_DEBUG
+                #if LOG_LEVEL_BUILD >= 2
                 logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
                 Serial.println("Request FileSystem write with restart.");
-                #endif
+                #endif  /* LOG_LEVEL_BUILD >= 2 */
               } else {
                 requestSaveToSpiffs = true;
-                #ifdef CFG_DEBUG
+                #if LOG_LEVEL_BUILD >= 2
                 logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
                 Serial.println("Request FileSystem write.");
-                #endif
+                #endif  /* LOG_LEVEL_BUILD >= 2 */
               }
             } else {
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("Configuration unchanged, do nothing");
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
             }
           } else if (key == "update_server_address") {
             if ( (value != "") && (value != myConfig.update_server_address) ) {
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("Request FileSystem write.");
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
               strlcpy(myConfig.update_server_address, value.c_str(), sizeof(myConfig.update_server_address));
               requestSaveToSpiffsWithRestart = true;
             } else {
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("Configuration unchanged, do nothing");
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
             }
           } else if (key == "auto_update") {
             boolean auto_update = static_cast<boolean>(value.toInt() & 1);
@@ -1306,10 +1308,10 @@ void handleWebServerClient(void) {
               myConfig.auto_update = auto_update;
               requestSaveToSpiffs = true;
             } else {
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("Configuration unchanged, do nothing");
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
             }
           } else if (key == "planned_restart") {
             boolean planned_restart = static_cast<boolean>(value.toInt() & 1);
@@ -1317,199 +1319,199 @@ void handleWebServerClient(void) {
               myConfig.planned_restart = planned_restart;
               requestSaveToSpiffs = true;
             } else {
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("Configuration unchanged, do nothing");
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
             }
           } else if (key == "calibration_factor") {
             uint8_t u8_value = (uint8_t) value.toInt();
             if ((u8_value != myConfig.calibration_factor) && (u8_value >= 50) && (u8_value <= 200)) {
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("Request FileSystem write.");
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
               myConfig.calibration_factor = static_cast<int16_t>(u8_value);
               /* also apply live (mirrors the MQTT changeSensorCalib path); without this the
                  Thermostat object kept the old factor and FS_MAIN synced the stale value back */
               myThermostat.setSensorCalibData(static_cast<int16_t>(u8_value), myThermostat.getSensorCalibOffset(), true);
               requestSaveToSpiffs = true;
             } else {
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("Configuration unchanged, do nothing");
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
             }
           } else if (key == "calibration_offset") {
             int16_t i16_value = static_cast<int16_t>(value.toInt());
             if ((i16_value != myConfig.calibration_offset) && (i16_value >= -50) && (i16_value <= 50)) {
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("Request FileSystem write.");
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
               myConfig.calibration_offset = static_cast<int16_t>(i16_value);
               /* apply live as well (see calibration_factor note) */
               myThermostat.setSensorCalibData(myThermostat.getSensorCalibFactor(), i16_value, true);
               requestSaveToSpiffs = true;
             } else {
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("Configuration unchanged, do nothing");
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
             }
           } else if (key == "display_brightness") {
             uint8_t u8_value = (uint8_t) value.toInt();
             if ((u8_value != myConfig.display_brightness) && (u8_value <= 255)) {
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("Request FileSystem write.");
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
               myConfig.display_brightness = u8_value;
               requestSaveToSpiffsWithRestart = true;
             } else {
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("Configuration unchanged, do nothing");
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
             }
           } else if (key == "update_firmware") {
             if ((value.toInt() & 1) == true) {
               update_firmware = true;
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("HTTP Update triggered via webpage");
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
             }
           } else if (key == "display_enabled") {
             if ((value.toInt() & 1) == true) {
               myConfig.display_enabled = true;
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("Display enabled via webpage");
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
             } else if ((value.toInt() & 1) == false) {
               myConfig.display_enabled = false;
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("Display disabled via webpage");
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
             }
             requestSaveToSpiffs = true;
           } else if (key == "mqtt_server_address") {
             if ( (value != "") && (value != myConfig.mqtt_host) ) {
               strlcpy(myConfig.mqtt_host, value.c_str(), sizeof(myConfig.mqtt_host));
               requestSaveToSpiffs = true;
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.printf("New MQTT server configured: %s\n", myConfig.mqtt_host);
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
             } else {
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("Configuration unchanged, do nothing");
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
             }
           } else if (key == "mqtt_server_port") {
             if ( (value.toInt() != myConfig.mqtt_port) && (value.toInt() > 0) && (value.toInt() <= UINT16_MAX) ) {
               myConfig.mqtt_port = value.toInt();
               requestSaveToSpiffs = true;
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("New MQTT port configured.");
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
             } else {
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("Configuration unchanged, do nothing");
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
             }
           } else if (key == "mqtt_user") {
             if ( (value != "") && (value != myConfig.mqtt_user) ) {
               strlcpy(myConfig.mqtt_user, value.c_str(), sizeof(myConfig.mqtt_user));
               requestSaveToSpiffs = true;
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("New MQTT user configured.");
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
             } else {
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("Configuration unchanged, do nothing");
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
             }
           } else if (key == "mqtt_pwd") {
             if ( (value != "") && (value != myConfig.mqtt_password) ) {
               strlcpy(myConfig.mqtt_password, value.c_str(), sizeof(myConfig.mqtt_password));
               requestSaveToSpiffs = true;
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("New MQTT password configured.");
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
             } else {
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("Configuration unchanged, do nothing");
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
             }
           } else if (key == "mqtt_pub_cycle") {
             if ( (value.toInt() != myConfig.mqtt_publish_cycle) && (value.toInt() > 0) && (value.toInt() <= UINT8_MAX) ) {
               myConfig.mqtt_publish_cycle = value.toInt();
               requestSaveToSpiffs = true;
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("New MQTT pyblish cycle configured.");
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
             } else {
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("Configuration unchanged, do nothing");
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
             }
           } else if (key == "timezone") {
             if ( (value != myConfig.timezone) && (value != "") ) {
               strlcpy(myConfig.timezone, value.c_str(), sizeof(myConfig.timezone));
               requestSaveToSpiffsWithRestart = true;    // restarting could be prevented by reconfiguration via configTzTime()
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("New UTC offset configured.");
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
             } else {
-              #ifdef CFG_DEBUG
+              #if LOG_LEVEL_BUILD >= 2
               logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
               Serial.println("Configuration unchanged, do nothing");
-              #endif
+              #endif  /* LOG_LEVEL_BUILD >= 2 */
             }
           }
         }
       }
       if (webServer.argName(i) == "InputMethod") {  /* check for dedicated arguments */
         if (webServer.arg(i) != String(myConfig.input_method) && (webServer.arg(i).toInt() >= 0) && (webServer.arg(i).toInt() < 2)) { /* check range and if changed at all */
-          #ifdef CFG_DEBUG
+          #if LOG_LEVEL_BUILD >= 2
           logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
           Serial.println("Request FileSystem write with restart.");
-          #endif
+          #endif  /* LOG_LEVEL_BUILD >= 2 */
           myConfig.input_method = static_cast<bool>(webServer.arg(i).toInt());
           requestSaveToSpiffsWithRestart = true;
         } else {
-          #ifdef CFG_DEBUG
+          #if LOG_LEVEL_BUILD >= 2
           logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
           Serial.println("Configuration unchanged, do nothing");
-          #endif
+          #endif  /* LOG_LEVEL_BUILD >= 2 */
         }
       }
       if (webServer.argName(i) == "Sensor") {  /* check for dedicated arguments */
         if (webServer.arg(i) != String(myConfig.sensor_type) && (webServer.arg(i).toInt() >= 0) && (webServer.arg(i).toInt() < 2)) { /* check range and if changed at all */
-          #ifdef CFG_DEBUG
+          #if LOG_LEVEL_BUILD >= 2
           logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
           Serial.println("Request FileSystem write with restart.");
-          #endif
+          #endif  /* LOG_LEVEL_BUILD >= 2 */
           myConfig.sensor_type = webServer.arg(i).toInt();
           requestSaveToSpiffsWithRestart = true;
         } else {
-          #ifdef CFG_DEBUG
+          #if LOG_LEVEL_BUILD >= 2
           logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
           Serial.println("Configuration unchanged, do nothing");
-          #endif
+          #endif  /* LOG_LEVEL_BUILD >= 2 */
         }
       }
       if (isPost && webServer.argName(i) == "LogLevel") {  /* runtime console verbosity, nothing is persisted */
@@ -1559,32 +1561,32 @@ void handleHttpReset(void) {
 /* MQTT callback if a message was received */
 void messageReceived(String &topic, String &payload) {  // NOLINT
   if (topic == myMqttHelper.getTopicSystemRestartRequest()) {
-    #ifdef CFG_DEBUG
+    #if LOG_LEVEL_BUILD >= 2
     logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("[MQTT] Restart request received with value: " + payload);
-    #endif
+    #endif  /* LOG_LEVEL_BUILD >= 2 */
     if (payload == "PRESS") {
       systemRestartRequest = true;
-      #ifdef CFG_DEBUG
+      #if LOG_LEVEL_BUILD >= 2
       logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
       Serial.println("[MQTT] Restart requested by MQTT");
-      #endif
+      #endif  /* LOG_LEVEL_BUILD >= 2 */
     }
   } else if (topic == myMqttHelper.getTopicUpdateFirmware()) { /* HTTP Update */
     if (payload == "PRESS") {
-      #ifdef CFG_DEBUG
+      #if LOG_LEVEL_BUILD >= 2
       logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
       Serial.println("[MQTT] Firmware updated triggered via MQTT");
-      #endif
+      #endif  /* LOG_LEVEL_BUILD >= 2 */
       update_firmware = true;
       myMqttHelper.setTriggerRemoveDiscovered(false);
     }
   } else if (topic == myMqttHelper.getTopicTargetTempCmd()) { /* check incoming target temperature, don't set same target temperature as new*/
     if (!isNumericPayload(payload)) {
-      #ifdef CFG_DEBUG
+      #if LOG_LEVEL_BUILD >= 2
       logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
       Serial.println("[MQTT] Non-numeric target temperature payload >> ignored: " + payload);
-      #endif
+      #endif  /* LOG_LEVEL_BUILD >= 2 */
     } else if (myThermostat.getTargetTemperature() != floatToInt(payload.toFloat())) {
       /* set new target temperature for heating control, min/max limitation inside (string to float to int16_t) */
       myThermostat.setTargetTemperature(floatToInt(payload.toFloat()));
@@ -1598,23 +1600,23 @@ void messageReceived(String &topic, String &payload) {  // NOLINT
       /* do nothing */
     }
   } else if (topic == myMqttHelper.getTopicChangeName()) {
-    #ifdef CFG_DEBUG
+    #if LOG_LEVEL_BUILD >= 2
     logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("[MQTT] New name received: " + payload);
-    #endif
+    #endif  /* LOG_LEVEL_BUILD >= 2 */
     if (payload != myConfig.name) {
-      #ifdef CFG_DEBUG
+      #if LOG_LEVEL_BUILD >= 2
       logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
       Serial.println("[MQTT] Old name was: " + String(myConfig.name));
-      #endif
+      #endif  /* LOG_LEVEL_BUILD >= 2 */
       strlcpy(myConfig.name, payload.c_str(), sizeof(myConfig.name));
       requestSaveToSpiffsWithRestart = true;
     }
   } else if (topic == myMqttHelper.getTopicChangeSensorCalib()) {
-    #ifdef CFG_DEBUG
+    #if LOG_LEVEL_BUILD >= 2
     logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("[MQTT] New sensor calibration parameters received: " + payload);
-    #endif
+    #endif  /* LOG_LEVEL_BUILD >= 2 */
 
     int16_t offset;
     int16_t factor;
@@ -1623,16 +1625,16 @@ void messageReceived(String &topic, String &payload) {  // NOLINT
       myThermostat.setSensorCalibData(factor, offset, true);
     }
   } else if (topic == myMqttHelper.getTopicChangeHysteresis()) {
-    #ifdef CFG_DEBUG
+    #if LOG_LEVEL_BUILD >= 2
     logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("[MQTT] New hysteresis parameter received: " + payload);
-    #endif
+    #endif  /* LOG_LEVEL_BUILD >= 2 */
 
     if (!isNumericPayload(payload)) {
-      #ifdef CFG_DEBUG
+      #if LOG_LEVEL_BUILD >= 2
       logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
       Serial.println("[MQTT] Non-numeric hysteresis payload >> ignored: " + payload);
-      #endif
+      #endif  /* LOG_LEVEL_BUILD >= 2 */
     } else {
       myThermostat.setThermostatHysteresis(payload.toInt());
     }
@@ -1644,17 +1646,17 @@ void messageReceived(String &topic, String &payload) {  // NOLINT
       /* Home Assistant sends "unknown" / "unavailable" when its own outside temperature
          source has no value; toFloat() on such a payload is 0.0 and would drive the
          thermostat to a false outside temperature, so the payload is dropped */
-      #ifdef CFG_DEBUG
+      #if LOG_LEVEL_BUILD >= 2
       logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
       Serial.println("[MQTT] Non-numeric outside temperature payload >> ignored");
-      #endif
+      #endif  /* LOG_LEVEL_BUILD >= 2 */
     } else {
       myThermostat.setOutsideTemperature(floatToInt(payload.toFloat()));
     }
   } else {
-    #ifdef CFG_DEBUG
+    #if LOG_LEVEL_BUILD >= 2
     logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("[MQTT] Unknown command received: " + topic + " : " + payload);
-    #endif
+    #endif  /* LOG_LEVEL_BUILD >= 2 */
   }
 }

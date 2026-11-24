@@ -145,10 +145,11 @@ void ConsoleTee::emitTimestamp(void) {
 /*===================================================================================================================*/
 /* print level                                                                                                   */
 /*===================================================================================================================*/
-/* the verbosity the tee accepts at runtime: it starts at WARNING so errors and the should-be-solved issues show,
-   and the web command log_level sets it (LOG_ERROR or LOG_INFO) without recompiling. LOG_LEVEL_BUILD is what the
-   image compiled in, not what the tee shows — see print_log.h. */
-uint8_t logRuntimeLevel = LOG_WARNING;
+/* the verbosity the tee accepts at runtime: it starts at INFO, so the capture and the console carry the running
+   values out of the box - every image compiles that text in now (LOG_LEVEL_BUILD=2 in platformio.ini). The web
+   dropdown and the log_level command lower it to WARNING or ERROR without recompiling. LOG_LEVEL_BUILD is what
+   the image compiled in, not what the tee shows - see print_log.h. */
+uint8_t logRuntimeLevel = LOG_INFO;
 
 /* the level of the line printed next; LOG_ERROR for malfunctions and fallback, LOG_WARNING for a should-be-solved
    issue, LOG_INFO for the running telemetry. A line feed in the tee resets to INFO, so the level only has to be

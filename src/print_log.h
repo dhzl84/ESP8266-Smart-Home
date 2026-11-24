@@ -45,9 +45,10 @@
   #endif
 #endif
 /* how loud the capture is at build time: 0 = failures and state changes, 1 = the running values, 2 = the
-   per-field dumps. Levels 0 and 1 compile into every build; level 2 only into debug builds, because those
-   dumps cost their print sites in the release flash. Raise LOG_LEVEL_BUILD to carry more text in a
-   release image; the web command log_level selects 0/1 at runtime without recompiling. */
+   per-field dumps. Levels 0 and 1 compile into every build; level 2 is compiled in as well, because
+   platformio.ini passes -D LOG_LEVEL_BUILD=2 to every environment - a release image carries the INFO text too
+   and pays for it in flash. The fallback below keeps a build that does not come through platformio.ini at the
+   warnings tier. The web dropdown and the log_level command pick the runtime level without recompiling. */
 #ifndef LOG_LEVEL_BUILD
   #ifdef CFG_DEBUG
     #define LOG_LEVEL_BUILD 2
@@ -108,7 +109,7 @@ void logHtmlAppend(char* row, size_t* rowLen, char c);  // NOLINT: out parameter
    level INFO    everything else: the running values, the boot table, the per-field dumps - the routine telemetry.
 
    The three levels map onto the build/toolchain gates like this:
-     INFO    compiled when LOG_LEVEL_BUILD >= 2 (the field dumps and the boot table, usually debug-only)
+     INFO    compiled when LOG_LEVEL_BUILD >= 2 (the field dumps and the boot table; every env sets it now)
      WARNING compiled when LOG_LEVEL_BUILD >= 1 (a warning is always compiled as soon as any telemetry is)
      ERROR   compiled into every build (it is the minimum the device can say about itself)
    A site above level 1 emits one line; after the line feed the next line defaults back to INFO. */

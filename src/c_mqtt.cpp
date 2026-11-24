@@ -74,12 +74,12 @@ void mqttHelper::buildTopics(void) {
    publish an empty payload: an empty retained discovery message makes Home Assistant delete the entity. */
 int mqttHelper::checkPayload(char* buf, size_t size, int written, const char* what) {
   if ((written < 0) || (static_cast<size_t>(written) >= size)) {
-    #ifdef CFG_DEBUG
+    #if LOG_LEVEL_BUILD >= 2
     logSetLevel(LOG_WARNING);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.print(what);
     Serial.print(" JSON does not fit into buffer, needed bytes: ");
     Serial.println(written + 1);
-    #endif
+    #endif  /* LOG_LEVEL_BUILD >= 2 */
     buf[0] = '\0';
     return -1;
   }

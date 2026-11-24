@@ -49,18 +49,18 @@ void loadConfiguration(Configuration &config) { // NOLINT: pass by reference
 
   DynamicJsonDocument jsonDoc(cCONFIG_JSON_SIZE);  /* heap, see cCONFIG_JSON_SIZE */
   if (!file) {
-    #ifdef CFG_DEBUG
+    #if LOG_LEVEL_BUILD >= 2
     logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("Failed to open configuration, using defaults");
-    #endif
+    #endif  /* LOG_LEVEL_BUILD >= 2 */
     jsonDoc.clear();
   } else if (jsonDoc.capacity() < cCONFIG_JSON_SIZE) {
     file.close();
     delay(1);  // let the UART/WiFi interrupt work after LittleFS access
-    #ifdef CFG_DEBUG
+    #if LOG_LEVEL_BUILD >= 2
     logSetLevel(LOG_ERROR);   /* ERROR: fallback to default configuration, the device cannot work from disk */
     Serial.println("Not enough heap for configuration, using defaults");
-    #endif
+    #endif  /* LOG_LEVEL_BUILD >= 2 */
     jsonDoc.clear();
   } else {
     DeserializationError error = deserializeJson(jsonDoc, file);
@@ -68,22 +68,23 @@ void loadConfiguration(Configuration &config) { // NOLINT: pass by reference
     delay(1);  // let the UART/WiFi interrupt work after LittleFS access
 
     if (error || jsonDoc.overflowed()) {
-      #ifdef CFG_DEBUG
+      #if LOG_LEVEL_BUILD >= 2
       logSetLevel(LOG_ERROR);   /* ERROR: deserializeJson failed, falling back to default configuration */
       Serial.print(F("deserializeJson() failed with code "));
       Serial.println(error ? error.c_str() : "NoMemory");
       logSetLevel(LOG_ERROR);   /* ERROR: fallback to default configuration */
       Serial.println("Using default configuration");
-      #endif /* CFG_DEBUG */
+      #endif  /* LOG_LEVEL_BUILD >= 2 */
       jsonDoc.clear();
     }
   }
 
+  /* CFG_DEBUG on purpose: the dump carries wifiPwd / mqttPwd and the console window is readable by any LAN host */
   #ifdef CFG_DEBUG
   serializeJsonPretty(jsonDoc, Serial);
   logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
   Serial.println();
-  #endif /* CFG_DEBUG */
+  #endif  /* CFG_DEBUG */
 
   // Copy values from the jsonDoc to the Config, if the key doesn't exist, load the default config
   strlcpy(config.name,                          jsonDoc["name"]                  | getEspChipId().c_str(), sizeof(config.name));
@@ -118,10 +119,10 @@ bool saveConfiguration(const Configuration &config) {
   DynamicJsonDocument jsonDoc(cCONFIG_JSON_SIZE);  /* heap, see cCONFIG_JSON_SIZE */
 
   if (jsonDoc.capacity() < cCONFIG_JSON_SIZE) {
-    #ifdef CFG_DEBUG
+    #if LOG_LEVEL_BUILD >= 2
     logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("Not enough heap for configuration, file not written");
-    #endif
+    #endif  /* LOG_LEVEL_BUILD >= 2 */
     return false;
   }
 
@@ -129,10 +130,10 @@ bool saveConfiguration(const Configuration &config) {
     File file = FileSystem.open(filename, "r");
     delay(1);  // let the UART/WiFi interrupt work after LittleFS access
     if (!file) {
-      #ifdef CFG_DEBUG
+      #if LOG_LEVEL_BUILD >= 2
       logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
       Serial.println("Failed to open configuration, file not written");
-      #endif
+      #endif  /* LOG_LEVEL_BUILD >= 2 */
       return false;
     }
 
@@ -143,11 +144,11 @@ bool saveConfiguration(const Configuration &config) {
     if (error || jsonDoc.overflowed()) {
       /* Do not compare fields from a partial document. Keep the file and retry later. */
       jsonDoc.clear();
-      #ifdef CFG_DEBUG
+      #if LOG_LEVEL_BUILD >= 2
       logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
       Serial.print(F("deserializeJson() failed with code "));
       Serial.println(error ? error.c_str() : "NoMemory");
-      #endif
+      #endif  /* LOG_LEVEL_BUILD >= 2 */
       return false;
     }
 
@@ -184,7 +185,7 @@ bool saveConfiguration(const Configuration &config) {
     Serial.print((config.auto_update ==             jsonDoc["autoUpd"]) ? false : true);
     Serial.print((config.planned_restart ==         jsonDoc["planRestart"]) ? false : true);
     Serial.println();
-    #endif /* CFG_DEBUG */
+    #endif  /* CFG_DEBUG */
 
     /* check if FileSystem content is equal to avoid delete and write */
 
@@ -249,10 +250,10 @@ bool saveConfiguration(const Configuration &config) {
     if (jsonDoc.overflowed()) {
       /* incomplete document, keep the old file instead of storing half a configuration */
       ret = false;
-      #ifdef CFG_DEBUG
+      #if LOG_LEVEL_BUILD >= 2
       logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
       Serial.println("Configuration does not fit into JSON document, file not written");
-      #endif /* CFG_DEBUG */
+      #endif  /* LOG_LEVEL_BUILD >= 2 */
     } else {
       /* Write to a temp file first, then rename: removing the config before writing
          (previous order) lost the whole configuration on a crash between the two steps.
@@ -265,10 +266,10 @@ bool saveConfiguration(const Configuration &config) {
       // Serialize JSON to temp file
       if (!file || serializeJson(jsonDoc, file) == 0) {
         ret = false;
-        #ifdef CFG_DEBUG
+        #if LOG_LEVEL_BUILD >= 2
         logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
         Serial.println("Failed to write temp file, keeping old configuration");
-        #endif /* CFG_DEBUG */
+        #endif  /* LOG_LEVEL_BUILD >= 2 */
         if (file) {
           file.close();
           delay(1);
@@ -284,44 +285,44 @@ bool saveConfiguration(const Configuration &config) {
         serializeJsonPretty(jsonDoc, Serial);
         logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
         Serial.println();
-        #endif /* CFG_DEBUG */
+        #endif  /* CFG_DEBUG */
         file.close();
         delay(1);  // let the UART/WiFi interrupt work after LittleFS access
 
         if (FileSystem.remove(filename)) {
-          #ifdef CFG_DEBUG
+          #if LOG_LEVEL_BUILD >= 2
           logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
           Serial.println("Removing old FileSystem file succeeded");
-          #endif /* CFG_DEBUG */
+          #endif  /* LOG_LEVEL_BUILD >= 2 */
         } else if (!FileSystem.exists(filename)) {
-          #ifdef CFG_DEBUG
+          #if LOG_LEVEL_BUILD >= 2
           logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
           Serial.println("No old FileSystem file, nothing to remove");
-          #endif /* CFG_DEBUG */
+          #endif  /* LOG_LEVEL_BUILD >= 2 */
         } else {
           ret = false;
-          #ifdef CFG_DEBUG
+          #if LOG_LEVEL_BUILD >= 2
           logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
           Serial.println("Removing old FileSystem file failed");
-          #endif /* CFG_DEBUG */
+          #endif  /* LOG_LEVEL_BUILD >= 2 */
         }
         delay(1);  // let the UART/WiFi interrupt work after LittleFS access
 
         if (!FileSystem.rename(configtmpname, filename)) {
           ret = false;
-          #ifdef CFG_DEBUG
+          #if LOG_LEVEL_BUILD >= 2
           logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
           Serial.println("Renaming temp file over configuration failed");
-          #endif /* CFG_DEBUG */
+          #endif  /* LOG_LEVEL_BUILD >= 2 */
         }
         delay(1);  // let the UART/WiFi interrupt work after LittleFS access
       }
     }
   } else {
-    #ifdef CFG_DEBUG
+    #if LOG_LEVEL_BUILD >= 2
     logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
     Serial.println("FileSystem content equals current config, no FileSystem write necessary");
-    #endif /* CFG_DEBUG */
+    #endif  /* LOG_LEVEL_BUILD >= 2 */
   }
   return ret;
 }
@@ -334,22 +335,22 @@ String readSpiffs(String file) {
     File f = FileSystem.open(file, "r");
     yield();  // yield after LittleFS open()
     if (!f) {
-      #ifdef CFG_DEBUG
+      #if LOG_LEVEL_BUILD >= 2
       logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
       Serial.println("oh no, failed to open file: " + file);
-      #endif
+      #endif  /* LOG_LEVEL_BUILD >= 2 */
       /* TODO: Error handling */
     } else {
       fileContent = f.readStringUntil('\n');
       f.close();
       delay(1);  // let the UART/WiFi interrupt work after LittleFS access
 
-      #ifdef CFG_DEBUG
+      #if LOG_LEVEL_BUILD >= 2
       if (fileContent == "") {
         logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
         Serial.println("File " + file + " is empty");
       }
-      #endif
+      #endif  /* LOG_LEVEL_BUILD >= 2 */
     }
   }
   return fileContent;
