@@ -73,6 +73,7 @@ void BME280::InitializeFilter() {
   WriteSettings();
 
   float dummy;
+  /* flawfinder: ignore - member function, not POSIX read(2): float refs, no buffer */
   read(dummy, dummy, dummy);
 
   m_settings.filter = filter;
@@ -342,6 +343,7 @@ float BME280::hum() {
 }
 
 /****************************************************************/
+/* flawfinder: ignore - member function, not POSIX read(2): float refs, no buffer */
 void BME280::read(float &pressure, float &temp, float &humidity, TempUnit tempUnit, PresUnit presUnit) {
   int32_t data[8];
   int32_t t_fine;

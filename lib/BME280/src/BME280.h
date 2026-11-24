@@ -183,6 +183,7 @@ public:
 
    /////////////////////////////////////////////////////////////////
    /// Read the data from the BME280 in the specified unit.
+   /* flawfinder: ignore - member function, not POSIX read(2): float refs, no buffer */
    void   read(
       float&    pressure,
       float&    temperature,
