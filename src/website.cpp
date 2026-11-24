@@ -49,6 +49,11 @@ static const char htmlFormOpen[] = "<form method='POST' autocomplete='off'>";
 static const char htmlFormClose[] = "</form>";
 static const char htmlRestartButton[] = "<button class='plain' onclick=\"window.location.href='/restart'\">Restart</button>";
 static const char htmlRestartWaitingButton[] = "<button class='plain' onclick=\"window.location.href='/'\">Restarting, reload site</button>";
+static const char htmlThermostatStepForm[] =
+    "<form method='POST' autocomplete='off' class='row'>"
+    "<button type='submit' name='TargetStep' value='-5' class='round' aria-label='Lower target temperature'>&minus;</button>"
+    "<button type='submit' name='TargetStep' value='5' class='round' aria-label='Raise target temperature'>+</button>"
+    "</form>";
 static const char htmlPageFooter[] = "</div>\n</body>\n</html>\n";
 
 /* the whole look of the page in one literal: a light palette and a dark palette, cards, pills, forms and the
@@ -110,7 +115,10 @@ static const char htmlStyleBlock[] =
     "input[type=submit],button{-webkit-appearance:none;appearance:none;border:0;border-radius:12px;padding:10px 16px;background:var(--accent);color:#fff;font:inherit;font-weight:600;cursor:pointer}\n"
     "input[type=submit]:active,button:active{opacity:.8}\n"
     "input[type=submit]:hover,button:hover{filter:brightness(1.06)}\n"
-    "button.plain{background:var(--fill);color:var(--text)}\n"
+    "button.plain{background:var(--fill);color:var(--text);border:1px solid var(--line)}\n"
+    ".stat .row{margin-top:14px}\n"
+    "button.round{width:40px;height:40px;padding:0;border-radius:50%;background:var(--fill);color:var(--text);font-size:20px;font-weight:500;line-height:1}\n"
+    "button.wide{width:100%}\n"
     "pre.console{margin:12px 0 0;padding:14px;border-radius:14px;background:#0f1113;color:#b8e48a;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;height:30em;overflow:auto;white-space:pre-wrap;word-break:break-all}\n"
     "footer{margin-top:24px;text-align:center;font-size:12px;color:var(--muted)}\n"
     "@media(max-width:520px){.wrap{padding:16px 12px 40px}.card{padding:16px}.hero{padding:20px 16px}.value{font-size:52px}.hero-meta{align-items:flex-start}.pills{justify-content:flex-start}.field .row{flex-direction:column;align-items:stretch}}\n"
@@ -245,21 +253,31 @@ static void htmlWindowDashboard(void) {
   htmlSendText(myConfig.sensor_type == cDHT22 ? "DHT22 sensor" : "BME280 sensor");
   htmlSendText("</div></div>");
 
+  /* target temperature: the value plus a stepper, 0.5 °C per press, POST TargetStep */
   htmlSendText("<div class='card stat'><div class='label'>Target temperature</div><div class='value'>");
   formatScaled(valueBuf, sizeof(valueBuf), myThermostat.getTargetTemperature(), 1);
   htmlSendText(valueBuf);
   htmlSendText("<span class='unit'>&deg;C</span></div><div class='sub'>Hysteresis &plusmn;");
   formatScaled(valueBuf, sizeof(valueBuf), myThermostat.getThermostatHysteresis(), 1);
   htmlSendText(valueBuf);
-  htmlSendText(" &deg;C</div></div>");
+  htmlSendText(" &deg;C</div>");
+  htmlSendText(htmlThermostatStepForm);
+  htmlSendText("</div>");
 
+  /* heating state: the state plus the heat/off switch, POST ThermostatMode */
   htmlSendText("<div class='card stat'><div class='label'>Heating state</div><div class='state'><span class='dot ");
   htmlSendText(stateClass);
   htmlSendText("'></span><span>");
   htmlSendText(stateText);
   htmlSendText("</span></div><div class='sub'>");
   htmlSendText(heating ? "Relay on" : (thermostatHeat ? "Relay off" : "Thermostat off"));
-  htmlSendText("</div></div>");
+  htmlSendText("</div>");
+  if (thermostatHeat) {
+    htmlSendText("<form method='POST' autocomplete='off' class='row'><button type='submit' name='ThermostatMode' value='0' class='plain wide'>Turn off</button></form>");
+  } else {
+    htmlSendText("<form method='POST' autocomplete='off' class='row'><button type='submit' name='ThermostatMode' value='1' class='wide'>Turn on</button></form>");
+  }
+  htmlSendText("</div>");
 
   htmlSendText("</div>\n");
 }

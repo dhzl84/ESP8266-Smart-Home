@@ -1227,16 +1227,9 @@ static void applyRuntimeLogLevel(int16_t requested) {
 }
 
 void handleWebServerClient(void) {
-  htmlStreamPage();  /* page is streamed in chunks, no page String is built */
-
-  #ifdef CFG_DEBUG_HTML
-  /* high water mark of the continuation stack that executes loop(): the core's
-     cont_check() reports 'Stack smashing detected' when this stack runs out */
-  Serial.print("Free ContStack after page send: ");
-  Serial.println(ESP.getFreeContStack());
-  #endif /* CFG_DEBUG_HTML */
-
-  /* Evaluate Received Arguments */
+  /* Evaluate Received Arguments first: the page streamed at the end of this function then already shows what
+     the POST changed, so a press on a control (target temperature, thermostat mode) is visible in the same
+     response instead of only after the next reload */
   if (webServer.args() > 0) {  /* Arguments were received */
     for ( uint8_t i = 0; i < webServer.args(); i++ ) {
       #ifdef CFG_DEBUG
@@ -1522,8 +1515,31 @@ void handleWebServerClient(void) {
           applyRuntimeLogLevel(static_cast<int16_t>(webServer.arg(i).toInt()));
         }
       }
+      if (webServer.argName(i) == "TargetStep") {  /* +/- buttons of the target temperature card, step in 0.1 °C */
+        const int16_t step = static_cast<int16_t>(webServer.arg(i).toInt());
+        if ((step >= -50) && (step <= 50) && (step != 0)) {
+          /* setTargetTemperature() clamps to MINIMUM_TARGET_TEMP / MAXIMUM_TARGET_TEMP and flags new_data_,
+             so MQTT and the display follow and FS_MAIN persists the value after its debounce */
+          myThermostat.setTargetTemperature(static_cast<int16_t>(myThermostat.getTargetTemperature()) + step);
+        }
+      }
+      if (webServer.argName(i) == "ThermostatMode") {  /* heat / off switch of the heating state card */
+        const String modeArg = webServer.arg(i);
+        if ((modeArg == "0") || (modeArg == "1")) {  /* an empty or foreign value must not switch the heating */
+          myThermostat.setThermostatMode(modeArg == "1");
+        }
+      }
     }
   }
+
+  htmlStreamPage();  /* page is streamed in chunks, no page String is built */
+
+  #ifdef CFG_DEBUG_HTML
+  /* high water mark of the continuation stack that executes loop(): the core's
+     cont_check() reports 'Stack smashing detected' when this stack runs out */
+  Serial.print("Free ContStack after page send: ");
+  Serial.println(ESP.getFreeContStack());
+  #endif /* CFG_DEBUG_HTML */
 }
 
 void handleHttpReset(void) {
