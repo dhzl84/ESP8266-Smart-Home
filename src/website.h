@@ -13,6 +13,7 @@
 
 #include "main.h"          /* the board, config and version macros and the library helpers the page renders */
 #include "c_mqtt.h"        /* mqttHelper: the class of myMqttHelper, whose last error the page shows */
+#include "c_thermostat.h"  /* Thermostat: the class of myThermostat, whose sensor and heating state the page shows */
 #include "MQTTClient.h"    /* MQTTClient: the class of myMqttClient, whose connection state the page shows */
 
 /*===================================================================================================================*/
@@ -21,6 +22,7 @@
 extern uint32_t mqtt_connect_counter;
 extern bool     update_firmware;
 extern struct Configuration myConfig;
+extern Thermostat myThermostat;
 extern mqttHelper myMqttHelper;
 extern MQTTClient myMqttClient;
 extern DiffTime MyLooptime;

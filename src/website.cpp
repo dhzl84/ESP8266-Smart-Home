@@ -8,9 +8,15 @@
    by cont_check), and each row checks its own length so a row that does not fit is reported by key instead of
    silently truncating.
 
+   The page opens with a dashboard window that shows the live sensor and thermostat values (current temperature,
+   current humidity, target temperature, heating state), followed by the configuration windows and the console
+   output window of print_log.h as the last window at the bottom; the command console_clear that empties it is
+   handled in main.cpp.
+
    The page is rebuilt from the current configuration on every request, which is what makes POST work: the browser
-   sends the changed values back to the same URL. The console output window of print_log.h is the last window at
-   the bottom; the command console_clear that empties it is handled in main.cpp. */
+   sends the changed values back to the same URL. The style is one flash literal with a light and a dark palette
+   (prefers-color-scheme), rounded cards and the platform UI font, so the page follows the system appearance of the
+   phone or desktop that opens it. */
 
 /*===================================================================================================================*/
 /* includes                                                                                                   */
@@ -23,28 +29,91 @@
 /* page resources: the static page HTML, as flash literals                                                  */
 /*===================================================================================================================*/
 /* The literals sit in the text section, exactly where the page used to keep them unnamed. Named, the repeating
-   fragments share one literal (the three POST forms, the table closes, the two restart buttons) and the style of
+   fragments share one literal (the POST forms, the table closes, the two restart buttons) and the style of
    the page is one literal the compiler concatenates, so the style costs one chunk of the chunked response
-   instead of six. The bytes the page sends do not change. */
+   instead of many. The bytes the page sends do not change with the number of literals. */
 
 static const char htmlHeadDoctype[] = "<!DOCTYPE html> <html>\n";
-static const char htmlHeadMeta[] = "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
+static const char htmlHeadMeta[] =
+    "<head><meta charset='utf-8'>\n"
+    "<meta name='viewport' content='width=device-width, initial-scale=1.0, viewport-fit=cover'>\n"
+    "<meta name='theme-color' content='#f2f2f7' media='(prefers-color-scheme: light)'>\n"
+    "<meta name='theme-color' content='#000000' media='(prefers-color-scheme: dark)'>\n";
 static const char htmlHeadClose[] = "</head>\n";
-static const char htmlBodyOpen[] = "<body>\n";
+static const char htmlBodyOpen[] = "<body>\n<div class='wrap'>\n";
 static const char htmlTableOpen[] = "<table>";
 static const char htmlTableClose[] = "</table>";
-static const char htmlCommandsTableOpen[] = "<table style='font-size: 12px'>";
+static const char htmlCommandsTableOpen[] = "<div class='tablewrap'><table class='cmd'>";
+static const char htmlCommandsTableClose[] = "</table></div>";
 static const char htmlFormOpen[] = "<form method='POST' autocomplete='off'>";
 static const char htmlFormClose[] = "</form>";
-static const char htmlRestartButton[] = "<button onclick=\"window.location.href='/restart'\"> Restart </button>";
-static const char htmlRestartWaitingButton[] = "<button onclick=\"window.location.href='/'\"> Restarting, reload site </button>";
-static const char htmlPageFooter[] = "</body>\n" "</html>\n";
+static const char htmlRestartButton[] = "<button class='plain' onclick=\"window.location.href='/restart'\">Restart</button>";
+static const char htmlRestartWaitingButton[] = "<button class='plain' onclick=\"window.location.href='/'\">Restarting, reload site</button>";
+static const char htmlPageFooter[] = "</div>\n</body>\n</html>\n";
+
+/* the whole look of the page in one literal: a light palette and a dark palette, cards, pills, forms and the
+   console window. Sizes are fluid, the layout is one centred column that folds on narrow screens. */
 static const char htmlStyleBlock[] =
-    "<style>html { font-family: Helvetica; font-size: 16px; display: inline-block; margin: 0px auto; text-align: left;}\n"
-    "body {background-color: #202226; color: #A0A2A8}\n"
-    "p {color: #2686c1; margin-bottom: 10px;}\n"
-    "table {color: #A0A2A8;}\n"
-    "pre { color: #B8E48A; background-color: #0D0F12; border: 1px solid #41484F; border-radius: 4px; padding: 4px 8px; margin: 6px 0px 0px 0px; font-family: 'Courier'; font-size: 12px; line-height: 1.2; height: 30em; overflow-y: scroll; white-space: pre-wrap; word-break: break-all; }\n"
+    "<style>\n"
+    ":root{color-scheme:light dark;--bg:#f2f2f7;--card:#ffffff;--text:#1d1d1f;--muted:#6e6e73;--line:rgba(0,0,0,.08);--fill:rgba(120,120,128,.12);--accent:#0071e3;--accent-soft:rgba(0,113,227,.12);--heat:#ff9500;--heat-soft:rgba(255,149,0,.15);--ok:#248a3d;--ok-soft:rgba(52,199,89,.15);--err:#d70015;--err-soft:rgba(255,59,48,.14);--shadow:0 1px 2px rgba(0,0,0,.04),0 10px 30px rgba(0,0,0,.05)}\n"
+    "@media(prefers-color-scheme:dark){:root{--bg:#000000;--card:#1c1c1e;--text:#f5f5f7;--muted:#98989d;--line:rgba(255,255,255,.10);--fill:rgba(120,120,128,.24);--accent:#0a84ff;--accent-soft:rgba(10,132,255,.18);--heat:#ff9f0a;--heat-soft:rgba(255,159,10,.18);--ok:#30d158;--ok-soft:rgba(48,209,88,.18);--err:#ff453a;--err-soft:rgba(255,69,58,.18);--shadow:none}}\n"
+    "*{box-sizing:border-box}\n"
+    "html{-webkit-text-size-adjust:100%}\n"
+    "body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 -apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}\n"
+    ".wrap{max-width:760px;margin:0 auto;padding:20px 16px 48px}\n"
+    ".top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:4px 0 18px}\n"
+    ".brand{font-size:20px;font-weight:600;letter-spacing:-.015em}\n"
+    ".brand small{display:block;margin-top:2px;font-size:12px;font-weight:400;color:var(--muted);letter-spacing:0}\n"
+    ".pills{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}\n"
+    ".pill{display:inline-block;padding:5px 11px;border-radius:999px;background:var(--fill);color:var(--muted);font-size:12px;font-weight:500;white-space:nowrap}\n"
+    ".pill.ok{background:var(--ok-soft);color:var(--ok)}\n"
+    ".pill.bad{background:var(--err-soft);color:var(--err)}\n"
+    ".pill.heat{background:var(--heat-soft);color:var(--heat)}\n"
+    ".card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px;margin:0 0 14px;box-shadow:var(--shadow)}\n"
+    ".hero{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:24px}\n"
+    ".label{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}\n"
+    ".value{margin-top:4px;font-size:64px;font-weight:600;line-height:1.05;letter-spacing:-.035em;font-variant-numeric:tabular-nums}\n"
+    ".unit{margin-left:5px;font-size:24px;font-weight:500;letter-spacing:0;color:var(--muted)}\n"
+    ".hero-meta{display:flex;flex-direction:column;align-items:flex-end;gap:8px}\n"
+    ".grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin:0 0 14px}\n"
+    ".grid .card{margin:0;padding:18px}\n"
+    ".stat .value{font-size:30px;letter-spacing:-.02em}\n"
+    ".stat .value .unit{font-size:16px}\n"
+    ".sub{margin-top:8px;font-size:12px;color:var(--muted)}\n"
+    ".state{display:flex;align-items:center;gap:9px;margin-top:12px;font-size:22px;font-weight:600;letter-spacing:-.01em}\n"
+    ".dot{width:11px;height:11px;border-radius:50%;background:var(--muted);flex:0 0 auto}\n"
+    ".dot.heat{background:var(--heat);animation:pulse 2s ease-out infinite}\n"
+    "@keyframes pulse{0%{box-shadow:0 0 0 0 var(--heat-soft)}70%{box-shadow:0 0 0 9px rgba(0,0,0,0)}100%{box-shadow:0 0 0 0 rgba(0,0,0,0)}}\n"
+    "details.card>summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;font-weight:600;font-size:15px}\n"
+    "details.card>summary::-webkit-details-marker{display:none}\n"
+    "details.card>summary::after{content:'+';font-size:20px;font-weight:400;color:var(--muted);line-height:1}\n"
+    "details.card[open]>summary::after{content:'\\2212'}\n"
+    "details.card[open]>summary{margin-bottom:12px}\n"
+    "table{width:100%;border-collapse:collapse;font-size:14px}\n"
+    "td{padding:11px 0;border-bottom:1px solid var(--line);vertical-align:top;word-break:break-word}\n"
+    "tr:last-child td{border-bottom:0}\n"
+    "td:first-child{width:46%;padding-right:14px;color:var(--muted)}\n"
+    "td:nth-child(2){font-weight:500}\n"
+    ".tablewrap{margin-top:4px;overflow-x:auto}\n"
+    "table.cmd{font-size:13px}\n"
+    "table.cmd td{width:auto;padding:9px 12px 9px 0;color:var(--text);font-weight:400}\n"
+    "table.cmd td:first-child{width:auto;color:var(--text);font-weight:600;white-space:nowrap;padding-right:16px}\n"
+    "table.cmd tr:first-child td{color:var(--muted);font-weight:600}\n"
+    ".formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:14px}\n"
+    ".field{display:flex;flex-direction:column;gap:7px}\n"
+    ".field>label{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}\n"
+    ".row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}\n"
+    "select,input[type=text]{-webkit-appearance:none;appearance:none;width:100%;min-width:0;flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background-color:var(--fill);color:var(--text);font:inherit}\n"
+    "select{padding-right:34px;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 18px) calc(50% - 2px),calc(100% - 13px) calc(50% - 2px);background-size:5px 5px,5px 5px;background-repeat:no-repeat,no-repeat}\n"
+    "input::placeholder{color:var(--muted);opacity:1}\n"
+    "select:focus,input[type=text]:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}\n"
+    "input[type=submit],button{-webkit-appearance:none;appearance:none;border:0;border-radius:12px;padding:10px 16px;background:var(--accent);color:#fff;font:inherit;font-weight:600;cursor:pointer}\n"
+    "input[type=submit]:active,button:active{opacity:.8}\n"
+    "input[type=submit]:hover,button:hover{filter:brightness(1.06)}\n"
+    "button.plain{background:var(--fill);color:var(--text)}\n"
+    "pre.console{margin:12px 0 0;padding:14px;border-radius:14px;background:#0f1113;color:#b8e48a;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;height:30em;overflow:auto;white-space:pre-wrap;word-break:break-all}\n"
+    "footer{margin-top:24px;text-align:center;font-size:12px;color:var(--muted)}\n"
+    "@media(max-width:520px){.wrap{padding:16px 12px 40px}.card{padding:16px}.hero{padding:20px 16px}.value{font-size:52px}.hero-meta{align-items:flex-start}.pills{justify-content:flex-start}.field .row{flex-direction:column;align-items:stretch}}\n"
     "</style>\n";
 
 
@@ -92,7 +161,7 @@ static void htmlRowAppend(int rowLen, const char* key, const char* row, size_t r
 
 static void htmlRow2(const char* key, const char* value) {
   char row[HTML_ROW_BUF_SIZE];
-  htmlRowAppend(snprintf(row, sizeof(row), "<tr><td>%s:</td><td>%s</td></tr>", key, value), key, row, sizeof(row));
+  htmlRowAppend(snprintf(row, sizeof(row), "<tr><td>%s</td><td>%s</td></tr>", key, value), key, row, sizeof(row));
 }
 
 static void htmlRow2Str(const char* key, const String& value) {  /* core APIs that return String */
@@ -101,12 +170,12 @@ static void htmlRow2Str(const char* key, const String& value) {  /* core APIs th
 
 static void htmlRow2U32(const char* key, uint32_t value, const char* suffix = "") {
   char row[HTML_ROW_BUF_SIZE];
-  htmlRowAppend(snprintf(row, sizeof(row), "<tr><td>%s:</td><td>%" PRIu32 "%s</td></tr>", key, value, suffix), key, row, sizeof(row));
+  htmlRowAppend(snprintf(row, sizeof(row), "<tr><td>%s</td><td>%" PRIu32 "%s</td></tr>", key, value, suffix), key, row, sizeof(row));
 }
 
 static void htmlRow2I32(const char* key, int32_t value, const char* suffix = "") {
   char row[HTML_ROW_BUF_SIZE];
-  htmlRowAppend(snprintf(row, sizeof(row), "<tr><td>%s:</td><td>%" PRId32 "%s</td></tr>", key, value, suffix), key, row, sizeof(row));
+  htmlRowAppend(snprintf(row, sizeof(row), "<tr><td>%s</td><td>%" PRId32 "%s</td></tr>", key, value, suffix), key, row, sizeof(row));
 }
 
 static void htmlRow4(const char* key, const char* value, const char* current_value, const char* description) {
@@ -117,6 +186,82 @@ static void htmlRow4(const char* key, const char* value, const char* current_val
 static void htmlRow4Int(const char* key, const char* value, int16_t current_value, const char* description) {
   char row[HTML_ROW_BUF_SIZE];
   htmlRowAppend(snprintf(row, sizeof(row), "<tr><td>%s</td><td>%s</td><td>%d</td><td>%s</td></tr>", key, value, current_value, description), key, row, sizeof(row));
+}
+
+/* one status pill: 'ok', 'bad', 'heat' or 'muted' picks the colour, the text is a page literal */
+static void htmlPill(const char* text, const char* state) {
+  char row[128];
+  htmlRowAppend(snprintf(row, sizeof(row), "<span class='pill %s'>%s</span>", state, text), "pill", row, sizeof(row));
+}
+
+/* ---- dashboard window, first window of the page ----
+   The live sensor and thermostat values: current temperature as the hero number, humidity, target temperature and
+   heating state as cards below it. A value that the sensor could not deliver yet is a dash instead of a wrong
+   number: the thermostat keeps THERMOSTAT_SENSOR_INIT_VALUE until the first successful read, and the sensor
+   error flag stays set while the reads fail. */
+static void htmlWindowDashboard(void) {
+  char valueBuf[16];
+  const bool sensorError      = myThermostat.getSensorError();
+  const bool temperatureReady = (sensorError == false) && (myThermostat.getFilteredTemperature() != THERMOSTAT_SENSOR_INIT_VALUE);
+  const bool humidityReady    = (sensorError == false) && (myThermostat.getFilteredHumidity() != THERMOSTAT_SENSOR_INIT_VALUE);
+  const bool thermostatHeat   = (myThermostat.getThermostatMode() == TH_HEAT);
+  const bool heating          = thermostatHeat && myThermostat.getActualState();
+
+  const char* stateText  = heating ? "Heating" : (thermostatHeat ? "Idle" : "Off");
+  const char* stateClass = heating ? "heat" : (thermostatHeat ? "ok" : "off");
+
+  /* HERO: current temperature */
+  htmlSendText("<section class='card hero'><div><div class='label'>Current temperature</div><div class='value'>");
+  if (temperatureReady) {
+    formatScaled(valueBuf, sizeof(valueBuf), myThermostat.getFilteredTemperature(), 1);
+    htmlSendText(valueBuf);
+    htmlSendText("<span class='unit'>&deg;C</span>");
+  } else {
+    htmlSendText("&mdash;");
+  }
+  htmlSendText("</div></div><div class='hero-meta'>");
+  htmlPill(thermostatHeat ? "Heat" : "Off", thermostatHeat ? "heat" : "muted");
+  if (sensorError) {
+    htmlPill("Sensor error", "bad");
+  } else if (temperatureReady == false) {
+    htmlPill("Sensor starting", "muted");
+  } else {
+    htmlPill("Sensor ok", "ok");
+  }
+  htmlSendText("</div></section>\n");
+
+  /* CARD GRID: humidity, target temperature, heating state */
+  htmlSendText("<div class='grid'>");
+
+  htmlSendText("<div class='card stat'><div class='label'>Current humidity</div><div class='value'>");
+  if (humidityReady) {
+    formatScaled(valueBuf, sizeof(valueBuf), myThermostat.getFilteredHumidity(), 1);
+    htmlSendText(valueBuf);
+    htmlSendText("<span class='unit'>%</span>");
+  } else {
+    htmlSendText("&mdash;");
+  }
+  htmlSendText("</div><div class='sub'>");
+  htmlSendText(myConfig.sensor_type == cDHT22 ? "DHT22 sensor" : "BME280 sensor");
+  htmlSendText("</div></div>");
+
+  htmlSendText("<div class='card stat'><div class='label'>Target temperature</div><div class='value'>");
+  formatScaled(valueBuf, sizeof(valueBuf), myThermostat.getTargetTemperature(), 1);
+  htmlSendText(valueBuf);
+  htmlSendText("<span class='unit'>&deg;C</span></div><div class='sub'>Hysteresis &plusmn;");
+  formatScaled(valueBuf, sizeof(valueBuf), myThermostat.getThermostatHysteresis(), 1);
+  htmlSendText(valueBuf);
+  htmlSendText(" &deg;C</div></div>");
+
+  htmlSendText("<div class='card stat'><div class='label'>Heating state</div><div class='state'><span class='dot ");
+  htmlSendText(stateClass);
+  htmlSendText("'></span><span>");
+  htmlSendText(stateText);
+  htmlSendText("</span></div><div class='sub'>");
+  htmlSendText(heating ? "Relay on" : (thermostatHeat ? "Relay off" : "Thermostat off"));
+  htmlSendText("</div></div>");
+
+  htmlSendText("</div>\n");
 }
 
 /* ---- console output window, last window at the bottom of the page ----
@@ -131,20 +276,20 @@ static void htmlWindowConsole(void) {
 
   char numBuf[24];
 
-  htmlSendText("<p><b>Console Output</b></p>");
-  htmlSendText("<p><small>showing ");
+  htmlSendText("<section class='card'><div class='row' style='justify-content:space-between'>");
+  htmlSendText("<div class='label'>Console output</div><div class='sub' style='margin:0'>");
   snprintf(numBuf, sizeof(numBuf), "%" PRIu32, window.linesShown);
   htmlSendText(numBuf);
-  htmlSendText(" of ");
+  htmlSendText(" / ");
   snprintf(numBuf, sizeof(numBuf), "%" PRIu32, window.linesTotal);
   htmlSendText(numBuf);
-  htmlSendText(" captured lines");
+  htmlSendText(" lines");
   if ((window.start < window.end) && (logLineStart(window.start) == false)) {
     htmlSendText(", first line cut off by the capture buffer");
   }
-  htmlSendText("</small></p>");
+  htmlSendText("</div></div>");
 
-  htmlSendText("<pre>");
+  htmlSendText("<pre class='console'>");
   if (window.linesTotal > window.linesShown) {
     htmlSendText("&hellip; older lines dropped\n");
   }
@@ -160,13 +305,15 @@ static void htmlWindowConsole(void) {
   if (rowLen > 0) {
     htmlSendChunk(row, rowLen);
   }
-  htmlSendText("</pre>");
+  htmlSendText("</pre></section>\n");
 }
 
 void htmlStreamPage(void) {
   float rssiInPercent = WiFi.RSSI();
   rssiInPercent = isnan(rssiInPercent) ? -100.0 : min(max(2 * (rssiInPercent + 100.0), 0.0), 100.0);
-  char numBuf[16];  /* one scratch buffer for values that need formatting */
+  #if CFG_BOARD_ESP8266
+  char numBuf[16];  /* one scratch buffer for the Vcc row */
+  #endif
 
   htmlPageBytes = 0;
   #if CFG_BOARD_ESP32
@@ -191,7 +338,22 @@ void htmlStreamPage(void) {
   htmlSendText(htmlHeadClose);
   /* BODY */
   htmlSendText(htmlBodyOpen);
-  htmlSendText("<p><b>System information</b></p>");
+
+  /* header: device name, firmware and the connection pills */
+  htmlSendText("<header class='top'><div class='brand'>");
+  htmlSendText(myConfig.name);
+  htmlSendText("<small>Thermostat &middot; FW ");
+  htmlSendText(VERSION);
+  htmlSendText("</small></div><div class='pills'>");
+  htmlPill(WiFi.status() == WL_CONNECTED ? "Wi-Fi" : "Wi-Fi off", WiFi.status() == WL_CONNECTED ? "ok" : "bad");
+  htmlPill(myMqttClient.connected() ? "MQTT" : "MQTT off", myMqttClient.connected() ? "ok" : "bad");
+  htmlSendText("</div></header>\n");
+
+  /* sensor and thermostat values */
+  htmlWindowDashboard();
+
+  /* SYSTEM INFORMATION */
+  htmlSendText("<details class='card'><summary>System information</summary>");
   htmlSendText(htmlTableOpen);
   /*= KEY ======================================||= VALUE ================================*/
   htmlRow2("Name", myConfig.name);
@@ -229,35 +391,42 @@ void htmlStreamPage(void) {
   htmlRow2U32("Looptime min [&micro;s]", MyLooptime.get_time_duration_min());
   htmlRow2U32("Looptime max [&micro;s]", MyLooptime.get_time_duration_max());
   htmlSendText(htmlTableClose);
-  /* Change Input Method */
-  htmlSendText("<p><b>Change Input Method</b></p>");
-  htmlSendText(htmlFormOpen);
+  htmlSendText("</details>\n");
 
-  if (myConfig.input_method == cPUSH_BUTTONS) {
-    htmlSendText("<select name='InputMethod'> <option value='0'>Rotary Encoder </option> <option value='1' selected> Push Buttons </option> </select>&nbsp;<input type='submit' value='Submit'>");
-  } else {
-    htmlSendText("<select name='InputMethod'> <option value='0' selected> Rotary Encoder </option> <option value='1'> Push Buttons </option> </select>&nbsp;<input type='submit' value='Submit'>");
-  }
-  htmlSendText(htmlFormClose);
-  /* Change sensor */
-  htmlSendText("<p><b>Change Sensor</b></p>");
+  /* CONFIGURATION: input method and sensor, one POST form each */
+  htmlSendText("<section class='card'><div class='label'>Configuration</div><div class='formgrid'>");
+
   htmlSendText(htmlFormOpen);
-  htmlSendText("<select name='Sensor'> ");
+  htmlSendText("<div class='field'><label for='input_method'>Input method</label><div class='row'><select name='InputMethod' id='input_method'>");
+  if (myConfig.input_method == cPUSH_BUTTONS) {
+    htmlSendText("<option value='0'>Rotary Encoder </option> <option value='1' selected> Push Buttons </option>");
+  } else {
+    htmlSendText("<option value='0' selected> Rotary Encoder </option> <option value='1'> Push Buttons </option>");
+  }
+  htmlSendText("</select><input type='submit' value='Apply'></div></div>");
+  htmlSendText(htmlFormClose);
+
+  htmlSendText(htmlFormOpen);
+  htmlSendText("<div class='field'><label for='sensor'>Sensor</label><div class='row'><select name='Sensor' id='sensor'>");
   if (myConfig.sensor_type == cDHT22) {  /* select currently configured input method */
     htmlSendText("<option value='0' selected >DHT22 </option> <option value='1'> BME280 </option>");
   } else {
     htmlSendText("<option value='0'>DHT22 </option> <option value='1' selected > BME280 </option>");
   }
-  htmlSendText("</select>&nbsp;<input type='submit' value='Submit'>");
+  htmlSendText("</select><input type='submit' value='Apply'></div></div>");
   htmlSendText(htmlFormClose);
 
-  /* Command Line */
-  htmlSendText("<p><b>Command Line</b></p>");
+  htmlSendText("</div></section>\n");
+
+  /* COMMAND LINE */
+  htmlSendText("<section class='card'><div class='label'>Command line</div>");
   htmlSendText(htmlFormOpen);
-  htmlSendText("<input type='text' name='cmd' value='key:value'>&nbsp;<input type='submit' value='Submit'>");
+  htmlSendText("<div class='row' style='margin-top:12px'><input type='text' name='cmd' placeholder='key:value' aria-label='Command'><input type='submit' value='Send'></div>");
   htmlSendText(htmlFormClose);
-  htmlSendText("<p><b>Commands</b></p>");
+  htmlSendText("</section>\n");
+
   /* COMMANDS TABLE */
+  htmlSendText("<details class='card'><summary>Commands</summary>");
   htmlSendText(htmlCommandsTableOpen);
   htmlRow4("<b>Key</b>", "<b>Value</b>", "<b>Current Value</b>", "<b>Description</b>");
   htmlRow4("discover", "0 | 1", "none", "MQTT on demand device discovery: 1 = discover; 0 = remove");
@@ -279,15 +448,20 @@ void htmlStreamPage(void) {
   htmlRow4("timezone", "string", myConfig.timezone, "Timezone for NTP, pick from this list: https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv");
   htmlRow4("console_clear", "1", "none", "Clear the console output window (last window at the bottom of the page)");
   htmlRow4Int("log_level", "0..2", logRuntimeLevel, "Console window verbosity: 0 errors, 1 warnings, 2 info");
-  htmlSendText(htmlTableClose);
-  /* Restart Device */
-  htmlSendText("<p><b>Restart Device</b></p>");
+  htmlSendText(htmlCommandsTableClose);
+  htmlSendText("</details>\n");
+
+  /* RESTART DEVICE */
+  htmlSendText("<section class='card'><div class='row' style='justify-content:space-between'><div><div class='label'>Restart device</div><div class='sub'>Reboots the controller and reloads this page.</div></div>");
   if (systemRestartRequest == false) {
-  htmlSendText(htmlRestartButton);
+    htmlSendText(htmlRestartButton);
   } else {
-  htmlSendText(htmlRestartWaitingButton);
+    htmlSendText(htmlRestartWaitingButton);
   }
+  htmlSendText("</div></section>\n");
+
   htmlWindowConsole();  /* last window: the captured console output, see htmlWindowConsole() above */
+  htmlSendText("<footer>ESP8266 Smart Home</footer>\n");
   htmlSendText(htmlPageFooter);
 
   #if CFG_BOARD_ESP32
