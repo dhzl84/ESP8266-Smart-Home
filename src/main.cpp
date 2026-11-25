@@ -138,7 +138,7 @@ bool     wifiConnected = false;
    dispatches, so the handlers below record it. They run in the SDK's event context, where a Serial print would
    preempt the heap work of the reconnect (see the note in WIFI_CONNECT()) - they store numbers only, and
    HANDLE_SYSTEM_STATE() prints them from the loop, where every print site of this project lives. */
-uint16_t wifiDisconnectTotal = 0;   /* drops and failed connect attempts since boot, shown on the page */
+uint16_t wifiDisconnectTotal = 0;   /* station disconnect events (drops and failed reconnect attempts) since boot, shown on the page */
 /* one validated RSSI reader for the log, the status page and the API: a real reading is negative and only
    exists while the link is up; the ESP8266 reports 31 (a positive error code) when it has none, so anything
    >= 0 or a dropped link is rejected instead of being stored as a bogus signal strength */
@@ -678,15 +678,26 @@ void HANDLE_SYSTEM_STATE(void) {
     wifiDropPending = false;
     wifiDisconnectTotal++;
     const uint32_t upMs = (wifiLinkUpAtMs == 0) ? 0 : (millis() - wifiLinkUpAtMs);
+    char rssiText[40];
+    if (wifiRssi < 0) {
+      (void)snprintf(rssiText, sizeof(rssiText), "rssi %d dBm (min %d)",
+                     static_cast<int>(wifiRssi), static_cast<int>(wifiRssiMin));
+    } else {
+      strlcpy(rssiText, "rssi n/a", sizeof(rssiText));
+    }
     logSetLevel(LOG_WARNING);   /* level 1: the link dropped, always captured */
-    Serial.printf("[WiFi] Drop: reason %u %s, rssi %d dBm (min %d), ch %u, up %u s, heap %u\n",
+    Serial.printf("[WiFi] Drop: reason %u %s, %s, ch %u, up %u s, heap %u\n",
                   static_cast<unsigned int>(wifiDropReason),
                   wifiDropReasonToString(wifiDropReason),
-                  static_cast<int>(wifiRssi),
-                  static_cast<int>(wifiRssiMin),
+                  rssiText,
                   static_cast<unsigned int>(wifiChannel),
                   static_cast<unsigned int>(millisecondsToSeconds(upMs)),
                   static_cast<unsigned int>(ESP.getFreeHeap()));
+    /* a failed reconnect attempt never had a link: after the first Drop of an outage the figures are
+       cleared, so later Drop lines read 'rssi n/a' and 'up 0 s' instead of the previous association's */
+    wifiRssi       = 0;
+    wifiRssiMin    = 0;
+    wifiLinkUpAtMs = 0;
   }
   if (wifiDhcpTimedOut == true) {
     wifiDhcpTimedOut = false;
@@ -719,9 +730,15 @@ void HANDLE_SYSTEM_STATE(void) {
         wifiRssiMin = upRssi;
       }
       wifiLinkUpAtMs = millis();
+      char rssiUpText[20];
+      if (wifiRssi < 0) {
+        (void)snprintf(rssiUpText, sizeof(rssiUpText), "rssi %d dBm", static_cast<int>(wifiRssi));
+      } else {
+        strlcpy(rssiUpText, "rssi n/a", sizeof(rssiUpText));
+      }
       logSetLevel(LOG_WARNING);   /* level 0: the link is back, always captured */
-      Serial.printf("[WiFi] Up: rssi %d dBm, ch %u, drops %u, heap %u\n",
-                    static_cast<int>(wifiRssi),
+      Serial.printf("[WiFi] Up: %s, ch %u, drops %u, heap %u\n",
+                    rssiUpText,
                     static_cast<unsigned int>(wifiChannel),
                     static_cast<unsigned int>(wifiDisconnectTotal),
                     static_cast<unsigned int>(ESP.getFreeHeap()));
