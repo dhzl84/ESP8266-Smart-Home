@@ -160,7 +160,6 @@ static volatile bool     wifiDhcpTimedOut = false;  /* the station asked for an 
 static int16_t           wifiRssi         = 0;      /* last RSSI seen while the link was up, dBm */
 static int16_t           wifiRssiMin      = 0;      /* weakest RSSI of the current association, dBm */
 static uint8_t           wifiChannel      = 0;      /* channel of the current association */
-static uint8_t           wifiBssid[6]     = {0, 0, 0, 0, 0, 0};  /* BSSID: a different one after a reconnect = roaming */
 static uint32_t          wifiLinkUpAtMs   = 0;      /* millis() of the current association, 0 = was never up */
 
 static void onStationDisconnected(const WiFiEventStationModeDisconnected& event) {
@@ -709,14 +708,11 @@ void HANDLE_SYSTEM_STATE(void) {
       logSetLevel(LOG_WARNING);   /* level 0: a connection state change, in every build and always captured */
       Serial.printf("[WiFi] Status: %s\n", wifiStatusToString(WiFi.status()).c_str());
       #if CFG_BOARD_ESP8266
-      /* the association details: a BSSID that changes between two connects means the station roams between APs */
-      const uint8_t* bssid = WiFi.BSSID();
-      if (bssid != nullptr) {
-        for (uint8_t i = 0; i < sizeof(wifiBssid); i++) {
-          wifiBssid[i] = bssid[i];
-        }
-      }
+      /* the association details; the AP BSSID is deliberately not logged: the console window is served by the
+         unauthenticated status page, so the AP MAC would leak to anyone on the LAN */
       wifiChannel    = WiFi.channel();
+      wifiRssi       = 0;   /* start a fresh association: never carry the previous link's figures into its drops */
+      wifiRssiMin    = 0;
       int16_t upRssi = 0;
       if (readValidRssi(&upRssi)) {
         wifiRssi    = upRssi;
@@ -724,10 +720,9 @@ void HANDLE_SYSTEM_STATE(void) {
       }
       wifiLinkUpAtMs = millis();
       logSetLevel(LOG_WARNING);   /* level 0: the link is back, always captured */
-      Serial.printf("[WiFi] Up: rssi %d dBm, ch %u, bssid %02X:%02X:%02X:%02X:%02X:%02X, drops %u, heap %u\n",
+      Serial.printf("[WiFi] Up: rssi %d dBm, ch %u, drops %u, heap %u\n",
                     static_cast<int>(wifiRssi),
                     static_cast<unsigned int>(wifiChannel),
-                    wifiBssid[0], wifiBssid[1], wifiBssid[2], wifiBssid[3], wifiBssid[4], wifiBssid[5],
                     static_cast<unsigned int>(wifiDisconnectTotal),
                     static_cast<unsigned int>(ESP.getFreeHeap()));
       #endif  /* CFG_BOARD_ESP8266 */

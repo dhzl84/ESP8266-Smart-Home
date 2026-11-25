@@ -754,7 +754,7 @@ void handleApiState(void) {
   dropsField[0] = '\0';
   #endif
   const int payloadLen = snprintf(payload, sizeof(payload),
-                 "{\"target\":%s,\"current\":%s,\"humidity\":%s,\"heat\":%d,\"relay\":%d,\"sensor\":%d,\"angle\":%u,\"log\":%" PRIu32 ",%s,\"heap\":%u%s}",
+                 "{\"target\":%s,\"current\":%s,\"humidity\":%s,\"heat\":%d,\"relay\":%d,\"sensor\":%d,\"angle\":%u,\"log\":%" PRIu32 ",%s%s}",
                  targetBuf,
                  currentBuf,
                  humidityBuf,
@@ -764,7 +764,6 @@ void handleApiState(void) {
                  thermostatDialAngle(),
                  logWindow.linesTotal,
                  linkField,
-                 static_cast<unsigned int>(ESP.getFreeHeap()),
                  dropsField);
   if ((payloadLen < 0) || (static_cast<size_t>(payloadLen) >= sizeof(payload))) {
     /* the fixed fields never reach the buffer size, but fail loud instead of sending cut JSON */
