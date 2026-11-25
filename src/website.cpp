@@ -497,10 +497,18 @@ static void htmlWindowConsole(void) {
 }
 
 void htmlStreamPage(void) {
-  float rssiInPercent = WiFi.RSSI();
-  rssiInPercent = isnan(rssiInPercent) ? -100.0 : min(max(2 * (rssiInPercent + 100.0), 0.0), 100.0);
+  int16_t pageRssi = 0;
+  const bool pageRssiValid = readValidRssi(&pageRssi);
+  float rssiInPercent = 0.0;
+  if (pageRssiValid) {
+    rssiInPercent = min(max(2 * (static_cast<float>(pageRssi) + 100.0f), 0.0f), 100.0f);
+  }
   char rssiBuf[16];  /* the dBm figure the percentage above hides */
-  (void)snprintf(rssiBuf, sizeof(rssiBuf), "%d dBm", static_cast<int>(WiFi.RSSI()));
+  if (pageRssiValid) {
+    (void)snprintf(rssiBuf, sizeof(rssiBuf), "%d dBm", static_cast<int>(pageRssi));
+  } else {
+    strlcpy(rssiBuf, "n/a", sizeof(rssiBuf));
+  }
   #if CFG_BOARD_ESP8266
   char numBuf[16];  /* one scratch buffer for the Vcc row */
   #endif
@@ -574,7 +582,9 @@ void htmlStreamPage(void) {
   htmlRow2Str("WiFi Status", wifiStatusToString(WiFi.status()));
   htmlRow2I32("WiFi Strength", static_cast<int32_t>(rssiInPercent), " %");
   htmlRow2Str("WiFi Signal", rssiBuf);
+  #if CFG_BOARD_ESP8266
   htmlRow2U32("WiFi Drops", wifiDisconnectTotal);
+  #endif
   htmlRow2("MQTT Status", myMqttClient.connected() ? "connected" : "disconnected");
   htmlRow2U32("MQTT Connects", mqtt_connect_counter);
   htmlRow2Str("MQTT Last Error", myMqttHelper.mqttLastErrorToString((int8_t)myMqttClient.lastError()));
@@ -728,9 +738,23 @@ void handleApiState(void) {
   logWindowSnapshot(&logWindow);
 
   char payload[256];  /* the dashboard values plus the link figures a drop report needs */
+  int16_t apiRssi = 0;
+  char linkField[40];  /* rssi/ch as a unit: both are meaningless when the link is down */
+  if (readValidRssi(&apiRssi)) {
+    (void)snprintf(linkField, sizeof(linkField), "\"rssi\":%d,\"ch\":%u",
+                   static_cast<int>(apiRssi), static_cast<unsigned int>(WiFi.channel()));
+  } else {
+    strlcpy(linkField, "\"rssi\":null,\"ch\":null", sizeof(linkField));
+  }
+  char dropsField[24];  /* the drop counter is only meaningful on the ESP8266 board */
+  #if CFG_BOARD_ESP8266
+  (void)snprintf(dropsField, sizeof(dropsField), ",\"drops\":%u",
+                 static_cast<unsigned int>(wifiDisconnectTotal));
+  #else
+  dropsField[0] = '\0';
+  #endif
   (void)snprintf(payload, sizeof(payload),
-                 "{\"target\":%s,\"current\":%s,\"humidity\":%s,\"heat\":%d,\"relay\":%d,\"sensor\":%d,\"angle\":%u,\"log\":%" PRIu32 ","
-                 "\"rssi\":%d,\"ch\":%u,\"heap\":%u,\"drops\":%u}",
+                 "{\"target\":%s,\"current\":%s,\"humidity\":%s,\"heat\":%d,\"relay\":%d,\"sensor\":%d,\"angle\":%u,\"log\":%" PRIu32 ",%s,\"heap\":%u%s}",
                  targetBuf,
                  currentBuf,
                  humidityBuf,
@@ -739,10 +763,9 @@ void handleApiState(void) {
                  sensorError ? 1 : 0,
                  thermostatDialAngle(),
                  logWindow.linesTotal,
-                 static_cast<int>(WiFi.RSSI()),
-                 static_cast<unsigned int>(WiFi.channel()),
+                 linkField,
                  static_cast<unsigned int>(ESP.getFreeHeap()),
-                 static_cast<unsigned int>(wifiDisconnectTotal));
+                 dropsField);
 
   webServer.sendHeader("Cache-Control", "no-store");
   webServer.send(200, "application/json", payload);

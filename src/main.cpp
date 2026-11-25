@@ -139,6 +139,20 @@ bool     wifiConnected = false;
    preempt the heap work of the reconnect (see the note in WIFI_CONNECT()) - they store numbers only, and
    HANDLE_SYSTEM_STATE() prints them from the loop, where every print site of this project lives. */
 uint16_t wifiDisconnectTotal = 0;   /* drops and failed connect attempts since boot, shown on the page */
+/* one validated RSSI reader for the log, the status page and the API: a real reading is negative and only
+   exists while the link is up; the ESP8266 reports 31 (a positive error code) when it has none, so anything
+   >= 0 or a dropped link is rejected instead of being stored as a bogus signal strength */
+bool readValidRssi(int16_t* out) {
+  if (WiFi.status() != WL_CONNECTED) {
+    return false;
+  }
+  const int16_t value = static_cast<int16_t>(WiFi.RSSI());
+  if (value >= 0) {
+    return false;
+  }
+  *out = value;
+  return true;
+}
 #if CFG_BOARD_ESP8266
 static volatile uint8_t  wifiDropReason   = 0;      /* WiFiDisconnectReason of the last drop, 0 = none recorded */
 static volatile bool     wifiDropPending  = false;  /* a drop was recorded and not printed yet */
@@ -681,13 +695,11 @@ void HANDLE_SYSTEM_STATE(void) {
     Serial.println("[WiFi] Drop: DHCP timeout, the AP handed out no address");
   }
   /* sample the link while it is up: these are the figures the next drop line reports */
-  if (wifiConnected == true) {
-    const int16_t rssi = static_cast<int16_t>(WiFi.RSSI());
-    if (rssi != 0) {
-      wifiRssi = rssi;
-      if ((wifiRssiMin == 0) || (rssi < wifiRssiMin)) {
-        wifiRssiMin = rssi;
-      }
+  int16_t sampledRssi = 0;
+  if (readValidRssi(&sampledRssi)) {
+    wifiRssi = sampledRssi;
+    if ((wifiRssiMin == 0) || (sampledRssi < wifiRssiMin)) {
+      wifiRssiMin = sampledRssi;
     }
   }
   #endif  /* CFG_BOARD_ESP8266 */
@@ -705,8 +717,11 @@ void HANDLE_SYSTEM_STATE(void) {
         }
       }
       wifiChannel    = WiFi.channel();
-      wifiRssi       = static_cast<int16_t>(WiFi.RSSI());
-      wifiRssiMin    = wifiRssi;
+      int16_t upRssi = 0;
+      if (readValidRssi(&upRssi)) {
+        wifiRssi    = upRssi;
+        wifiRssiMin = upRssi;
+      }
       wifiLinkUpAtMs = millis();
       logSetLevel(LOG_WARNING);   /* level 0: the link is back, always captured */
       Serial.printf("[WiFi] Up: rssi %d dBm, ch %u, bssid %02X:%02X:%02X:%02X:%02X:%02X, drops %u, heap %u\n",
