@@ -130,6 +130,83 @@ bool     requestSaveToSpiffs = false;
 bool     requestSaveToSpiffsWithRestart = false;
 bool     wifiConnected = false;
 
+/*===================================================================================================================*/
+/* WiFi link diagnostics                                                                                             */
+/*===================================================================================================================*/
+/* Nothing in loop() re-issues WiFi.begin(): a link that drops and comes back is the station's own auto-reconnect
+   (WiFi.setAutoReconnect() in WIFI_CONNECT()). The only evidence of *why* it dropped is the station event the core
+   dispatches, so the handlers below record it. They run in the SDK's event context, where a Serial print would
+   preempt the heap work of the reconnect (see the note in WIFI_CONNECT()) - they store numbers only, and
+   HANDLE_SYSTEM_STATE() prints them from the loop, where every print site of this project lives. */
+uint16_t wifiDisconnectTotal = 0;   /* station disconnect events (drops and failed reconnect attempts) since boot, shown on the page */
+/* one validated RSSI reader for the log, the status page and the API: a real reading is negative and only
+   exists while the link is up; the ESP8266 reports 31 (a positive error code) when it has none, so anything
+   >= 0 or a dropped link is rejected instead of being stored as a bogus signal strength */
+bool readValidRssi(int16_t* out) {
+  if (WiFi.status() != WL_CONNECTED) {
+    return false;
+  }
+  const int16_t value = static_cast<int16_t>(WiFi.RSSI());
+  if (value >= 0) {
+    return false;
+  }
+  *out = value;
+  return true;
+}
+#if CFG_BOARD_ESP8266
+static volatile uint8_t  wifiDropReason   = 0;      /* WiFiDisconnectReason of the last drop, 0 = none recorded */
+static volatile bool     wifiDropPending  = false;  /* a drop was recorded and not printed yet */
+static volatile bool     wifiDhcpTimedOut = false;  /* the station asked for an address and got none */
+static int16_t           wifiRssi         = 0;      /* last RSSI seen while the link was up, dBm */
+static int16_t           wifiRssiMin      = 0;      /* weakest RSSI of the current association, dBm */
+static uint8_t           wifiChannel      = 0;      /* channel of the current association */
+static uint32_t          wifiLinkUpAtMs   = 0;      /* millis() of the current association, 0 = was never up */
+
+static void onStationDisconnected(const WiFiEventStationModeDisconnected& event) {
+  wifiDropReason  = static_cast<uint8_t>(event.reason);
+  wifiDropPending = true;
+}
+
+static void onStationDhcpTimeout(void) {
+  wifiDhcpTimedOut = true;
+}
+
+/* the drop reason as the 802.11 name: the numbers are what the AP said, the names are what to search for */
+static const char* wifiDropReasonToString(uint8_t reason) {
+  switch (reason) {
+    case WIFI_DISCONNECT_REASON_UNSPECIFIED:            return "UNSPECIFIED";
+    case WIFI_DISCONNECT_REASON_AUTH_EXPIRE:            return "AUTH_EXPIRE";
+    case WIFI_DISCONNECT_REASON_AUTH_LEAVE:             return "AUTH_LEAVE";
+    case WIFI_DISCONNECT_REASON_ASSOC_EXPIRE:           return "ASSOC_EXPIRE";
+    case WIFI_DISCONNECT_REASON_ASSOC_TOOMANY:          return "ASSOC_TOOMANY";
+    case WIFI_DISCONNECT_REASON_NOT_AUTHED:             return "NOT_AUTHED";
+    case WIFI_DISCONNECT_REASON_NOT_ASSOCED:            return "NOT_ASSOCED";
+    case WIFI_DISCONNECT_REASON_ASSOC_LEAVE:            return "ASSOC_LEAVE (the AP deauthenticated us)";
+    case WIFI_DISCONNECT_REASON_ASSOC_NOT_AUTHED:       return "ASSOC_NOT_AUTHED";
+    case WIFI_DISCONNECT_REASON_DISASSOC_PWRCAP_BAD:    return "DISASSOC_PWRCAP_BAD";
+    case WIFI_DISCONNECT_REASON_DISASSOC_SUPCHAN_BAD:   return "DISASSOC_SUPCHAN_BAD";
+    case WIFI_DISCONNECT_REASON_IE_INVALID:             return "IE_INVALID";
+    case WIFI_DISCONNECT_REASON_MIC_FAILURE:            return "MIC_FAILURE";
+    case WIFI_DISCONNECT_REASON_4WAY_HANDSHAKE_TIMEOUT: return "4WAY_HANDSHAKE_TIMEOUT";
+    case WIFI_DISCONNECT_REASON_GROUP_KEY_UPDATE_TIMEOUT: return "GROUP_KEY_UPDATE_TIMEOUT";
+    case WIFI_DISCONNECT_REASON_IE_IN_4WAY_DIFFERS:     return "IE_IN_4WAY_DIFFERS";
+    case WIFI_DISCONNECT_REASON_GROUP_CIPHER_INVALID:   return "GROUP_CIPHER_INVALID";
+    case WIFI_DISCONNECT_REASON_PAIRWISE_CIPHER_INVALID: return "PAIRWISE_CIPHER_INVALID";
+    case WIFI_DISCONNECT_REASON_AKMP_INVALID:           return "AKMP_INVALID";
+    case WIFI_DISCONNECT_REASON_UNSUPP_RSN_IE_VERSION:  return "UNSUPP_RSN_IE_VERSION";
+    case WIFI_DISCONNECT_REASON_INVALID_RSN_IE_CAP:     return "INVALID_RSN_IE_CAP";
+    case WIFI_DISCONNECT_REASON_802_1X_AUTH_FAILED:     return "802_1X_AUTH_FAILED";
+    case WIFI_DISCONNECT_REASON_CIPHER_SUITE_REJECTED:  return "CIPHER_SUITE_REJECTED";
+    case WIFI_DISCONNECT_REASON_BEACON_TIMEOUT:         return "BEACON_TIMEOUT (the AP went out of range)";
+    case WIFI_DISCONNECT_REASON_NO_AP_FOUND:            return "NO_AP_FOUND";
+    case WIFI_DISCONNECT_REASON_AUTH_FAIL:              return "AUTH_FAIL";
+    case WIFI_DISCONNECT_REASON_ASSOC_FAIL:             return "ASSOC_FAIL";
+    case WIFI_DISCONNECT_REASON_HANDSHAKE_TIMEOUT:      return "HANDSHAKE_TIMEOUT";
+    default:                                            return "unknown";
+  }
+}
+#endif  /* CFG_BOARD_ESP8266 */
+
 #define  FS_WRITE_DEBOUNCE      minutes_to_milliseconds(30) /* write FileSystem 30 minutes after last change */
 bool     FS_WRITTEN =           true;
 uint32_t FS_REFERENCE_TIME      = 0;
@@ -358,6 +435,9 @@ void WIFI_CONNECT(void) {
   WiFi.hostname(myConfig.name);
   WiFi.setAutoConnect(true);
   WiFi.setAutoReconnect(true);
+  /* record why the station loses the link; registered before begin() so the first attempt is covered too */
+  WiFi.onStationModeDisconnected(onStationDisconnected);
+  WiFi.onStationModeDHCPTimeout(onStationDhcpTimeout);
   #elif CFG_BOARD_ESP32
   WiFi.setHostname(myConfig.name);
   WiFi.setSleep(false);
@@ -590,10 +670,92 @@ void loop() {
 /* functions called by loop() */
 /*===================================================================================================================*/
 void HANDLE_SYSTEM_STATE(void) {
+  #if CFG_BOARD_ESP8266
+  /* A drop is printed here, not in the event handler: the handler runs in the SDK's event context, where a print
+     can preempt the heap work of the reconnect (see the note in WIFI_CONNECT()), and the figures below describe
+     the link that just went away - WiFi.RSSI() and WiFi.channel() already read the state of the next attempt. */
+  if (wifiDropPending == true) {
+    wifiDropPending = false;
+    wifiDisconnectTotal++;
+    const uint32_t upMs = (wifiLinkUpAtMs == 0) ? 0 : (millis() - wifiLinkUpAtMs);
+    char rssiText[40];
+    char chText[12];
+    if (wifiRssi < 0) {
+      (void)snprintf(rssiText, sizeof(rssiText), "rssi %d dBm (min %d)",
+                     static_cast<int>(wifiRssi), static_cast<int>(wifiRssiMin));
+    } else {
+      strlcpy(rssiText, "rssi n/a", sizeof(rssiText));
+    }
+    if (wifiChannel != 0) {
+      (void)snprintf(chText, sizeof(chText), "ch %u", static_cast<unsigned int>(wifiChannel));
+    } else {
+      strlcpy(chText, "ch n/a", sizeof(chText));
+    }
+    logSetLevel(LOG_WARNING);   /* level 1: the link dropped, always captured */
+    Serial.printf("[WiFi] Drop: reason %u %s, %s, %s, up %u s, heap %u\n",
+                  static_cast<unsigned int>(wifiDropReason),
+                  wifiDropReasonToString(wifiDropReason),
+                  rssiText,
+                  chText,
+                  static_cast<unsigned int>(millisecondsToSeconds(upMs)),
+                  static_cast<unsigned int>(ESP.getFreeHeap()));
+    /* a failed reconnect attempt never had a link: after the first Drop of an outage the figures are
+       cleared, so later Drop lines read 'rssi n/a', 'ch n/a' and 'up 0 s' instead of the previous link's */
+    wifiRssi       = 0;
+    wifiRssiMin    = 0;
+    wifiChannel    = 0;
+    wifiLinkUpAtMs = 0;
+  }
+  if (wifiDhcpTimedOut == true) {
+    wifiDhcpTimedOut = false;
+    logSetLevel(LOG_WARNING);   /* level 1: an attempt that never got an address, always captured */
+    Serial.println("[WiFi] Drop: DHCP timeout, the AP handed out no address");
+  }
+  /* sample the link while it is up: these are the figures the next drop line reports */
+  int16_t sampledRssi = 0;
+  if (readValidRssi(&sampledRssi)) {
+    wifiRssi = sampledRssi;
+    if ((wifiRssiMin == 0) || (sampledRssi < wifiRssiMin)) {
+      wifiRssiMin = sampledRssi;
+    }
+  }
+  #endif  /* CFG_BOARD_ESP8266 */
+
   if (WiFi.status() == WL_CONNECTED) {
     if (wifiConnected == false) {
       logSetLevel(LOG_WARNING);   /* level 0: a connection state change, in every build and always captured */
       Serial.printf("[WiFi] Status: %s\n", wifiStatusToString(WiFi.status()).c_str());
+      #if CFG_BOARD_ESP8266
+      /* the association details; the AP BSSID is deliberately not logged: the console window is served by the
+         unauthenticated status page, so the AP MAC would leak to anyone on the LAN */
+      wifiChannel    = WiFi.channel();
+      wifiRssi       = 0;   /* start a fresh association: never carry the previous link's figures into its drops */
+      wifiRssiMin    = 0;
+      int16_t upRssi = 0;
+      if (readValidRssi(&upRssi)) {
+        wifiRssi    = upRssi;
+        wifiRssiMin = upRssi;
+      }
+      wifiLinkUpAtMs = millis();
+      char rssiUpText[20];
+      char chUpText[12];
+      if (wifiRssi < 0) {
+        (void)snprintf(rssiUpText, sizeof(rssiUpText), "rssi %d dBm", static_cast<int>(wifiRssi));
+      } else {
+        strlcpy(rssiUpText, "rssi n/a", sizeof(rssiUpText));
+      }
+      if (wifiChannel != 0) {
+        (void)snprintf(chUpText, sizeof(chUpText), "ch %u", static_cast<unsigned int>(wifiChannel));
+      } else {
+        strlcpy(chUpText, "ch n/a", sizeof(chUpText));
+      }
+      logSetLevel(LOG_WARNING);   /* level 0: the link is back, always captured */
+      Serial.printf("[WiFi] Up: %s, %s, drops %u, heap %u\n",
+                    rssiUpText,
+                    chUpText,
+                    static_cast<unsigned int>(wifiDisconnectTotal),
+                    static_cast<unsigned int>(ESP.getFreeHeap()));
+      #endif  /* CFG_BOARD_ESP8266 */
     }
     wifiConnected = true;
   } else {
