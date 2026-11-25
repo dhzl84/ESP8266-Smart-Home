@@ -679,24 +679,31 @@ void HANDLE_SYSTEM_STATE(void) {
     wifiDisconnectTotal++;
     const uint32_t upMs = (wifiLinkUpAtMs == 0) ? 0 : (millis() - wifiLinkUpAtMs);
     char rssiText[40];
+    char chText[12];
     if (wifiRssi < 0) {
       (void)snprintf(rssiText, sizeof(rssiText), "rssi %d dBm (min %d)",
                      static_cast<int>(wifiRssi), static_cast<int>(wifiRssiMin));
     } else {
       strlcpy(rssiText, "rssi n/a", sizeof(rssiText));
     }
+    if (wifiChannel != 0) {
+      (void)snprintf(chText, sizeof(chText), "ch %u", static_cast<unsigned int>(wifiChannel));
+    } else {
+      strlcpy(chText, "ch n/a", sizeof(chText));
+    }
     logSetLevel(LOG_WARNING);   /* level 1: the link dropped, always captured */
-    Serial.printf("[WiFi] Drop: reason %u %s, %s, ch %u, up %u s, heap %u\n",
+    Serial.printf("[WiFi] Drop: reason %u %s, %s, %s, up %u s, heap %u\n",
                   static_cast<unsigned int>(wifiDropReason),
                   wifiDropReasonToString(wifiDropReason),
                   rssiText,
-                  static_cast<unsigned int>(wifiChannel),
+                  chText,
                   static_cast<unsigned int>(millisecondsToSeconds(upMs)),
                   static_cast<unsigned int>(ESP.getFreeHeap()));
     /* a failed reconnect attempt never had a link: after the first Drop of an outage the figures are
-       cleared, so later Drop lines read 'rssi n/a' and 'up 0 s' instead of the previous association's */
+       cleared, so later Drop lines read 'rssi n/a', 'ch n/a' and 'up 0 s' instead of the previous link's */
     wifiRssi       = 0;
     wifiRssiMin    = 0;
+    wifiChannel    = 0;
     wifiLinkUpAtMs = 0;
   }
   if (wifiDhcpTimedOut == true) {
@@ -731,15 +738,21 @@ void HANDLE_SYSTEM_STATE(void) {
       }
       wifiLinkUpAtMs = millis();
       char rssiUpText[20];
+      char chUpText[12];
       if (wifiRssi < 0) {
         (void)snprintf(rssiUpText, sizeof(rssiUpText), "rssi %d dBm", static_cast<int>(wifiRssi));
       } else {
         strlcpy(rssiUpText, "rssi n/a", sizeof(rssiUpText));
       }
+      if (wifiChannel != 0) {
+        (void)snprintf(chUpText, sizeof(chUpText), "ch %u", static_cast<unsigned int>(wifiChannel));
+      } else {
+        strlcpy(chUpText, "ch n/a", sizeof(chUpText));
+      }
       logSetLevel(LOG_WARNING);   /* level 0: the link is back, always captured */
-      Serial.printf("[WiFi] Up: %s, ch %u, drops %u, heap %u\n",
+      Serial.printf("[WiFi] Up: %s, %s, drops %u, heap %u\n",
                     rssiUpText,
-                    static_cast<unsigned int>(wifiChannel),
+                    chUpText,
                     static_cast<unsigned int>(wifiDisconnectTotal),
                     static_cast<unsigned int>(ESP.getFreeHeap()));
       #endif  /* CFG_BOARD_ESP8266 */
