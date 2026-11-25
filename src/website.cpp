@@ -753,7 +753,7 @@ void handleApiState(void) {
   #else
   dropsField[0] = '\0';
   #endif
-  (void)snprintf(payload, sizeof(payload),
+  const int payloadLen = snprintf(payload, sizeof(payload),
                  "{\"target\":%s,\"current\":%s,\"humidity\":%s,\"heat\":%d,\"relay\":%d,\"sensor\":%d,\"angle\":%u,\"log\":%" PRIu32 ",%s,\"heap\":%u%s}",
                  targetBuf,
                  currentBuf,
@@ -766,6 +766,10 @@ void handleApiState(void) {
                  linkField,
                  static_cast<unsigned int>(ESP.getFreeHeap()),
                  dropsField);
+  if ((payloadLen < 0) || (static_cast<size_t>(payloadLen) >= sizeof(payload))) {
+    /* the fixed fields never reach the buffer size, but fail loud instead of sending cut JSON */
+    strlcpy(payload, "{\"error\":\"payload truncated\"}", sizeof(payload));
+  }
 
   webServer.sendHeader("Cache-Control", "no-store");
   webServer.send(200, "application/json", payload);

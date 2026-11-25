@@ -62,6 +62,7 @@ struct Configuration {
 /* WiFi link counters main.cpp owns; the status page renders them */
 /*===================================================================================================================*/
 extern uint16_t wifiDisconnectTotal;  /* drops and failed connect attempts of the SDK's auto-reconnect since boot */
+bool readValidRssi(int16_t* out);     /* main.cpp: true and *out set only for a real (negative) RSSI while the link is up */
 
 /*===================================================================================================================*/
 /* function declarations */

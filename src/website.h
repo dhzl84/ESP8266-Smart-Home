@@ -28,8 +28,6 @@ extern MQTTClient myMqttClient;
 extern DiffTime MyLooptime;
 extern char time_buffer[];
 extern bool systemRestartRequest;
-extern uint16_t wifiDisconnectTotal;
-bool readValidRssi(int16_t* out);   /* true and *out set only for a real (negative) RSSI while the link is up */
 #if CFG_BOARD_ESP8266
 extern ESP8266WebServer webServer;
 #elif CFG_BOARD_ESP32
