@@ -499,6 +499,8 @@ static void htmlWindowConsole(void) {
 void htmlStreamPage(void) {
   float rssiInPercent = WiFi.RSSI();
   rssiInPercent = isnan(rssiInPercent) ? -100.0 : min(max(2 * (rssiInPercent + 100.0), 0.0), 100.0);
+  char rssiBuf[16];  /* the dBm figure the percentage above hides */
+  (void)snprintf(rssiBuf, sizeof(rssiBuf), "%d dBm", static_cast<int>(WiFi.RSSI()));
   #if CFG_BOARD_ESP8266
   char numBuf[16];  /* one scratch buffer for the Vcc row */
   #endif
@@ -571,6 +573,8 @@ void htmlStreamPage(void) {
   htmlRow2Str("IPv4", WiFi.localIP().toString());
   htmlRow2Str("WiFi Status", wifiStatusToString(WiFi.status()));
   htmlRow2I32("WiFi Strength", static_cast<int32_t>(rssiInPercent), " %");
+  htmlRow2Str("WiFi Signal", rssiBuf);
+  htmlRow2U32("WiFi Drops", wifiDisconnectTotal);
   htmlRow2("MQTT Status", myMqttClient.connected() ? "connected" : "disconnected");
   htmlRow2U32("MQTT Connects", mqtt_connect_counter);
   htmlRow2Str("MQTT Last Error", myMqttHelper.mqttLastErrorToString((int8_t)myMqttClient.lastError()));
@@ -723,9 +727,10 @@ void handleApiState(void) {
   LogWindow logWindow;
   logWindowSnapshot(&logWindow);
 
-  char payload[192];
+  char payload[256];  /* the dashboard values plus the link figures a drop report needs */
   (void)snprintf(payload, sizeof(payload),
-                 "{\"target\":%s,\"current\":%s,\"humidity\":%s,\"heat\":%d,\"relay\":%d,\"sensor\":%d,\"angle\":%u,\"log\":%" PRIu32 "}",
+                 "{\"target\":%s,\"current\":%s,\"humidity\":%s,\"heat\":%d,\"relay\":%d,\"sensor\":%d,\"angle\":%u,\"log\":%" PRIu32 ","
+                 "\"rssi\":%d,\"ch\":%u,\"heap\":%u,\"drops\":%u}",
                  targetBuf,
                  currentBuf,
                  humidityBuf,
@@ -733,7 +738,11 @@ void handleApiState(void) {
                  myThermostat.getActualState() ? 1 : 0,
                  sensorError ? 1 : 0,
                  thermostatDialAngle(),
-                 logWindow.linesTotal);
+                 logWindow.linesTotal,
+                 static_cast<int>(WiFi.RSSI()),
+                 static_cast<unsigned int>(WiFi.channel()),
+                 static_cast<unsigned int>(ESP.getFreeHeap()),
+                 static_cast<unsigned int>(wifiDisconnectTotal));
 
   webServer.sendHeader("Cache-Control", "no-store");
   webServer.send(200, "application/json", payload);

@@ -28,6 +28,7 @@ extern MQTTClient myMqttClient;
 extern DiffTime MyLooptime;
 extern char time_buffer[];
 extern bool systemRestartRequest;
+extern uint16_t wifiDisconnectTotal;
 #if CFG_BOARD_ESP8266
 extern ESP8266WebServer webServer;
 #elif CFG_BOARD_ESP32
