@@ -81,8 +81,8 @@ void SENSOR_MAIN(void);
 void DISPLAY_MAIN(void);
 void MQTT_MAIN(void);
 void FS_MAIN(void);
-void HANDLE_HTTP_UPDATE(WiFiClient &wiFiClient);
-void CHECK_FOR_UPDATE(WiFiClient &wiFiClient);
+void HANDLE_HTTP_UPDATE(void);
+void CHECK_FOR_UPDATE(void);
 void NTP(void);
 /* callback */
 void handleWebServerClient(void);

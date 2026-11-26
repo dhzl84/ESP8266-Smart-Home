@@ -5,7 +5,7 @@ import calendar
 
 YEAR = '2026'
 MONTH = '11'
-PATCH = '10'
+PATCH = '11'
 
 VERSION = ".".join([YEAR,MONTH,PATCH])
 

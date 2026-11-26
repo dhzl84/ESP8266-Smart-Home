@@ -171,6 +171,16 @@ static void onStationDhcpTimeout(void) {
   wifiDhcpTimedOut = true;
 }
 
+/* The core keeps every registered handler in a std::list and, at the next event dispatch, erases the entries
+   whose canExpire() && unique() holds - i.e. every handler that has no reference outside that list. A bare
+   WiFi.onStationModeDisconnected(fn); is therefore dropped before it ever runs: the counter stays 0 and no
+   Drop line is printed, while the polled status still shows the WL_DISCONNECTED/WL_CONNECTED pairs. Keep one
+   handle per handler, and register only once: WIFI_CONNECT() runs again on every reconnect attempt, and each
+   call would otherwise push another pair of handlers into that list. */
+static WiFiEventHandler wifiDisconnectedHandler;
+static WiFiEventHandler wifiDhcpTimeoutHandler;
+static bool             wifiHandlersRegistered = false;
+
 /* the drop reason as the 802.11 name: the numbers are what the AP said, the names are what to search for */
 static const char* wifiDropReasonToString(uint8_t reason) {
   switch (reason) {
@@ -435,9 +445,14 @@ void WIFI_CONNECT(void) {
   WiFi.hostname(myConfig.name);
   WiFi.setAutoConnect(true);
   WiFi.setAutoReconnect(true);
-  /* record why the station loses the link; registered before begin() so the first attempt is covered too */
-  WiFi.onStationModeDisconnected(onStationDisconnected);
-  WiFi.onStationModeDHCPTimeout(onStationDhcpTimeout);
+  /* record why the station loses the link; registered before begin() so the first attempt is covered too.
+     The returned handle has to outlive this call (see wifiDisconnectedHandler) and the registration must
+     happen exactly once - WIFI_CONNECT() is called again on every reconnect attempt. */
+  if (wifiHandlersRegistered == false) {
+    wifiDisconnectedHandler = WiFi.onStationModeDisconnected(onStationDisconnected);
+    wifiDhcpTimeoutHandler  = WiFi.onStationModeDHCPTimeout(onStationDhcpTimeout);
+    wifiHandlersRegistered  = true;
+  }
   #elif CFG_BOARD_ESP32
   WiFi.setHostname(myConfig.name);
   WiFi.setSleep(false);
@@ -573,7 +588,7 @@ void loop() {
     SetNextTimeInterval(&loop_1000_ms_in_millis, loop_time_1000_ms);
     FS_MAIN();              /* check for new data and write FileSystem is necessary */
     if (wifiConnected == true) {
-      HANDLE_HTTP_UPDATE(myWiFiClient);   /* pull update from server if it was requested via MQTT or a new version was detected */
+      HANDLE_HTTP_UPDATE();   /* pull update from server if it was requested via MQTT or a new version was detected */
     }
   }
   /* call every 10 s */
@@ -596,7 +611,7 @@ void loop() {
   if (TimeReached(loop_5_minutes_in_millis)) {
     SetNextTimeInterval(&loop_5_minutes_in_millis, loop_time_5_minutes);
     if (wifiConnected == true) {
-      CHECK_FOR_UPDATE(myWiFiClient);    /* check for updates on update server */
+      CHECK_FOR_UPDATE();    /* check for updates on update server */
     }
   }
   /* call every 30 minutes */
@@ -1103,10 +1118,15 @@ void MQTT_MAIN(void) {
   }
 }
 
-void CHECK_FOR_UPDATE(WiFiClient &myWiFiClient) {
-  // WiFiClient wifiClient;
+void CHECK_FOR_UPDATE(void) {
+  /* This request must not run on the MQTT client's WiFiClient: HTTPClient::begin(client, url) clones that
+     client (same ClientContext) and HTTPClient::connect() calls WiFiClient::connect(host, port), whose first
+     statement stops the socket. Every check therefore aborted the live broker session and cost one MQTT
+     reconnect, one retained 'offline' will and a full discovery republish. A local client gives the request
+     its own socket; end() releases it again, the ESP8266 has only a handful of TCP PCBs. */
+  WiFiClient wifiClient;
   HTTPClient httpClient;
-  httpClient.begin(myWiFiClient, myConfig.binary_version_address);
+  httpClient.begin(wifiClient, myConfig.binary_version_address);
   int httpCode = httpClient.GET();
   if (httpCode == 200) {
     myConfig.available_firmware_version = httpClient.getString();
@@ -1125,6 +1145,7 @@ void CHECK_FOR_UPDATE(WiFiClient &myWiFiClient) {
     Serial.printf("  HTTP Code: %d - %s\n", httpCode, httpClient.errorToString(httpCode).c_str());
     #endif  /* CFG_DEBUG_UPDATE_CHECK */
   }
+  httpClient.end();  /* close the connection the request opened */
 
   if ( (myConfig.available_firmware_version != "none") \
     && (myConfig.available_firmware_version != "") \
@@ -1135,12 +1156,17 @@ void CHECK_FOR_UPDATE(WiFiClient &myWiFiClient) {
   }
 }
 
-void HANDLE_HTTP_UPDATE(WiFiClient &myWiFiClient) {
+void HANDLE_HTTP_UPDATE(void) {
   if (update_firmware == true) {
     DISPLAY_MAIN();
-    CHECK_FOR_UPDATE(myWiFiClient);
+    CHECK_FOR_UPDATE();
     update_firmware = false;
-    t_httpUpdate_return ret = myHttpUpdate.update(myWiFiClient, myConfig.binary_address, FW);
+    /* the image download gets its own client, never the MQTT session's socket, and the session is closed on
+       purpose before the transfer: a successful update reboots the device anyway, and a failed one is picked
+       up again by MQTT_MAIN() */
+    myMqttClient.disconnect();
+    WiFiClient client;
+    t_httpUpdate_return ret = myHttpUpdate.update(client, myConfig.binary_address, FW);
 
     #if LOG_LEVEL_BUILD >= 2
     logSetLevel(LOG_INFO);   /* level 2: the dumps, hidden at a runtime level below 2 */
