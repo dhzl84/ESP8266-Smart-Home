@@ -175,8 +175,8 @@ static void onStationDhcpTimeout(void) {
    whose canExpire() && unique() holds - i.e. every handler that has no reference outside that list. A bare
    WiFi.onStationModeDisconnected(fn); is therefore dropped before it ever runs: the counter stays 0 and no
    Drop line is printed, while the polled status still shows the WL_DISCONNECTED/WL_CONNECTED pairs. Keep one
-   handle per handler, and register only once: WIFI_CONNECT() runs again on every reconnect attempt, and each
-   call would otherwise push another pair of handlers into that list. */
+   handle per handler. WIFI_CONNECT() is called once, from setup(); the registration guard is defence in depth
+   in case that ever changes, not a fix for a re-run (the retries are the SDK's auto-reconnect). */
 static WiFiEventHandler wifiDisconnectedHandler;
 static WiFiEventHandler wifiDhcpTimeoutHandler;
 static bool             wifiHandlersRegistered = false;
@@ -446,8 +446,8 @@ void WIFI_CONNECT(void) {
   WiFi.setAutoConnect(true);
   WiFi.setAutoReconnect(true);
   /* record why the station loses the link; registered before begin() so the first attempt is covered too.
-     The returned handle has to outlive this call (see wifiDisconnectedHandler) and the registration must
-     happen exactly once - WIFI_CONNECT() is called again on every reconnect attempt. */
+     The returned handle has to outlive this call (see wifiDisconnectedHandler). The guard only makes sure a
+     second WIFI_CONNECT() could never register a duplicate handler pair; today it is called once, from setup(). */
   if (wifiHandlersRegistered == false) {
     wifiDisconnectedHandler = WiFi.onStationModeDisconnected(onStationDisconnected);
     wifiDhcpTimeoutHandler  = WiFi.onStationModeDHCPTimeout(onStationDhcpTimeout);
